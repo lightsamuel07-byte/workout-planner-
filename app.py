@@ -1,0 +1,114 @@
+#!/usr/bin/env python3
+"""
+Workout Planning App - Streamlit Web Interface
+Main entry point for the web application.
+"""
+
+import streamlit as st
+import os
+from datetime import datetime, timedelta
+
+# Configure the page
+st.set_page_config(
+    page_title="💪 Samuel's Workout Planner",
+    page_icon="💪",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Minimal CSS - Only Fix Critical Issues
+st.markdown("""
+    <style>
+    /* Fix text area overlapping labels */
+    .stTextArea label[data-testid="stWidgetLabel"] {
+        display: none;
+    }
+
+    /* Clean corners */
+    button, input, textarea, select {
+        border-radius: 0 !important;
+    }
+    </style>
+""", unsafe_allow_html=True)
+
+# Initialize session state
+if 'current_page' not in st.session_state:
+    st.session_state.current_page = 'dashboard'
+
+# Sidebar navigation
+with st.sidebar:
+    st.markdown("# 💪 Workout Planner")
+    st.markdown("*Powered by Claude AI*")
+    st.markdown("---")
+
+    if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard"):
+        st.session_state.current_page = 'dashboard'
+        st.rerun()
+
+    if st.button("🆕 Generate Plan", use_container_width=True, key="nav_generate"):
+        st.session_state.current_page = 'generate'
+        st.rerun()
+
+    if st.button("📋 View Plans", use_container_width=True, key="nav_plans"):
+        st.session_state.current_page = 'plans'
+        st.rerun()
+
+    if st.button("📈 Progress", use_container_width=True, key="nav_progress"):
+        st.session_state.current_page = 'progress'
+        st.rerun()
+
+    st.markdown("---")
+    st.markdown("### ⚙️ Quick Settings")
+    st.markdown(f"**User:** Samuel")
+    st.markdown(f"**Goal:** Strength + Aesthetics")
+
+    # 1RM Settings
+    st.markdown("---")
+    st.markdown("### 🏋️ Current 1RMs")
+
+    # Initialize session state for 1RMs if not exists
+    if 'back_squat_1rm' not in st.session_state:
+        st.session_state.back_squat_1rm = 129.0
+    if 'bench_press_1rm' not in st.session_state:
+        st.session_state.bench_press_1rm = 96.5
+    if 'deadlift_1rm' not in st.session_state:
+        st.session_state.deadlift_1rm = 168.0
+
+    st.session_state.back_squat_1rm = st.number_input(
+        "Back Squat (kg)",
+        value=st.session_state.back_squat_1rm,
+        step=0.5,
+        key="input_back_squat"
+    )
+    st.session_state.bench_press_1rm = st.number_input(
+        "Bench Press (kg)",
+        value=st.session_state.bench_press_1rm,
+        step=0.5,
+        key="input_bench_press"
+    )
+    st.session_state.deadlift_1rm = st.number_input(
+        "Deadlift (kg)",
+        value=st.session_state.deadlift_1rm,
+        step=0.5,
+        key="input_deadlift"
+    )
+
+    # Google Sheets link
+    st.markdown("---")
+    st.markdown("### 📊 Google Sheets")
+    sheets_url = "https://docs.google.com/spreadsheets/d/1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+    st.markdown(f"[Open Workout Log]({sheets_url})")
+
+# Main content area - route to different pages
+if st.session_state.current_page == 'dashboard':
+    from pages import dashboard
+    dashboard.show()
+elif st.session_state.current_page == 'generate':
+    from pages import generate_plan
+    generate_plan.show()
+elif st.session_state.current_page == 'plans':
+    from pages import view_plans
+    view_plans.show()
+elif st.session_state.current_page == 'progress':
+    from pages import progress
+    progress.show()

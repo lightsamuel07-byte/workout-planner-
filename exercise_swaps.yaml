@@ -1,0 +1,47 @@
+# Samuel's Exercise Preferences and Automatic Swaps
+
+# Hard swaps - always applied
+exercise_swaps:
+  "Seated Calf Raise": "Standing Calf Raise"
+  "Bulgarian Split Squat": "Heel-Elevated Goblet Squat"
+  "Split Squat": "Heel-Elevated Goblet Squat"
+  "Rear-Foot Elevated Split Squat": "Heel-Elevated Goblet Squat"
+  "Forward Split Squat": "Leg Extension"
+  "Ab Rollout": "Dead Bug or Pallof Press"
+  "Hamstring Slider": "Physioball Leg Curl"
+
+# Daily warm-up
+daily_warmup: "McGill Big-3"
+
+# Finisher defaults
+finisher_defaults:
+  incline_walk: "3.5 mph @ 6-7%"
+  thaw_intensity: "preserve next day performance"
+
+# Recovery protocols
+recovery:
+  sauna: "include after main days when appropriate"
+
+# Hard preferences
+hard_preferences:
+  - "No belt on pulls"
+  - "Standing calf raises only (never seated)"
+  - "No split squats (any variant)"
+  - "Carries on Tuesday by default; load = moderate to preserve Friday deadlift grip"
+  - "American spelling only"
+
+# Lateral raise guardrail
+lateral_raise_rule: "If Monday used DB laterals, avoid DB laterals on Tuesday (use rear-delt/low-trap variants instead)"
+
+# Triceps attachment rotation
+triceps_rules:
+  tuesday: "rope (elbow-friendly)"
+  friday: "straight-bar heavy"
+  saturday: "variety but no single-arm D-handle"
+
+# Biceps rules
+biceps_rules:
+  - "Never same-grip two days in a row"
+  - "Rotate grips: supinated → neutral → pronated"
+  - "Keep ~48h before another long-length stimulus (e.g., incline curls)"
+  - "Cap biceps hard sets at 10-12 per rolling 4 days"

@@ -1,0 +1,147 @@
+# Workout Planning Tool Configuration
+# Version: 1.0
+# Last Updated: 2026-01-24
+
+# Google Sheets Configuration
+google_sheets:
+  spreadsheet_id: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+  sheet_name: "(Weekly Plan) 1/18/2026"  # Most recent sheet for reading history
+  credentials_file: "credentials.json"
+
+# Claude API Configuration
+claude:
+  api_key_env: "ANTHROPIC_API_KEY"  # Will read from environment variable
+  model: "claude-sonnet-4-5-20250929"
+  max_tokens: 8000
+
+# Output Configuration
+output:
+  folder: "output"
+  format: "markdown"  # Options: markdown, text, json
+
+# ============================================================================
+# ATHLETE PROFILE
+# ============================================================================
+athlete:
+  name: "Samuel"
+  units: "metric"
+  spelling: "American"
+
+# ============================================================================
+# GOALS & FOCUS AREAS
+# ============================================================================
+goals:
+  primary: "strength + aesthetics"
+  focus_areas:
+    - "arms"
+    - "medial delts"
+    - "upper chest"
+    - "back detail"
+  training_philosophy: "Maximize aesthetics without ever interfering with Mon/Wed/Fri Fort program"
+  approach: "Progressive overload every session"
+
+# ============================================================================
+# REFERENCE 1RMs
+# ============================================================================
+reference_1rms:
+  back_squat: 129  # kg
+  bench_press: 94  # kg (chest press)
+  deadlift: 168    # kg
+
+# ============================================================================
+# WEEKLY STRUCTURE
+# ============================================================================
+weekly_structure:
+  main_days:
+    - "Monday"
+    - "Wednesday"
+    - "Friday"
+  main_days_note: "Run Fort workouts exactly as written for that cycle"
+
+  supplemental_days:
+    - "Tuesday"
+    - "Thursday"
+    - "Saturday"
+  supplemental_days_note: "Aesthetics + incline walking; must NOT compromise next main day"
+
+  daily_warmup: "McGill Big-3 at top of every day"
+
+  finishers:
+    incline_walk: true
+    thaw_intensity_note: "THAW intensity must preserve next day performance"
+
+  sauna: "Include after all days when appropriate"
+
+# ============================================================================
+# HARD PREFERENCES & RULES
+# ============================================================================
+hard_rules:
+  equipment:
+    - "No belt on pulls"
+    - "Standing calf raises only (NEVER seated)"
+    - "No split squats (any variant)"
+
+  biceps:
+    - "Never same-grip two days in a row"
+    - "Rotate grips: supinated → neutral → pronated"
+    - "Keep ~48h before another long-length stimulus (e.g., incline curls)"
+    - "Cap biceps hard sets at 10-12 per rolling 4 days"
+
+  spelling: "American spelling only"
+
+# ============================================================================
+# PROGRESSION RULES
+# ============================================================================
+progression:
+  barbell_main_lifts:
+    rule: "If last top set ≤ RPE 9 (≥1 RIR), add ~2.5-5 kg next time or add 1-2 reps within range"
+    rounding: "Nearest 0.5 kg"
+
+  dumbbells:
+    rule: "Move up one DB step after hitting top of rep range on ≥2 sets clean; otherwise add reps"
+    rounding: "Nearest available step"
+
+  cable_machine:
+    rule: "When top of range is clean with prescribed tempo/pauses, add one plate next session; otherwise add reps"
+
+# ============================================================================
+# SWAP LIBRARY (Intent-Matched Alternatives)
+# ============================================================================
+swap_library:
+  ab_rollout_cable_bar:
+    - "RKC plank"
+    - "Hollow-body hold"
+    - "Stability-ball rollout"
+    - "Cable ab pulldown (lat bar)"
+
+  slider_hamstring_curl:
+    - "Swiss-ball leg curl"
+    - "Dual-DB towel ham slides"
+    - "Machine leg curl"
+
+  split_squat_any:
+    - "Heel-elevated goblet squat"
+    - "Leg extension"
+    - "Light hack squat"
+    - "Step-down (non-split)"
+
+  carries_if_grip_fatigue:
+    note: "Keep Tuesday carries at RPE 6-7, shorter distances (to preserve Friday deadlifts)"
+
+  lateral_raises_conflict:
+    - "Reverse pec deck"
+    - "Cable Y-raise (low→high)"
+    - "Rear-delt-biased face pulls"
+
+# ============================================================================
+# SANITY CHECKS (Enforce Before Finalizing)
+# ============================================================================
+sanity_checks:
+  - "No same-grip biceps on consecutive days"
+  - "Biceps hard sets ≤ 10-12 per rolling 4 days"
+  - "Standing calf raises only"
+  - "Triceps attachments varied across Tue/Fri/Sat; no single-arm D-handle on Sat"
+  - "No split squats anywhere"
+  - "Carries placed Tuesday at moderate load to preserve Friday grip"
+  - "THAW intensity won't trash the next main day"
+  - "Sauna included after main days when appropriate"

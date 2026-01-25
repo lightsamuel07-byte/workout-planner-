@@ -1,0 +1,30 @@
+# Environment variables
+.env
+
+# Google credentials
+credentials.json
+token.json
+
+# Streamlit secrets (local only)
+.streamlit/secrets.toml
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+
+# Output files
+output/*.md
+output/archive/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store

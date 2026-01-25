@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(tree:*)",
+      "Bash(chmod:*)",
+      "Bash(python3:*)",
+      "Bash(ls:*)",
+      "Bash(export ANTHROPIC_API_KEY=\"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\")",
+      "Bash(pip3 install:*)",
+      "Bash(export PATH=\"/Users/samuellight/Library/Python/3.13/bin:$PATH\")",
+      "Bash(timeout 5 streamlit run:*)",
+      "Bash(streamlit run:*)",
+      "Bash(pkill:*)",
+      "Bash(curl:*)",
+      "Bash(lsof:*)"
+    ]
+  }
+}
