@@ -125,6 +125,27 @@ def show():
 
     st.markdown("<br>", unsafe_allow_html=True)
 
+    # Initialize analytics ONCE for all sections to use
+    analytics = None
+    try:
+        import yaml
+        from src.sheets_reader import SheetsReader
+        from src.analytics import WorkoutAnalytics
+
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+
+        reader = SheetsReader(
+            credentials_file=config['google_sheets']['credentials_file'],
+            spreadsheet_id=config['google_sheets']['spreadsheet_id']
+        )
+        reader.authenticate()
+
+        analytics = WorkoutAnalytics(reader)
+        analytics.load_historical_data(weeks_back=4)
+    except Exception as e:
+        pass  # analytics will remain None, use fallback data
+
     # Stats and Quick Actions Row
     col1, col2, col3 = st.columns([2, 2, 3])
 
@@ -133,32 +154,19 @@ def show():
         st.metric("Total Exercises", plan_summary.get('total_exercises', 0))
 
         # Get real completion data
-        try:
-            import yaml
-            from src.sheets_reader import SheetsReader
-            from src.analytics import WorkoutAnalytics
+        if analytics:
+            try:
+                completion = analytics.get_workout_completion_rate(weeks=1)
+                volume_data = analytics.get_weekly_volume(weeks=1)
 
-            with open('config.yaml', 'r') as f:
-                config = yaml.safe_load(f)
+                current_week_volume = list(volume_data.values())[-1] if volume_data else 0
 
-            reader = SheetsReader(
-                credentials_file=config['google_sheets']['credentials_file'],
-                spreadsheet_id=config['google_sheets']['spreadsheet_id']
-            )
-            reader.authenticate()
-
-            analytics = WorkoutAnalytics(reader)
-            analytics.load_historical_data(weeks_back=4)
-
-            completion = analytics.get_workout_completion_rate(weeks=1)
-            volume_data = analytics.get_weekly_volume(weeks=1)
-
-            current_week_volume = list(volume_data.values())[-1] if volume_data else 0
-
-            st.metric("Workouts Complete", f"{completion['completed']} / {completion['total']}")
-            st.metric("Weekly Volume", f"{int(current_week_volume):,} kg")
-
-        except Exception as e:
+                st.metric("Workouts Complete", f"{completion['completed']} / {completion['total']}")
+                st.metric("Weekly Volume", f"{int(current_week_volume):,} kg")
+            except:
+                st.metric("Workouts Complete", "1 / 6")
+                st.metric("Weekly Volume", "42,500 kg")
+        else:
             # Fallback to mock data if sheets unavailable
             st.metric("Workouts Complete", "1 / 6")
             st.metric("Weekly Volume", "42,500 kg")
@@ -167,27 +175,32 @@ def show():
         st.markdown("### 🔥 Progress")
 
         # Get real lift progression data
-        try:
-            squat_prog = analytics.get_main_lift_progression('squat', weeks=8)
-            bench_prog = analytics.get_main_lift_progression('bench', weeks=8)
-            deadlift_prog = analytics.get_main_lift_progression('deadlift', weeks=8)
+        if analytics:
+            try:
+                squat_prog = analytics.get_main_lift_progression('squat', weeks=8)
+                bench_prog = analytics.get_main_lift_progression('bench', weeks=8)
+                deadlift_prog = analytics.get_main_lift_progression('deadlift', weeks=8)
 
-            if squat_prog:
-                st.metric("Back Squat", f"{squat_prog['current_load']} kg", f"+{squat_prog['progression_kg']} kg")
-            else:
+                if squat_prog:
+                    st.metric("Back Squat", f"{squat_prog['current_load']} kg", f"+{squat_prog['progression_kg']} kg")
+                else:
+                    st.metric("Back Squat", "129 kg", "+2.5 kg")
+
+                if bench_prog:
+                    st.metric("Bench Press", f"{bench_prog['current_load']} kg", f"+{bench_prog['progression_kg']} kg")
+                else:
+                    st.metric("Bench Press", "94 kg", "+1.5 kg")
+
+                if deadlift_prog:
+                    st.metric("Deadlift", f"{deadlift_prog['current_load']} kg", f"+{deadlift_prog['progression_kg']} kg")
+                else:
+                    st.metric("Deadlift", "168 kg", "+3.0 kg")
+            except:
+                # Fallback to mock data
                 st.metric("Back Squat", "129 kg", "+2.5 kg")
-
-            if bench_prog:
-                st.metric("Bench Press", f"{bench_prog['current_load']} kg", f"+{bench_prog['progression_kg']} kg")
-            else:
                 st.metric("Bench Press", "94 kg", "+1.5 kg")
-
-            if deadlift_prog:
-                st.metric("Deadlift", f"{deadlift_prog['current_load']} kg", f"+{deadlift_prog['progression_kg']} kg")
-            else:
                 st.metric("Deadlift", "168 kg", "+3.0 kg")
-
-        except:
+        else:
             # Fallback to mock data
             st.metric("Back Squat", "129 kg", "+2.5 kg")
             st.metric("Bench Press", "94 kg", "+1.5 kg")
@@ -221,9 +234,8 @@ def show():
     with col1:
         st.markdown("#### Last Workout")
 
-        try:
-            # Get most recent logged workout
-            if analytics.historical_data:
+        if analytics and analytics.historical_data:
+            try:
                 recent_workout = analytics.historical_data[-1]
                 workout_date = recent_workout.get('date', 'Unknown')
                 exercise_count = len(recent_workout.get('exercises', []))
@@ -231,11 +243,10 @@ def show():
                 st.write(f"**{workout_date}**")
                 st.write(f"✅ {exercise_count} exercises")
                 st.write("📊 Data in Google Sheets")
-            else:
-                st.write("No workout history yet")
-        except:
-            st.write("**Saturday, Jan 18** - Aesthetics + Upper")
-            st.write("✅ 10 exercises completed")
+            except Exception as e:
+                st.write("No workout history available")
+        else:
+            st.write("No workout history yet")
 
     with col2:
         st.markdown("#### Latest Plan")
