@@ -22,7 +22,13 @@ def check_password():
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        if st.session_state["password"] == st.secrets.get("APP_PASSWORD", "workout2026"):
+        # Try to get password from secrets, fall back to default for local dev
+        try:
+            correct_password = st.secrets.get("APP_PASSWORD", "workout2026")
+        except:
+            correct_password = "workout2026"
+
+        if st.session_state["password"] == correct_password:
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Don't store password
         else:
@@ -98,6 +104,14 @@ with st.sidebar:
         st.session_state.current_page = 'progress'
         st.rerun()
 
+    if st.button("📅 Weekly Review", use_container_width=True, key="nav_weekly_review"):
+        st.session_state.current_page = 'weekly_review'
+        st.rerun()
+
+    if st.button("📋 Exercise History", use_container_width=True, key="nav_exercise_history"):
+        st.session_state.current_page = 'exercise_history'
+        st.rerun()
+
     st.markdown("---")
     st.markdown("### ⚙️ Quick Settings")
     st.markdown(f"**User:** Samuel")
@@ -153,3 +167,9 @@ elif st.session_state.current_page == 'plans':
 elif st.session_state.current_page == 'progress':
     from pages import progress
     progress.show()
+elif st.session_state.current_page == 'weekly_review':
+    from pages import weekly_review
+    weekly_review.show()
+elif st.session_state.current_page == 'exercise_history':
+    from pages import exercise_history
+    exercise_history.show()

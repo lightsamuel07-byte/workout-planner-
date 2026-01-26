@@ -381,6 +381,53 @@ class SheetsReader:
 
         return supplemental_data
 
+    def get_all_weekly_plan_sheets(self):
+        """
+        Get ALL weekly plan sheet names sorted by date (not just most recent).
+
+        Returns:
+            List of sheet names in chronological order
+        """
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+
+        try:
+            # Get all sheets in the spreadsheet
+            sheet_metadata = self.service.spreadsheets().get(
+                spreadsheetId=self.spreadsheet_id
+            ).execute()
+
+            sheets = sheet_metadata.get('sheets', [])
+            sheet_names = [sheet['properties']['title'] for sheet in sheets]
+
+            # Filter for weekly plan sheets
+            import re
+            from datetime import datetime
+
+            weekly_plan_sheets = []
+            pattern1 = r'Weekly Plan \((\d+)/(\d+)/(\d+)\)'
+            pattern2 = r'\(Weekly Plan\)\s*(\d+)/(\d+)/(\d+)'
+
+            for name in sheet_names:
+                match = re.match(pattern1, name) or re.match(pattern2, name)
+                if match:
+                    month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+                    try:
+                        date = datetime(year, month, day)
+                        weekly_plan_sheets.append((name, date))
+                    except ValueError:
+                        continue
+
+            # Sort by date
+            weekly_plan_sheets.sort(key=lambda x: x[1])
+
+            # Return just the names
+            return [name for name, date in weekly_plan_sheets]
+
+        except HttpError as err:
+            print(f"Error getting weekly plan sheets: {err}")
+            return []
+
     def format_supplemental_for_ai(self, supplemental_data):
         """
         Format prior week's supplemental workouts for AI prompt.

@@ -11,51 +11,76 @@ def show():
     st.markdown('<div class="main-header">📈 Progress Dashboard</div>', unsafe_allow_html=True)
     st.markdown('<div class="sub-header">Track your strength gains and training progress</div>', unsafe_allow_html=True)
 
-    # Mock data for demonstration
     st.markdown("### 📊 Main Lifts Progress (Last 8 Weeks)")
 
-    # Create sample data using lists of tuples to avoid numpy import
     try:
+        import yaml
         import pandas as pd
+        from src.sheets_reader import SheetsReader
+        from src.analytics import WorkoutAnalytics
 
-        chart_data = pd.DataFrame({
-            'Week': list(range(1, 9)),
-            'Back Squat': [122, 124.5, 125, 127, 127, 129, 129, 131.5],
-            'Bench Press': [90, 91, 92, 92.5, 93, 93.5, 94, 96.5],
-            'Deadlift': [160, 162, 163, 165, 165, 166, 168, 170.5]
-        })
+        # Load config and authenticate
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
 
-        st.line_chart(chart_data.set_index('Week'))
-    except ImportError:
-        # Fallback if pandas/numpy has issues
-        st.info("Charts temporarily unavailable. Progress metrics shown below.")
-
-    # Progress metrics
-    col1, col2, col3 = st.columns(3)
-
-    with col1:
-        st.metric(
-            "Back Squat",
-            "131.5 kg",
-            "+9.5 kg (7.8%)",
-            delta_color="normal"
+        reader = SheetsReader(
+            credentials_file=config['google_sheets']['credentials_file'],
+            spreadsheet_id=config['google_sheets']['spreadsheet_id']
         )
+        reader.authenticate()
 
-    with col2:
-        st.metric(
-            "Bench Press",
-            "96.5 kg",
-            "+6.5 kg (7.2%)",
-            delta_color="normal"
-        )
+        # Load analytics
+        analytics = WorkoutAnalytics(reader)
+        analytics.load_historical_data(weeks_back=8)
 
-    with col3:
-        st.metric(
-            "Deadlift",
-            "170.5 kg",
-            "+10.5 kg (6.6%)",
-            delta_color="normal"
-        )
+        # Get progression data
+        squat_prog = analytics.get_main_lift_progression('squat', weeks=8)
+        bench_prog = analytics.get_main_lift_progression('bench', weeks=8)
+        deadlift_prog = analytics.get_main_lift_progression('deadlift', weeks=8)
+
+        # Build chart data
+        if squat_prog and bench_prog and deadlift_prog:
+            # Convert weekly data to chart format
+            weeks = sorted(squat_prog['weekly_data'].keys())
+
+            chart_data = pd.DataFrame({
+                'Week': list(range(1, len(weeks) + 1)),
+                'Back Squat': [squat_prog['weekly_data'][w] for w in weeks],
+                'Bench Press': [bench_prog['weekly_data'][w] for w in weeks],
+                'Deadlift': [deadlift_prog['weekly_data'][w] for w in weeks]
+            })
+
+            st.line_chart(chart_data.set_index('Week'))
+
+            # Show current metrics
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    "Back Squat",
+                    f"{squat_prog['current_load']} kg",
+                    f"+{squat_prog['progression_kg']} kg ({squat_prog['progression_pct']}%)"
+                )
+
+            with col2:
+                st.metric(
+                    "Bench Press",
+                    f"{bench_prog['current_load']} kg",
+                    f"+{bench_prog['progression_kg']} kg ({bench_prog['progression_pct']}%)"
+                )
+
+            with col3:
+                st.metric(
+                    "Deadlift",
+                    f"{deadlift_prog['current_load']} kg",
+                    f"+{deadlift_prog['progression_kg']} kg ({deadlift_prog['progression_pct']}%)"
+                )
+        else:
+            st.info("Not enough workout history yet. Keep logging workouts to see trends!")
+
+    except Exception as e:
+        st.error(f"Unable to load progress data: {e}")
+        st.info("Charts temporarily unavailable. Continue logging workouts in Google Sheets.")
 
     st.markdown("---")
 
@@ -63,24 +88,36 @@ def show():
     st.markdown("### 💪 Weekly Volume Tracking")
 
     try:
-        import pandas as pd
+        volume_data = analytics.get_weekly_volume(weeks=8)
 
-        volume_data = pd.DataFrame({
-            'Week': list(range(1, 9)),
-            'Total Volume (kg)': [32000, 35000, 37500, 38000, 40000, 41500, 42000, 44200]
-        })
+        if volume_data:
+            weeks = sorted(volume_data.keys())
 
-        st.bar_chart(volume_data.set_index('Week'))
-    except ImportError:
-        st.info("Volume chart temporarily unavailable.")
+            volume_df = pd.DataFrame({
+                'Week': list(range(1, len(weeks) + 1)),
+                'Total Volume (kg)': [volume_data[w] for w in weeks]
+            })
 
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        st.metric("Current Week", "44,200 kg")
-    with col2:
-        st.metric("Average", "41,350 kg")
-    with col3:
-        st.metric("Peak Week", "46,800 kg")
+            st.bar_chart(volume_df.set_index('Week'))
+
+            # Calculate stats
+            volumes = list(volume_data.values())
+            current_volume = volumes[-1]
+            avg_volume = sum(volumes) / len(volumes)
+            peak_volume = max(volumes)
+
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                st.metric("Current Week", f"{int(current_volume):,} kg")
+            with col2:
+                st.metric("Average", f"{int(avg_volume):,} kg")
+            with col3:
+                st.metric("Peak Week", f"{int(peak_volume):,} kg")
+        else:
+            st.info("Not enough workout history to display volume trends yet.")
+
+    except Exception as e:
+        st.error(f"Unable to load volume data: {e}")
 
     st.markdown("---")
 
@@ -90,22 +127,44 @@ def show():
     col1, col2 = st.columns(2)
 
     with col1:
-        st.markdown("""
-        **Volume Increases (Last 8 Weeks)**
-        - 💪 Arms: +18% volume
-        - 🔥 Medial Delts: +15% volume
-        - 📈 Upper Chest: +12% volume
-        - 💪 Back Detail: +10% volume
-        """)
+        st.markdown("**Volume Increases (Last 8 Weeks)**")
+
+        try:
+            focus_groups = ['arms', 'shoulders', 'chest', 'back']
+
+            for group in focus_groups:
+                group_volume = analytics.get_muscle_group_volume(group, weeks=8)
+
+                if group_volume and len(group_volume) >= 2:
+                    volumes = list(group_volume.values())
+                    first_week = volumes[0]
+                    last_week = volumes[-1]
+                    pct_increase = ((last_week - first_week) / first_week) * 100
+
+                    emoji = {'arms': '💪', 'shoulders': '🔥', 'chest': '📈', 'back': '💪'}.get(group, '✅')
+                    st.write(f"{emoji} {group.title()}: +{pct_increase:.0f}% volume")
+                else:
+                    st.write(f"✅ {group.title()}: insufficient data")
+
+        except Exception as e:
+            st.write("Unable to calculate muscle group progress")
 
     with col2:
-        st.markdown("""
-        **Bicep Grip Rotation Tracking**
-        - ✅ 24-week consistency streak
-        - ✅ Perfect rotation compliance
-        - ✅ Volume within 10-12 set target
-        - ✅ 48hr recovery between long-length stimulus
-        """)
+        st.markdown("**Bicep Grip Rotation Tracking**")
+
+        try:
+            bicep_compliance = analytics.get_bicep_grip_rotation_compliance(weeks=4)
+
+            if bicep_compliance['compliant']:
+                st.write("✅ Perfect rotation compliance")
+                st.write(f"✅ {bicep_compliance['total_bicep_sessions']} sessions tracked")
+            else:
+                st.write(f"⚠️ {len(bicep_compliance['violations'])} violations")
+                for violation in bicep_compliance['violations']:
+                    st.write(f"- {violation}")
+
+        except Exception as e:
+            st.write("Unable to check grip rotation compliance")
 
     st.markdown("---")
 
