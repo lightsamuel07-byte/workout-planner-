@@ -35,26 +35,29 @@ Replace `YOUR_USERNAME` with your actual GitHub username.
 
 ## 🔐 Step 3: Prepare Your Secrets
 
-Copy the content below and save it in a text file. You'll paste this into Streamlit Cloud in Step 5.
+You'll need to create a secrets.toml file with your actual credentials. The file should follow this format:
 
-**SECRETS.TOML CONTENT:**
+**SECRETS.TOML FORMAT:**
 
 ```toml
-# Claude API Key
-ANTHROPIC_API_KEY = "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"
+# Claude API Key (get from https://console.anthropic.com/settings/keys)
+ANTHROPIC_API_KEY = "your-api-key-here"
 
-# Google Sheets OAuth Credentials
+# Google Sheets OAuth Credentials (from your credentials.json file)
 [gcp_oauth]
-client_id = "965468927157-epq5bqjob6g3ar2alj6ffpgkikphj98e.apps.googleusercontent.com"
-project_id = "sams-workout-app"
+client_id = "your-client-id"
+project_id = "your-project-id"
 auth_uri = "https://accounts.google.com/o/oauth2/auth"
 token_uri = "https://oauth2.googleapis.com/token"
 auth_provider_x509_cert_url = "https://www.googleapis.com/oauth2/v1/certs"
-client_secret = "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"
+client_secret = "your-client-secret"
 redirect_uris = ["http://localhost"]
 ```
 
-⚠️ **IMPORTANT**: Keep this content safe and private! Never share it publicly.
+⚠️ **IMPORTANT**:
+- Replace all "your-xxx-here" placeholders with your actual credentials
+- Get your credentials from your local `.env` and `credentials.json` files
+- Never commit this content to GitHub!
 
 ## 🌐 Step 4: Deploy to Streamlit Cloud
 
