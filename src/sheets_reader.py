@@ -41,30 +41,17 @@ class SheetsReader:
         """Authenticate with Google Sheets API."""
         creds = None
 
-        # Check if running in Streamlit Cloud with secrets
-        if HAS_STREAMLIT and hasattr(st, 'secrets') and 'gcp_oauth' in st.secrets:
-            # Use Streamlit secrets (deployed environment)
-            from google.oauth2.credentials import Credentials as OAuth2Credentials
+        # Check if running in Streamlit Cloud with service account
+        if HAS_STREAMLIT and hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+            # Use service account (Streamlit Cloud)
+            from google.oauth2 import service_account
 
-            secrets_dict = dict(st.secrets['gcp_oauth'])
-            secrets_dict['installed'] = {
-                'client_id': secrets_dict.pop('client_id'),
-                'project_id': secrets_dict.pop('project_id'),
-                'auth_uri': secrets_dict.pop('auth_uri'),
-                'token_uri': secrets_dict.pop('token_uri'),
-                'auth_provider_x509_cert_url': secrets_dict.pop('auth_provider_x509_cert_url'),
-                'client_secret': secrets_dict.pop('client_secret'),
-                'redirect_uris': secrets_dict.pop('redirect_uris')
-            }
-
-            # Check for saved token in secrets
-            if 'gcp_token' in st.secrets:
-                creds = Credentials.from_authorized_user_info(dict(st.secrets['gcp_token']), SCOPES)
-            else:
-                # First time - need to authenticate
-                flow = InstalledAppFlow.from_client_config(secrets_dict, SCOPES)
-                creds = flow.run_local_server(port=0)
-                # Note: Token should be saved to secrets.toml manually after first auth
+            credentials_dict = dict(st.secrets['gcp_service_account'])
+            creds = service_account.Credentials.from_service_account_info(
+                credentials_dict,
+                scopes=SCOPES
+            )
+            print("✓ Authenticated with service account")
         else:
             # Use local credentials.json file
             # The file token.json stores the user's access and refresh tokens
