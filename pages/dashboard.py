@@ -35,6 +35,28 @@ def get_latest_plan():
     md_files.sort(reverse=True)
     return md_files[0]
 
+def get_latest_sheet_plan():
+    """Get the most recent workout plan from Google Sheets"""
+    try:
+        import yaml
+        from src.sheets_reader import SheetsReader
+
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+
+        reader = SheetsReader(
+            credentials_file=config['google_sheets']['credentials_file'],
+            spreadsheet_id=config['google_sheets']['spreadsheet_id']
+        )
+        reader.authenticate()
+
+        all_sheets = reader.get_all_weekly_plan_sheets()
+        if all_sheets:
+            return all_sheets[-1]  # Return most recent sheet name
+        return None
+    except:
+        return None
+
 def parse_plan_summary(plan_path):
     """Parse the plan file to extract a quick summary"""
     if not plan_path or not os.path.exists(plan_path):
@@ -72,11 +94,12 @@ def show():
 
     st.markdown(f'<div class="sub-header">Week of {week_start} - {week_end}</div>', unsafe_allow_html=True)
 
-    # Get latest plan
+    # Get latest plan (try markdown file first, then Google Sheets)
     latest_plan = get_latest_plan()
+    latest_sheet_plan = get_latest_sheet_plan()
     plan_summary = parse_plan_summary(latest_plan)
 
-    if not latest_plan:
+    if not latest_plan and not latest_sheet_plan:
         st.warning("⚠️ No workout plan found. Generate your first plan to get started!")
         if st.button("🚀 Generate Plan Now", type="primary"):
             st.session_state.current_page = 'generate'
@@ -256,6 +279,15 @@ def show():
             st.write(f"**Generated:** {plan_date[:8]}")
             st.write(f"📄 {plan_summary.get('total_exercises', 0)} exercises")
             st.write("✅ Saved to Google Sheets")
+            if st.button("View Plan →"):
+                st.session_state.current_page = 'plans'
+                st.rerun()
+        elif latest_sheet_plan:
+            # Show plan from Google Sheets if no markdown file
+            plan_date = latest_sheet_plan.replace('Weekly Plan (', '').replace('(Weekly Plan) ', '').replace(')', '')
+            st.write(f"**Sheet:** {plan_date}")
+            st.write(f"📊 Plan in Google Sheets")
+            st.write("✅ Ready to log workouts")
             if st.button("View Plan →"):
                 st.session_state.current_page = 'plans'
                 st.rerun()
