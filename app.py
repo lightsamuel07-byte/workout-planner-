@@ -14,6 +14,7 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import pages using importlib for better Streamlit Cloud compatibility
+# Force reload on every run to pick up code changes
 try:
     dashboard = importlib.import_module('pages.dashboard')
     generate_plan = importlib.import_module('pages.generate_plan')
@@ -22,6 +23,15 @@ try:
     weekly_review = importlib.import_module('pages.weekly_review')
     exercise_history = importlib.import_module('pages.exercise_history')
     workout_logger = importlib.import_module('pages.workout_logger')
+
+    # Reload modules to pick up code changes (fixes Streamlit Cloud caching)
+    importlib.reload(dashboard)
+    importlib.reload(generate_plan)
+    importlib.reload(view_plans)
+    importlib.reload(progress)
+    importlib.reload(weekly_review)
+    importlib.reload(exercise_history)
+    importlib.reload(workout_logger)
 except ImportError as e:
     st.error(f"Critical error loading pages: {e}")
     st.code(f"Python path: {sys.path}")
