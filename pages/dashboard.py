@@ -54,7 +54,12 @@ def get_latest_sheet_plan():
         if all_sheets:
             return all_sheets[-1]  # Return most recent sheet name
         return None
-    except:
+    except Exception as e:
+        # Log the actual error for debugging
+        import streamlit as st
+        st.error(f"Error loading Google Sheets plan: {e}")
+        import traceback
+        st.code(traceback.format_exc())
         return None
 
 def parse_plan_summary(plan_path):
@@ -100,6 +105,10 @@ def show():
     plan_summary = parse_plan_summary(latest_plan)
 
     if not latest_plan and not latest_sheet_plan:
+        # Debug: Show what we tried to find
+        st.write(f"Debug: latest_plan = {latest_plan}")
+        st.write(f"Debug: latest_sheet_plan = {latest_sheet_plan}")
+
         st.warning("⚠️ No workout plan found. Generate your first plan to get started!")
         if st.button("🚀 Generate Plan Now", type="primary"):
             st.session_state.current_page = 'generate'
