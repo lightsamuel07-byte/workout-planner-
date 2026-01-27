@@ -45,11 +45,11 @@ def show():
         current_sheet = all_sheets[-1]
         reader.sheet_name = current_sheet
 
-        # Debug info (can be removed later)
-        with st.expander("🔧 Debug Info"):
-            st.write(f"Found {len(all_sheets)} weekly plan sheets")
-            st.write(f"Current sheet: `{current_sheet}`")
-            st.write(f"All sheets: {all_sheets}")
+        # Debug info - displayed prominently to diagnose cloud issues
+        st.info(f"🔧 **Debug Info:** Found {len(all_sheets)} weekly plan sheets")
+        st.write(f"**Current sheet:** `{current_sheet}`")
+        st.write(f"**All sheets:** {all_sheets}")
+        st.markdown("---")
 
         # Read the current week's plan
         week_data = reader.read_workout_history()
