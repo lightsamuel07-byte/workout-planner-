@@ -16,6 +16,9 @@ sys.path.insert(0, os.path.dirname(__file__))
 # Import pages using importlib for better Streamlit Cloud compatibility
 # Force reload on every run to pick up code changes
 try:
+    # Import pages package first to ensure it's in sys.modules
+    import pages
+
     dashboard = importlib.import_module('pages.dashboard')
     generate_plan = importlib.import_module('pages.generate_plan')
     view_plans = importlib.import_module('pages.view_plans')
