@@ -45,11 +45,18 @@ def show():
         current_sheet = all_sheets[-1]
         reader.sheet_name = current_sheet
 
+        # Debug info (can be removed later)
+        with st.expander("🔧 Debug Info"):
+            st.write(f"Found {len(all_sheets)} weekly plan sheets")
+            st.write(f"Current sheet: `{current_sheet}`")
+            st.write(f"All sheets: {all_sheets}")
+
         # Read the current week's plan
         week_data = reader.read_workout_history()
 
         if not week_data:
-            st.warning("No workout data found in the current plan.")
+            st.warning(f"No workout data found in sheet: `{current_sheet}`")
+            st.info("This usually means the sheet exists but has no workout data, or the sheet format is different than expected.")
             return
 
         # Find today's workout (case-insensitive)
