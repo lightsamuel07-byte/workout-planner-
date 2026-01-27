@@ -95,6 +95,7 @@ def show():
 
     # Header
     st.markdown('<div class="main-header">📅 Weekly Dashboard</div>', unsafe_allow_html=True)
+    st.caption("🔧 Debug: Dashboard version 2026-01-27-18:07 with @st.cache_resource fix deployed")
 
     # Get current week
     week_dates = get_current_week_dates()
