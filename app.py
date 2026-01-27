@@ -7,17 +7,26 @@ Main entry point for the web application.
 import streamlit as st
 import os
 import sys
+import importlib
 from datetime import datetime, timedelta
 
 # Ensure pages directory is in Python path
 sys.path.insert(0, os.path.dirname(__file__))
 
-# Import all pages at startup to avoid lazy loading issues
+# Import pages using importlib for better Streamlit Cloud compatibility
 try:
-    from pages import dashboard, generate_plan, view_plans, progress
-    from pages import weekly_review, exercise_history, workout_logger, diagnostics
+    dashboard = importlib.import_module('pages.dashboard')
+    generate_plan = importlib.import_module('pages.generate_plan')
+    view_plans = importlib.import_module('pages.view_plans')
+    progress = importlib.import_module('pages.progress')
+    weekly_review = importlib.import_module('pages.weekly_review')
+    exercise_history = importlib.import_module('pages.exercise_history')
+    workout_logger = importlib.import_module('pages.workout_logger')
 except ImportError as e:
-    st.error(f"Failed to import pages: {e}")
+    st.error(f"Critical error loading pages: {e}")
+    st.code(f"Python path: {sys.path}")
+    st.code(f"Current directory: {os.getcwd()}")
+    st.code(f"Directory contents: {os.listdir(os.getcwd())}")
     st.stop()
 
 # Configure the page
@@ -128,10 +137,6 @@ with st.sidebar:
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
-    if st.button("🔧 Diagnostics", use_container_width=True, key="nav_diagnostics"):
-        st.session_state.current_page = 'diagnostics'
-        st.rerun()
-
     st.markdown("---")
     st.markdown("### ⚙️ Quick Settings")
     st.markdown(f"**User:** Samuel")
@@ -189,5 +194,3 @@ elif st.session_state.current_page == 'exercise_history':
     exercise_history.show()
 elif st.session_state.current_page == 'log_workout':
     workout_logger.show()
-elif st.session_state.current_page == 'diagnostics':
-    diagnostics.show()
