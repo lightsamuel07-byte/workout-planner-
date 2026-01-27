@@ -6,11 +6,19 @@ Main entry point for the web application.
 
 import streamlit as st
 import os
+import sys
 from datetime import datetime, timedelta
 
+# Ensure pages directory is in Python path
+sys.path.insert(0, os.path.dirname(__file__))
+
 # Import all pages at startup to avoid lazy loading issues
-from pages import dashboard, generate_plan, view_plans, progress
-from pages import weekly_review, exercise_history, workout_logger, diagnostics
+try:
+    from pages import dashboard, generate_plan, view_plans, progress
+    from pages import weekly_review, exercise_history, workout_logger, diagnostics
+except ImportError as e:
+    st.error(f"Failed to import pages: {e}")
+    st.stop()
 
 # Configure the page
 st.set_page_config(
