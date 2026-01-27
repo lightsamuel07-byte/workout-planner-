@@ -105,20 +105,25 @@ def show():
     st.markdown(f'<div class="sub-header">Week of {week_start} - {week_end}</div>', unsafe_allow_html=True)
 
     # Get latest plan (try markdown file first, then Google Sheets)
+    st.info("🔍 Checking for workout plans...")
+
     latest_plan = get_latest_plan()
+    st.write(f"📄 Markdown file plan: `{latest_plan if latest_plan else 'None'}`")
+
     latest_sheet_plan = get_latest_sheet_plan()
+    st.write(f"📊 Google Sheets plan: `{latest_sheet_plan if latest_sheet_plan else 'None'}`")
+
     plan_summary = parse_plan_summary(latest_plan)
 
     if not latest_plan and not latest_sheet_plan:
-        # Debug: Show what we tried to find
-        st.write(f"Debug: latest_plan = {latest_plan}")
-        st.write(f"Debug: latest_sheet_plan = {latest_sheet_plan}")
-
+        st.error("❌ Both plan sources returned None")
         st.warning("⚠️ No workout plan found. Generate your first plan to get started!")
         if st.button("🚀 Generate Plan Now", type="primary"):
             st.session_state.current_page = 'generate'
             st.rerun()
         return
+
+    st.success(f"✅ Found plan: {latest_sheet_plan or latest_plan}")
 
     # Weekly Calendar View
     st.markdown("### 📆 This Week's Schedule")
