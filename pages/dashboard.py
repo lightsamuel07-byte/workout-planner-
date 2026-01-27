@@ -35,28 +35,32 @@ def get_latest_plan():
     md_files.sort(reverse=True)
     return md_files[0]
 
+@st.cache_resource
+def get_sheets_reader():
+    """Get authenticated sheets reader (cached for performance)"""
+    import yaml
+    from src.sheets_reader import SheetsReader
+
+    with open('config.yaml', 'r') as f:
+        config = yaml.safe_load(f)
+
+    reader = SheetsReader(
+        credentials_file=config['google_sheets']['credentials_file'],
+        spreadsheet_id=config['google_sheets']['spreadsheet_id']
+    )
+    reader.authenticate()
+    return reader
+
 def get_latest_sheet_plan():
     """Get the most recent workout plan from Google Sheets"""
     try:
-        import yaml
-        from src.sheets_reader import SheetsReader
-
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
-        reader = SheetsReader(
-            credentials_file=config['google_sheets']['credentials_file'],
-            spreadsheet_id=config['google_sheets']['spreadsheet_id']
-        )
-        reader.authenticate()
-
+        reader = get_sheets_reader()
         all_sheets = reader.get_all_weekly_plan_sheets()
         if all_sheets:
             return all_sheets[-1]  # Return most recent sheet name
         return None
     except Exception as e:
         # Log the actual error for debugging
-        import streamlit as st
         st.error(f"Error loading Google Sheets plan: {e}")
         import traceback
         st.code(traceback.format_exc())
