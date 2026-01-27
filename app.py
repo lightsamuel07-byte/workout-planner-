@@ -116,6 +116,10 @@ with st.sidebar:
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
+    if st.button("🔧 Diagnostics", use_container_width=True, key="nav_diagnostics"):
+        st.session_state.current_page = 'diagnostics'
+        st.rerun()
+
     st.markdown("---")
     st.markdown("### ⚙️ Quick Settings")
     st.markdown(f"**User:** Samuel")
@@ -180,3 +184,6 @@ elif st.session_state.current_page == 'exercise_history':
 elif st.session_state.current_page == 'log_workout':
     from pages import workout_logger
     workout_logger.show()
+elif st.session_state.current_page == 'diagnostics':
+    from pages import diagnostics
+    diagnostics.show()
