@@ -108,6 +108,7 @@ with st.sidebar:
     st.markdown("# 💪 Workout Planner")
     st.markdown("*Powered by Claude AI*")
     st.markdown("---")
+    # Deployment trigger: v1.0.1
 
     if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard"):
         st.session_state.current_page = 'dashboard'
