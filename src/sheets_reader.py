@@ -42,7 +42,15 @@ class SheetsReader:
         creds = None
 
         # Check if running in Streamlit Cloud with service account
-        if HAS_STREAMLIT and hasattr(st, 'secrets') and 'gcp_service_account' in st.secrets:
+        use_service_account = False
+        if HAS_STREAMLIT and hasattr(st, 'secrets'):
+            try:
+                if 'gcp_service_account' in st.secrets:
+                    use_service_account = True
+            except:
+                pass  # Secrets not available, use local credentials
+
+        if use_service_account:
             # Use service account (Streamlit Cloud)
             from google.oauth2 import service_account
 
@@ -138,11 +146,11 @@ class SheetsReader:
             if not row:  # Skip empty rows
                 continue
 
-            # Check if this is a date row (e.g., "Tuesday 1/20")
+            # Check if this is a date row (e.g., "Tuesday 1/20" or "TUESDAY - AESTHETICS")
             first_col = row[0] if len(row) > 0 else ""
 
-            # Simple heuristic: if first column contains a day name or date pattern
-            if any(day in first_col for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]):
+            # Simple heuristic: if first column contains a day name or date pattern (case-insensitive)
+            if any(day.lower() in first_col.lower() for day in ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]):
                 # Save previous workout if exists
                 if current_workout:
                     workouts.append(current_workout)
@@ -465,3 +473,100 @@ class SheetsReader:
             formatted += "\n"
 
         return formatted
+
+    def write_workout_logs(self, workout_date, logs):
+        """
+        Write workout logs back to Google Sheets.
+
+        Args:
+            workout_date: The date/day identifier for the workout (e.g., "Monday, Jan 20")
+            logs: List of dictionaries with 'exercise' and 'log' keys
+
+        Returns:
+            Boolean indicating success
+        """
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+
+        try:
+            # Read current sheet data to find the correct rows
+            range_name = f"'{self.sheet_name}'!A:H"
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=range_name
+            ).execute()
+
+            values = result.get('values', [])
+
+            if not values:
+                print(f"No data found in {self.sheet_name}")
+                return False
+
+            # Find the workout date section
+            date_row = None
+            for i, row in enumerate(values):
+                if len(row) > 0 and workout_date in row[0]:
+                    date_row = i
+                    break
+
+            if date_row is None:
+                print(f"Could not find workout date: {workout_date}")
+                return False
+
+            # Build update data
+            updates = []
+
+            # Start checking rows after the date row
+            current_row = date_row + 1
+            log_index = 0
+
+            while current_row < len(values) and log_index < len(logs):
+                row = values[current_row]
+
+                # Stop if we hit another date header or empty row
+                if len(row) == 0 or (len(row) > 0 and any(day in row[0] for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])):
+                    break
+
+                # Check if this row has an exercise name matching our log
+                if len(row) > 1:
+                    exercise_name = row[1].strip() if len(row) > 1 else ""
+
+                    # Match with our log
+                    if log_index < len(logs):
+                        log_entry = logs[log_index]
+
+                        # Check if exercise names match (allow partial match)
+                        if log_entry['exercise'].lower() in exercise_name.lower() or exercise_name.lower() in log_entry['exercise'].lower():
+                            # Column H (index 7) is the LOG column
+                            if log_entry['log']:  # Only update if there's actual log data
+                                cell_range = f"'{self.sheet_name}'!H{current_row + 1}"
+                                updates.append({
+                                    'range': cell_range,
+                                    'values': [[log_entry['log']]]
+                                })
+
+                            log_index += 1
+
+                current_row += 1
+
+            # Perform batch update
+            if updates:
+                body = {
+                    'valueInputOption': 'USER_ENTERED',
+                    'data': updates
+                }
+
+                self.service.spreadsheets().values().batchUpdate(
+                    spreadsheetId=self.spreadsheet_id,
+                    body=body
+                ).execute()
+
+                print(f"✓ Updated {len(updates)} exercise logs")
+                return True
+            else:
+                print("No logs to update")
+                return False
+
+        except HttpError as err:
+            print(f"Error writing workout logs: {err}")
+            return False

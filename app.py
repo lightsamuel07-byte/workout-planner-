@@ -92,6 +92,10 @@ with st.sidebar:
         st.session_state.current_page = 'dashboard'
         st.rerun()
 
+    if st.button("📝 Log Workout", use_container_width=True, key="nav_log_workout"):
+        st.session_state.current_page = 'log_workout'
+        st.rerun()
+
     if st.button("🆕 Generate Plan", use_container_width=True, key="nav_generate"):
         st.session_state.current_page = 'generate'
         st.rerun()
@@ -173,3 +177,6 @@ elif st.session_state.current_page == 'weekly_review':
 elif st.session_state.current_page == 'exercise_history':
     from pages import exercise_history
     exercise_history.show()
+elif st.session_state.current_page == 'log_workout':
+    from pages import workout_logger
+    workout_logger.show()
