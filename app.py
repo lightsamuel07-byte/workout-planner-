@@ -8,6 +8,10 @@ import streamlit as st
 import os
 from datetime import datetime, timedelta
 
+# Import all pages at startup to avoid lazy loading issues
+from pages import dashboard, generate_plan, view_plans, progress
+from pages import weekly_review, exercise_history, workout_logger, diagnostics
+
 # Configure the page
 st.set_page_config(
     page_title="💪 Samuel's Workout Planner",
@@ -164,26 +168,18 @@ with st.sidebar:
 
 # Main content area - route to different pages
 if st.session_state.current_page == 'dashboard':
-    from pages import dashboard
     dashboard.show()
 elif st.session_state.current_page == 'generate':
-    from pages import generate_plan
     generate_plan.show()
 elif st.session_state.current_page == 'plans':
-    from pages import view_plans
     view_plans.show()
 elif st.session_state.current_page == 'progress':
-    from pages import progress
     progress.show()
 elif st.session_state.current_page == 'weekly_review':
-    from pages import weekly_review
     weekly_review.show()
 elif st.session_state.current_page == 'exercise_history':
-    from pages import exercise_history
     exercise_history.show()
 elif st.session_state.current_page == 'log_workout':
-    from pages import workout_logger
     workout_logger.show()
 elif st.session_state.current_page == 'diagnostics':
-    from pages import diagnostics
     diagnostics.show()
