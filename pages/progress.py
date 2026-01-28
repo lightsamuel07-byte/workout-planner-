@@ -4,7 +4,7 @@ Progress page - View training progress and stats
 
 import streamlit as st
 from datetime import datetime, timedelta
-from src.ui_utils import render_page_header, get_authenticated_reader
+from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
 
 def show():
     """Render the progress page"""
@@ -193,6 +193,4 @@ def show():
     """)
 
     # Back button
-    if st.button("🏠 Back to Dashboard", use_container_width=True):
-        st.session_state.current_page = 'dashboard'
-        st.rerun()
+    nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
