@@ -59,7 +59,7 @@ def check_password():
         # Try to get password from secrets, fall back to default for local dev
         try:
             correct_password = st.secrets.get("APP_PASSWORD", "workout2026")
-        except:
+        except (AttributeError, KeyError):
             correct_password = "workout2026"
 
         if st.session_state["password"] == correct_password:

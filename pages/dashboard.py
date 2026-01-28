@@ -184,8 +184,10 @@ def show():
 
         analytics = WorkoutAnalytics(reader)
         analytics.load_historical_data(weeks_back=4)
-    except Exception as e:
-        pass  # analytics will remain None, use fallback data
+    except (FileNotFoundError, KeyError, ImportError, Exception) as e:
+        # Analytics unavailable - will use fallback data below
+        print(f"Analytics initialization failed: {e}")
+        pass
 
     # Stats and Quick Actions Row
     col1, col2, col3 = st.columns([2, 2, 3])
@@ -205,7 +207,8 @@ def show():
 
                 st.metric("Workouts Complete", f"{completion['completed']} / {completion['total']}")
                 st.metric("Weekly Volume", f"{int(current_week_volume):,} kg")
-            except:
+            except (KeyError, ValueError, IndexError, Exception) as e:
+                print(f"Failed to load workout completion: {e}")
                 st.metric("Workouts Complete", fallback['workouts_completed'])
                 st.metric("Weekly Volume", fallback['weekly_volume'])
         else:
@@ -238,8 +241,9 @@ def show():
                     st.metric("Deadlift", f"{deadlift_prog['current_load']} kg", f"+{deadlift_prog['progression_kg']} kg")
                 else:
                     st.metric("Deadlift", *fallback['deadlift'])
-            except:
+            except (KeyError, ValueError, IndexError, Exception) as e:
                 # Fallback to mock data
+                print(f"Failed to load lift progression: {e}")
                 st.metric("Back Squat", *fallback['back_squat'])
                 st.metric("Bench Press", *fallback['bench_press'])
                 st.metric("Deadlift", *fallback['deadlift'])
@@ -258,8 +262,7 @@ def show():
             st.session_state.current_page = 'plans'
             st.rerun()
 
-        if st.button("📝 Log Today's Workout", use_container_width=True):
-            st.info("Logging feature coming soon! For now, use Google Sheets.")
+        nav_button("Log Today's Workout", "log_workout", "📝", use_container_width=True)
 
         if st.button("📈 View Progress Charts", use_container_width=True):
             st.session_state.current_page = 'progress'

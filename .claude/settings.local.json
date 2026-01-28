@@ -12,7 +12,12 @@
       "Bash(streamlit run:*)",
       "Bash(pkill:*)",
       "Bash(curl:*)",
-      "Bash(lsof:*)"
+      "Bash(lsof:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git remote:*)",
+      "Bash(python:*)"
     ]
   }
 }
