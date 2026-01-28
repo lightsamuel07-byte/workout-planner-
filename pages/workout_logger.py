@@ -4,6 +4,7 @@ Workout Logger page - Log today's workout in real-time
 
 import streamlit as st
 from datetime import datetime
+import html
 from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
 
 
@@ -87,6 +88,7 @@ def show():
                 sets = ex.get('sets', '')
                 reps = ex.get('reps', '')
                 load = ex.get('load', '')
+                rest = ex.get('rest', '')
                 notes = ex.get('notes', '')
                 existing_log = ex.get('log', '')
 
@@ -103,26 +105,26 @@ def show():
                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; margin: 0.5rem 0;">
                             <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
                                 <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">SETS</div>
-                                <div style="font-weight: 700;">{sets if sets else '-'}</div>
+                                <div style="font-weight: 700;">{html.escape(sets) if sets else '-'}</div>
                             </div>
                             <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
                                 <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">REPS</div>
-                                <div style="font-weight: 700;">{reps if reps else '-'}</div>
+                                <div style="font-weight: 700;">{html.escape(reps) if reps else '-'}</div>
                             </div>
                             <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
                                 <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">LOAD</div>
-                                <div style="font-weight: 700;">{load if load else '-'}</div>
+                                <div style="font-weight: 700;">{html.escape(load) if load else '-'}</div>
                             </div>
                             <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
                                 <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">REST</div>
-                                <div style="font-weight: 700;">{ex.get('rest', '-')}</div>
+                                <div style="font-weight: 700;">{html.escape(rest) if rest else '-'}</div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
 
                         # Notes below grid
                         if notes:
-                            st.markdown(f"<span style='color: #888; font-size: 0.9rem; font-style: italic;'>💡 {notes}</span>", unsafe_allow_html=True)
+                            st.markdown(f"<span style='color: #888; font-size: 0.9rem; font-style: italic;'>💡 {html.escape(notes)}</span>", unsafe_allow_html=True)
 
                     with col2:
                         # Logging input
@@ -130,7 +132,7 @@ def show():
 
                         # Show existing log if present
                         if existing_log:
-                            st.markdown(f"<div style='background-color: #d4edda; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;'><span style='color: #155724; font-size: 0.9rem;'>✅ Logged: {existing_log}</span></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='background-color: #d4edda; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;'><span style='color: #155724; font-size: 0.9rem;'>✅ Logged: {html.escape(existing_log)}</span></div>", unsafe_allow_html=True)
                         else:
                             # Detect exercise type for smart placeholder
                             exercise_lower = exercise_name.lower()
