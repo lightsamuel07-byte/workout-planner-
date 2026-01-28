@@ -3,42 +3,30 @@ Workout Logger page - Log today's workout in real-time
 """
 
 import streamlit as st
-import yaml
 from datetime import datetime
-from src.sheets_reader import SheetsReader
+from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
 
 
 def show():
     """Render the workout logger page"""
-
-    st.markdown('<div class="main-header">📝 Log Workout</div>', unsafe_allow_html=True)
 
     # Get today's date
     today = datetime.now()
     day_name = today.strftime("%A")
     date_str = today.strftime("%B %d, %Y")
 
-    st.markdown(f'<div class="sub-header">{day_name}, {date_str}</div>', unsafe_allow_html=True)
+    render_page_header("Log Workout", f"{day_name}, {date_str}", "📝")
 
     try:
-        # Load config and authenticate
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
-        reader = SheetsReader(
-            credentials_file=config['google_sheets']['credentials_file'],
-            spreadsheet_id=config['google_sheets']['spreadsheet_id']
-        )
-        reader.authenticate()
+        # Get authenticated reader
+        reader = get_authenticated_reader()
 
         # Get the most recent weekly plan sheet
         all_sheets = reader.get_all_weekly_plan_sheets()
 
         if not all_sheets:
             st.warning("⚠️ No workout plan found. Generate your first plan to start logging!")
-            if st.button("🚀 Generate Plan Now", type="primary"):
-                st.session_state.current_page = 'generate'
-                st.rerun()
+            nav_button("Generate Plan Now", "generate", "🚀", type="primary")
             return
 
         # Use the most recent sheet
@@ -63,9 +51,7 @@ def show():
 
         if not todays_workout:
             st.info(f"No workout scheduled for {day_name}. Enjoy your rest day!")
-            if st.button("🏠 Back to Dashboard", use_container_width=True):
-                st.session_state.current_page = 'dashboard'
-                st.rerun()
+            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
         # Display today's workout plan
@@ -93,6 +79,7 @@ def show():
         # Display each block with logging inputs
         for block_name, block_exercises in blocks.items():
             if block_name and block_name != 'Other':
+                st.markdown("---")
                 st.markdown(f"### {block_name}")
 
             for idx, ex in block_exercises:
@@ -105,24 +92,37 @@ def show():
 
                 # Create a card for each exercise
                 with st.container():
-                    col1, col2 = st.columns([3, 2])
+                    col1, col2 = st.columns([2, 1])
 
                     with col1:
-                        # Exercise details
+                        # Exercise name
                         st.markdown(f"**{exercise_name}**")
-                        info_parts = []
-                        if sets:
-                            info_parts.append(f"{sets} sets")
-                        if reps:
-                            info_parts.append(f"{reps} reps")
-                        if load:
-                            info_parts.append(f"@ {load}")
 
-                        if info_parts:
-                            st.markdown(f"<span style='color: #666; font-size: 0.9rem;'>{'  ×  '.join(info_parts)}</span>", unsafe_allow_html=True)
+                        # 4-column grid for metrics (like view_plans.py)
+                        st.markdown(f"""
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; margin: 0.5rem 0;">
+                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">SETS</div>
+                                <div style="font-weight: 700;">{sets if sets else '-'}</div>
+                            </div>
+                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">REPS</div>
+                                <div style="font-weight: 700;">{reps if reps else '-'}</div>
+                            </div>
+                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">LOAD</div>
+                                <div style="font-weight: 700;">{load if load else '-'}</div>
+                            </div>
+                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">REST</div>
+                                <div style="font-weight: 700;">{ex.get('rest', '-')}</div>
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
 
+                        # Notes below grid
                         if notes:
-                            st.markdown(f"<span style='color: #888; font-size: 0.85rem; font-style: italic;'>💡 {notes}</span>", unsafe_allow_html=True)
+                            st.markdown(f"<span style='color: #888; font-size: 0.9rem; font-style: italic;'>💡 {notes}</span>", unsafe_allow_html=True)
 
                     with col2:
                         # Logging input
@@ -202,14 +202,10 @@ def show():
 
         # Cancel button
         with col1:
-            if st.button("🏠 Back to Dashboard", use_container_width=True):
-                st.session_state.current_page = 'dashboard'
-                st.rerun()
+            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
 
     except Exception as e:
         st.error(f"Unable to load workout plan: {e}")
         st.info("Make sure you have a workout plan generated in Google Sheets.")
 
-        if st.button("🏠 Back to Dashboard", use_container_width=True):
-            st.session_state.current_page = 'dashboard'
-            st.rerun()
+        nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)

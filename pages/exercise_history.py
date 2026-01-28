@@ -3,27 +3,18 @@ Exercise History page - View detailed history for any exercise
 """
 
 import streamlit as st
-import yaml
-from src.sheets_reader import SheetsReader
+from src.ui_utils import render_page_header, get_authenticated_reader
 from src.analytics import WorkoutAnalytics
 
 
 def show():
     """Render the exercise history page"""
 
-    st.markdown('<div class="main-header">📋 Exercise History</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">View detailed progression for any exercise</div>', unsafe_allow_html=True)
+    render_page_header("Exercise History", "View detailed progression for any exercise", "📋")
 
     try:
-        # Load analytics
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
-        reader = SheetsReader(
-            credentials_file=config['google_sheets']['credentials_file'],
-            spreadsheet_id=config['google_sheets']['spreadsheet_id']
-        )
-        reader.authenticate()
+        # Get authenticated reader
+        reader = get_authenticated_reader()
 
         analytics = WorkoutAnalytics(reader)
         analytics.load_historical_data(weeks_back=12)

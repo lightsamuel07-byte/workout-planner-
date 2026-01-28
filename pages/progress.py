@@ -4,30 +4,21 @@ Progress page - View training progress and stats
 
 import streamlit as st
 from datetime import datetime, timedelta
+from src.ui_utils import render_page_header, get_authenticated_reader
 
 def show():
     """Render the progress page"""
 
-    st.markdown('<div class="main-header">📈 Progress Dashboard</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Track your strength gains and training progress</div>', unsafe_allow_html=True)
+    render_page_header("Progress Dashboard", "Track your strength gains and training progress", "📈")
 
     st.markdown("### 📊 Main Lifts Progress (Last 8 Weeks)")
 
     try:
-        import yaml
         import pandas as pd
-        from src.sheets_reader import SheetsReader
         from src.analytics import WorkoutAnalytics
 
-        # Load config and authenticate
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
-        reader = SheetsReader(
-            credentials_file=config['google_sheets']['credentials_file'],
-            spreadsheet_id=config['google_sheets']['spreadsheet_id']
-        )
-        reader.authenticate()
+        # Get authenticated reader
+        reader = get_authenticated_reader()
 
         # Load analytics
         analytics = WorkoutAnalytics(reader)

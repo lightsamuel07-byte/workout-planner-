@@ -3,27 +3,18 @@ Weekly Review page - Browse and review past workout weeks
 """
 
 import streamlit as st
-import yaml
-from src.sheets_reader import SheetsReader
+from src.ui_utils import render_page_header, get_authenticated_reader
 from datetime import datetime
 
 
 def show():
     """Render the weekly review page"""
 
-    st.markdown('<div class="main-header">📅 Weekly Review</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Browse your workout history week by week</div>', unsafe_allow_html=True)
+    render_page_header("Weekly Review", "Browse your workout history week by week", "📅")
 
     try:
-        # Load config and authenticate
-        with open('config.yaml', 'r') as f:
-            config = yaml.safe_load(f)
-
-        reader = SheetsReader(
-            credentials_file=config['google_sheets']['credentials_file'],
-            spreadsheet_id=config['google_sheets']['spreadsheet_id']
-        )
-        reader.authenticate()
+        # Get authenticated reader
+        reader = get_authenticated_reader()
 
         # Get all weekly plan sheets
         all_sheets = reader.get_all_weekly_plan_sheets()

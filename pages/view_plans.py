@@ -6,6 +6,7 @@ import streamlit as st
 import os
 import glob
 import re
+from src.ui_utils import render_page_header, nav_button
 
 def get_all_plans():
     """Get all workout plan files sorted by date (newest first)"""
@@ -87,17 +88,14 @@ def parse_exercises(day_content):
 def show():
     """Render the view plans page"""
 
-    st.markdown('<div class="main-header">📋 Workout Plans</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">View your generated workout plans</div>', unsafe_allow_html=True)
+    render_page_header("Workout Plans", "View your generated workout plans", "📋")
 
     # Get all plans
     plans = get_all_plans()
 
     if not plans:
         st.warning("⚠️ No workout plans found. Generate your first plan to get started!")
-        if st.button("🚀 Generate Plan Now", type="primary"):
-            st.session_state.current_page = 'generate'
-            st.rerun()
+        nav_button("Generate Plan Now", "generate", "🚀", type="primary")
         return
 
     # Plan selector

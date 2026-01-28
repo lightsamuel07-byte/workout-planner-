@@ -97,7 +97,7 @@ def check_password():
 if not check_password():
     st.stop()
 
-# Minimal CSS - Only Fix Critical Issues
+# CSS - Critical Fixes + Mobile Responsiveness
 st.markdown("""
     <style>
     /* Fix text area overlapping labels */
@@ -108,6 +108,30 @@ st.markdown("""
     /* Clean corners */
     button, input, textarea, select {
         border-radius: 0 !important;
+    }
+
+    /* Mobile responsiveness */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 1.5rem !important;
+        }
+        .sub-header {
+            font-size: 1rem !important;
+        }
+        /* Ensure minimum readable font sizes */
+        body, p, span, div {
+            font-size: max(0.9rem, 14px) !important;
+        }
+    }
+
+    /* Ensure touch targets are large enough */
+    button {
+        min-height: 44px !important;
+        padding: 0.75rem !important;
+    }
+
+    input, textarea {
+        min-height: 44px !important;
     }
     </style>
 """, unsafe_allow_html=True)

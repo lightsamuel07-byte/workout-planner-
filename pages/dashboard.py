@@ -6,6 +6,19 @@ import streamlit as st
 from datetime import datetime, timedelta
 import os
 import glob
+from src.ui_utils import render_page_header, nav_button
+
+
+def get_fallback_stats():
+    """Return default stats when data unavailable"""
+    return {
+        'workouts_completed': '1 / 6',
+        'weekly_volume': '42,500 kg',
+        'back_squat': ('129 kg', '+2.5 kg'),
+        'bench_press': ('94 kg', '+1.5 kg'),
+        'deadlift': ('168 kg', '+3.0 kg'),
+    }
+
 
 def get_current_week_dates():
     """Get Monday through Sunday of current week"""
@@ -93,15 +106,13 @@ def parse_plan_summary(plan_path):
 def show():
     """Render the dashboard page"""
 
-    # Header
-    st.markdown('<div class="main-header">📅 Weekly Dashboard</div>', unsafe_allow_html=True)
-
     # Get current week
     week_dates = get_current_week_dates()
     week_start = week_dates[0].strftime("%b %d")
     week_end = week_dates[6].strftime("%b %d, %Y")
 
-    st.markdown(f'<div class="sub-header">Week of {week_start} - {week_end}</div>', unsafe_allow_html=True)
+    # Header
+    render_page_header("Weekly Dashboard", f"Week of {week_start} - {week_end}", "📅")
 
     # Get latest plan (try markdown file first, then Google Sheets)
     latest_plan = get_latest_plan()
@@ -110,9 +121,7 @@ def show():
 
     if not latest_plan and not latest_sheet_plan:
         st.warning("⚠️ No workout plan found. Generate your first plan to get started!")
-        if st.button("🚀 Generate Plan Now", type="primary"):
-            st.session_state.current_page = 'generate'
-            st.rerun()
+        nav_button("Generate Plan Now", "generate", "🚀", type="primary")
         return
 
     # Weekly Calendar View
@@ -186,6 +195,7 @@ def show():
         st.metric("Total Exercises", plan_summary.get('total_exercises', 0))
 
         # Get real completion data
+        fallback = get_fallback_stats()
         if analytics:
             try:
                 completion = analytics.get_workout_completion_rate(weeks=1)
@@ -196,17 +206,18 @@ def show():
                 st.metric("Workouts Complete", f"{completion['completed']} / {completion['total']}")
                 st.metric("Weekly Volume", f"{int(current_week_volume):,} kg")
             except:
-                st.metric("Workouts Complete", "1 / 6")
-                st.metric("Weekly Volume", "42,500 kg")
+                st.metric("Workouts Complete", fallback['workouts_completed'])
+                st.metric("Weekly Volume", fallback['weekly_volume'])
         else:
             # Fallback to mock data if sheets unavailable
-            st.metric("Workouts Complete", "1 / 6")
-            st.metric("Weekly Volume", "42,500 kg")
+            st.metric("Workouts Complete", fallback['workouts_completed'])
+            st.metric("Weekly Volume", fallback['weekly_volume'])
 
     with col2:
         st.markdown("### 🔥 Progress")
 
         # Get real lift progression data
+        fallback = get_fallback_stats()
         if analytics:
             try:
                 squat_prog = analytics.get_main_lift_progression('squat', weeks=8)
@@ -216,34 +227,32 @@ def show():
                 if squat_prog:
                     st.metric("Back Squat", f"{squat_prog['current_load']} kg", f"+{squat_prog['progression_kg']} kg")
                 else:
-                    st.metric("Back Squat", "129 kg", "+2.5 kg")
+                    st.metric("Back Squat", *fallback['back_squat'])
 
                 if bench_prog:
                     st.metric("Bench Press", f"{bench_prog['current_load']} kg", f"+{bench_prog['progression_kg']} kg")
                 else:
-                    st.metric("Bench Press", "94 kg", "+1.5 kg")
+                    st.metric("Bench Press", *fallback['bench_press'])
 
                 if deadlift_prog:
                     st.metric("Deadlift", f"{deadlift_prog['current_load']} kg", f"+{deadlift_prog['progression_kg']} kg")
                 else:
-                    st.metric("Deadlift", "168 kg", "+3.0 kg")
+                    st.metric("Deadlift", *fallback['deadlift'])
             except:
                 # Fallback to mock data
-                st.metric("Back Squat", "129 kg", "+2.5 kg")
-                st.metric("Bench Press", "94 kg", "+1.5 kg")
-                st.metric("Deadlift", "168 kg", "+3.0 kg")
+                st.metric("Back Squat", *fallback['back_squat'])
+                st.metric("Bench Press", *fallback['bench_press'])
+                st.metric("Deadlift", *fallback['deadlift'])
         else:
             # Fallback to mock data
-            st.metric("Back Squat", "129 kg", "+2.5 kg")
-            st.metric("Bench Press", "94 kg", "+1.5 kg")
-            st.metric("Deadlift", "168 kg", "+3.0 kg")
+            st.metric("Back Squat", *fallback['back_squat'])
+            st.metric("Bench Press", *fallback['bench_press'])
+            st.metric("Deadlift", *fallback['deadlift'])
 
     with col3:
         st.markdown("### 🎯 Quick Actions")
 
-        if st.button("🆕 Generate New Week Plan", use_container_width=True, type="primary"):
-            st.session_state.current_page = 'generate'
-            st.rerun()
+        nav_button("Generate New Week Plan", "generate", "🆕", use_container_width=True, type="primary")
 
         if st.button("📋 View Full Week Plan", use_container_width=True):
             st.session_state.current_page = 'plans'

@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import sys
 import os
+from src.ui_utils import render_page_header
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -23,8 +24,7 @@ def get_next_monday():
 def show():
     """Render the generate plan page"""
 
-    st.markdown('<div class="main-header">🆕 Generate New Workout Plan</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sub-header">Create your personalized weekly workout plan</div>', unsafe_allow_html=True)
+    render_page_header("Generate New Workout Plan", "Create your personalized weekly workout plan", "🆕")
 
     # Calculate next Monday
     next_monday = get_next_monday()
