@@ -134,6 +134,30 @@ EXERCISE SWAP RULES - APPLY THESE AUTOMATICALLY:
 
 CRITICAL INSTRUCTIONS FOR PLAN CREATION:
 
+**READING FORT INSTRUCTIONS FOR SUPPLEMENTAL ADJUSTMENTS:**
+
+Carefully analyze Fort workouts for intensity indicators that should inform supplemental programming:
+
+- **Percentage targets** (e.g., "85% 1RM"): If Fort is heavy (>80% 1RM), reduce supplemental intensity to RPE 6-7
+- **RPE cues** (e.g., "RPE 8-9", "work to near failure"): If Fort prescribes high RPE, keep supplemental moderate (RPE 6-7)
+- **Volume spikes**: If Fort has unusually high set counts, reduce supplemental volume by 1-2 sets per exercise
+- **Rep ranges**: If Fort moves to lower reps (1-5 strength phase), keep supplemental higher reps (8-15 hypertrophy)
+- **Coach notes about fatigue**: If notes mention "tough week", "grinder sets", or "deload", reduce supplemental intensity
+- **Exercise selection signals**: If Fort adds more accessories than usual, reduce supplemental exercise count
+
+**Progressive Overload from Prior Week Logs:**
+
+The workout history section contains prior week's logged performance. Use this data intelligently:
+
+- **User logged MORE reps than prescribed**: Increase load by 2.5-5kg for next week
+- **User logged exact reps with good form**: Maintain load or increase by 2.5kg (conservative progression)
+- **User logged FEWER reps or noted "struggled"**: Maintain same load or reduce by 2.5kg if needed
+- **Pay attention to RPE, Form, Energy notes**: If user noted "RPE 9" or "form breakdown", don't increase load
+- **Look for patterns**: If user consistently hits top of rep range, they're ready for load progression
+- **Recovery signals**: If Energy was "Fatigued" or notes mention poor sleep, be conservative with progression
+
+**Integration Principle:** Fort workouts are priority #1. Supplemental work must support, not interfere with, Fort performance.
+
 1. **MONDAY, WEDNESDAY, FRIDAY (Main Days - Fort Workouts):**
    - Use the trainer workouts provided above but REFORMAT them for consistent parsing
    - **IMPORTANT**: Apply all exercise swaps listed above BEFORE formatting
@@ -145,11 +169,31 @@ CRITICAL INSTRUCTIONS FOR PLAN CREATION:
 
    **Required format for EVERY Fort exercise:**
    ```
-   ### A1. [Exercise Name]
-   - [Sets] x [Reps] @ [Weight] kg (or time format like 1:00 for timed drills)
-   - **Rest:** [Rest period]
-   - **Notes:** [Coaching cues, tempo, technique notes, percentages]
+   ### A1. [Exercise Name] (specify bench angle if applicable, e.g., "30° Incline DB Press")
+   - [Sets] x [Reps] @ [Weight] kg (or time format like 1:00 for timed drills; for two-cable exercises, specify "per side")
+   - **Rest:** [Rest period from trainer, or intelligent default]
+   - **RPE:** [Target Rate of Perceived Exertion, 1-10 scale]
+   - **Form:** [Key form cues and technique focus]
+   - **Energy:** [Expected energy level: Fresh/Moderate/Fatigued]
+   - **Adjustments:** [Any modifications from standard form]
+   - **Notes:** [Additional coaching cues, tempo, technique notes, percentages]
    ```
+
+   **EXERCISE NAMING RULES (CRITICAL):**
+   1. **Bench exercises**: ALWAYS specify angle
+      - ✅ Correct: "30° Incline DB Press", "Flat Bench Press", "15° Decline DB Fly"
+      - ❌ Wrong: "Incline Press" (missing degree), "DB Bench" (missing angle)
+
+   2. **Cable exercises with two cables**: Specify load per side
+      - ✅ Correct: "15 kg per side" for High-to-Low Cable Fly
+      - ✅ Single cable: Just specify total load (e.g., "20 kg")
+
+   3. **Machine exercises**: Specify grip/attachment
+      - ✅ Examples: "Lat Pulldown (Wide Grip)", "Cable Row (V-Handle)"
+
+   4. **Free weight carries**: Use kettlebells (not dumbbells)
+      - ✅ Correct: "Kettlebell Farmer Carry", "KB Suitcase Carry"
+      - ❌ Wrong: "DB Farmer Carry", "Dumbbell Carry"
 
    **Example - Converting a PREP section:**
    Original from user:
@@ -211,6 +255,16 @@ CRITICAL INSTRUCTIONS FOR PLAN CREATION:
    - **Notes:** Glute emphasis; last set = myo-rep (1 RIR, rest 10-15s, 3-4 more reps x 3 rounds)
    ```
 
+   **REST PERIOD RULES:**
+   - **Fort Days (Mon/Wed/Fri)**: Follow trainer's prescribed rest periods. If not specified:
+     * Main lifts (squats, deadlifts, presses): 3-5 minutes
+     * Accessory compounds: 2-3 minutes
+     * Isolation work: 60-90 seconds
+   - **Supplemental Days (Tue/Thu/Sat)**:
+     * Main movements (A, B blocks): 90-120 seconds
+     * Isolation (C, D, E blocks): 60-90 seconds
+     * Finishers/carries: 30-45 seconds
+
 2. **TUESDAY, THURSDAY, SATURDAY (Supplemental Days):**
    Design workouts using the SAME EXACT format as Fort workouts above:
    - Use the ### A1. [Exercise] format with bullet points
@@ -227,25 +281,62 @@ CRITICAL INSTRUCTIONS FOR PLAN CREATION:
    - Consider: Samuel's conditioning level, proximity to next Fort workout, and aerobic capacity
    - Format incline walks as exercises in the plan using the ### format
 
-   **Use the EXACT SAME format structure:**
+   **Use the EXACT SAME format structure with ALL fields:**
    ```
    ### A1. Incline Walk (Warm-up)
    - 1 x 10:00 @ 3.4 mph, 6% grade
    - **Rest:** 2-3min before first exercise
-   - **Notes:** Increase blood flow, activate glutes and hamstrings; adjust speed/grade as needed for readiness
+   - **RPE:** 3-4
+   - **Form:** Upright posture, glutes engaged
+   - **Energy:** Fresh
+   - **Adjustments:** Adjust speed/grade based on readiness
+   - **Notes:** Increase blood flow, activate glutes and hamstrings
 
    ### A2. Cable Lateral Raise
    - 3 x 12-15 @ 20 kg
-   - **Rest:** 60s
-   - **Notes:** Constant tension; wrist height; medial delt focus
+   - **Rest:** 90s
+   - **RPE:** 7-8
+   - **Form:** Constant tension through range; wrist height
+   - **Energy:** Fresh to moderate
+   - **Adjustments:** None
+   - **Notes:** Medial delt focus; avoid momentum
 
    [... other exercises ...]
 
    ### F1. Incline Walk (Finisher)
    - 1 x 15:00 @ 3.5 mph, 6% grade
    - **Rest:** N/A (end of session)
-   - **Notes:** Steady pace for fat oxidation; maintain conversation pace; should not compromise next day's performance
+   - **RPE:** 4-5
+   - **Form:** Maintain upright posture throughout
+   - **Energy:** Fatigued but controlled
+   - **Adjustments:** None
+   - **Notes:** Steady pace for fat oxidation; should not compromise next day's performance
    ```
+
+   **CRITICAL: SUPPLEMENTAL DAY INTERFERENCE CHECKS**
+
+   Before finalizing supplemental exercises, verify against Fort schedule to prevent interference:
+
+   **Tuesday (post-Monday squat, pre-Wednesday press):**
+   - ❌ Avoid: Heavy leg work (squats, lunges, heavy leg compounds), heavy pressing movements
+   - ✅ Safe: Arms (biceps, triceps), shoulders (lateral/rear delts), upper chest, back detail work
+   - ⚠️ Recovery concern: Don't fatigue grip or core heavily before Wednesday's pressing work
+
+   **Thursday (post-Wednesday press, pre-Friday deadlift):**
+   - ❌ Avoid: Heavy bicep/forearm work, heavy back pulling, exercises that tax grip strength
+   - ✅ Safe: Legs (accessories, light work - not heavy squats), chest accessories, delts (all heads)
+   - ⚠️ Recovery concern: Preserve grip strength for Friday deadlifts - no heavy curls or farmer walks
+
+   **Saturday (post-Friday deadlift):**
+   - ❌ Avoid: Heavy lower back loading, heavy leg compounds, heavy deadlift variations
+   - ✅ Safe: Upper body focus - arms, chest, delts, light back accessories (no heavy rows)
+   - ⚠️ Recovery concern: Allow CNS recovery from Friday's deadlift session
+
+   **Additional Recovery Rules:**
+   - If Fort day heavily loads shoulders, avoid heavy overhead work day before/after
+   - Never train same muscle group heavy two days in a row
+   - Cap total weekly bicep hard sets at 10-12 across rolling 4-day window
+   - Monitor cumulative fatigue - if Fort week is brutal, dial back supplemental intensity
 
 3. **SUNDAY:**
    - Active recovery or rest day
@@ -284,9 +375,12 @@ CRITICAL INSTRUCTIONS FOR PLAN CREATION:
 
 6. **PROGRESSION GUIDANCE:**
    - Barbell main lifts: If last top set ≤ RPE 9 (≥1 RIR), add 2.5-5 kg or 1-2 reps
-   - Dumbbells: Move up one step after hitting top of rep range on ≥2 clean sets
-   - Cable/Machine: When top of range is clean, add one plate next session
+   - Dumbbells: Move up one step after hitting top of rep range on ≥2 clean sets with RPE ≤8
+   - Cable/Machine: When top of range is clean (RPE 7-8), add one plate next session
    - Round: barbell to 0.5 kg, DBs to nearest available step
+   - **Use RPE tracking**: Target RPE 7-8 for supplemental work; if user logged RPE 9-10, reduce load
+   - **Use Form tracking**: Only progress if prior week showed good form; form breakdown = maintain load
+   - **Use Energy tracking**: If prior week showed "Fatigued", be conservative with progression
 
 7. **1RM REFERENCES (for calculating percentages if needed):**
    - Back Squat: 129 kg
@@ -328,11 +422,19 @@ Focus: Strength + Aesthetics (arms, medial delts, upper chest, back detail)
 ### A1. [First PREP Exercise]
 - [Sets] x [Reps/Time] @ [Load]
 - **Rest:** [Rest period]
+- **RPE:** [Target RPE]
+- **Form:** [Key form cues]
+- **Energy:** [Expected energy level]
+- **Adjustments:** [Any modifications]
 - **Notes:** [Coaching cues]
 
 ### A2. [Second PREP Exercise]
 - [Sets] x [Reps/Time] @ [Load]
 - **Rest:** [Rest period]
+- **RPE:** [Target RPE]
+- **Form:** [Key form cues]
+- **Energy:** [Expected energy level]
+- **Adjustments:** [Any modifications]
 - **Notes:** [Coaching cues]
 
 [Continue with all Fort exercises in ### A1., ### B1., etc. format]
@@ -347,11 +449,19 @@ Focus: Strength + Aesthetics (arms, medial delts, upper chest, back detail)
 ### A1. [Exercise Name]
 - [Sets] x [Reps] @ [Load] kg
 - **Rest:** [Rest period]
-- **Notes:** [Coaching cues, grip type for biceps]
+- **RPE:** [Target RPE]
+- **Form:** [Key form cues, grip type for biceps]
+- **Energy:** [Expected energy level]
+- **Adjustments:** [Any modifications]
+- **Notes:** [Additional coaching cues]
 
 ### A2. [Exercise Name]
 - [Sets] x [Reps] @ [Load] kg
 - **Rest:** [Rest period]
+- **RPE:** [Target RPE]
+- **Form:** [Key form cues]
+- **Energy:** [Expected energy level]
+- **Adjustments:** [Any modifications]
 - **Notes:** [Coaching cues]
 
 [Continue with all supplemental exercises in ### format]

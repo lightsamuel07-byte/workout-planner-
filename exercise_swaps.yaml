@@ -10,6 +10,14 @@ exercise_swaps:
   "Ab Rollout": "Dead Bug or Pallof Press"
   "Hamstring Slider": "Physioball Leg Curl"
 
+  # Carry Equipment Rules - Always kettlebell, never dumbbell
+  "Dumbbell Farmer Carry": "Kettlebell Farmer Carry"
+  "Dumbbell Farmers Carry": "Kettlebell Farmer Carry"
+  "DB Farmer Carry": "Kettlebell Farmer Carry"
+  "DB Farmers Carry": "Kettlebell Farmer Carry"
+  "Dumbbell Suitcase Carry": "Kettlebell Suitcase Carry"
+  "DB Suitcase Carry": "Kettlebell Suitcase Carry"
+
 # Daily warm-up
 daily_warmup: "McGill Big-3"
 
