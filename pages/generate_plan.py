@@ -6,7 +6,8 @@ import streamlit as st
 from datetime import datetime, timedelta
 import sys
 import os
-from src.ui_utils import render_page_header
+from src.ui_utils import render_page_header, action_button
+from src.design_system import get_colors
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -97,8 +98,14 @@ def show():
     # Validation and Generate Button
     all_workouts_filled = monday_workout and wednesday_workout and friday_workout
 
+    colors = get_colors()
+    
     if not all_workouts_filled:
-        st.warning("⚠️ Please paste all three Fort workouts (Monday, Wednesday, Friday) to continue.")
+        st.markdown(f"""
+        <div style="background: rgba(255, 107, 53, 0.1); border-left: 4px solid {colors['warning']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+            ⚠️ <strong>Please paste all three Fort workouts</strong> (Monday, Wednesday, Friday) to continue.
+        </div>
+        """, unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -207,23 +214,29 @@ USER PREFERENCES:
                     st.balloons()
 
                     st.markdown(f"""
-                    ### 🎉 Success!
-
-                    Your workout plan has been generated and saved to:
-                    - 📄 Markdown file: `{output_file}`
-                    - 📊 Google Sheets: `{sheet_name}`
-
-                    """)
+                    <div style="
+                        background: rgba(0, 212, 170, 0.1);
+                        border: 2px solid {colors['accent']};
+                        border-radius: 8px;
+                        padding: 2rem;
+                        text-align: center;
+                        margin: 2rem 0;
+                    ">
+                        <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
+                        <div style="font-size: 1.5rem; font-weight: 700; color: {colors['text_primary']}; margin-bottom: 1rem;">Success!</div>
+                        <div style="color: {colors['text_secondary']}; margin-bottom: 1rem;">
+                            Your workout plan has been generated and saved to:<br>
+                            📄 Markdown file: <code>{output_file}</code><br>
+                            📊 Google Sheets: <code>{sheet_name}</code>
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
 
                     col1, col2 = st.columns(2)
                     with col1:
-                        if st.button("📋 View Generated Plan", use_container_width=True):
-                            st.session_state.current_page = 'plans'
-                            st.rerun()
+                        action_button("📋 View Generated Plan", "plans", accent=True, use_container_width=True)
                     with col2:
-                        if st.button("📊 Back to Dashboard", use_container_width=True):
-                            st.session_state.current_page = 'dashboard'
-                            st.rerun()
+                        action_button("📊 Back to Dashboard", "dashboard", use_container_width=True)
 
                 else:
                     st.error("❌ Failed to generate plan. Please check your API key and try again.")
@@ -236,8 +249,19 @@ USER PREFERENCES:
 
     # Cost estimate
     st.markdown("---")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("⏱️ **Estimated time:** 30-45 seconds")
-    with col2:
-        st.markdown("💰 **API cost:** ~$0.30 (Claude Sonnet 4.5)")
+    
+    colors = get_colors()
+    st.markdown(f"""
+    <div style="display: flex; justify-content: space-around; padding: 1rem; background: {colors['surface']}; border: 1px solid {colors['border_light']}; border-radius: 8px;">
+        <div style="text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">⏱️</div>
+            <div style="font-size: 0.875rem; color: {colors['text_secondary']};">Estimated time</div>
+            <div style="font-weight: 600; color: {colors['text_primary']};">30-45 seconds</div>
+        </div>
+        <div style="text-align: center;">
+            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">💰</div>
+            <div style="font-size: 0.875rem; color: {colors['text_secondary']};">API cost</div>
+            <div style="font-weight: 600; color: {colors['text_primary']};">~$0.30</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)

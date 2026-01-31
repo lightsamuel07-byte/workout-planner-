@@ -5,7 +5,14 @@ Workout Logger page - Log today's workout in real-time
 import streamlit as st
 from datetime import datetime
 import html
-from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
+from src.ui_utils import (
+    render_page_header, 
+    get_authenticated_reader, 
+    action_button, 
+    empty_state,
+    progress_bar
+)
+from src.design_system import get_colors
 
 
 def show():
@@ -26,14 +33,12 @@ def show():
         all_sheets = reader.get_all_weekly_plan_sheets()
 
         if not all_sheets:
-            st.markdown("""
-            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
-                <div style="font-size:4rem;margin-bottom:1rem;">📝</div>
-                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Workout Plan</div>
-                <div style="color:#666;margin-bottom:1.5rem;">Generate a plan first, then come back to log your workouts!</div>
-            </div>
-            """, unsafe_allow_html=True)
-            nav_button("Generate Plan Now", "generate", "🚀", type="primary")
+            empty_state(
+                "📝",
+                "No Workout Plan",
+                "Generate a plan first, then come back to log your workouts!"
+            )
+            action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
             return
 
         # Use the most recent sheet
@@ -62,14 +67,12 @@ def show():
                 break
 
         if not todays_workout:
-            st.markdown(f"""
-            <div style="text-align:center;padding:3rem 2rem;background:#e8f5e9;border-radius:12px;margin:2rem 0;">
-                <div style="font-size:4rem;margin-bottom:1rem;">😌</div>
-                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">Rest Day</div>
-                <div style="color:#666;margin-bottom:1.5rem;">No workout scheduled for {day_name}. Enjoy your recovery!</div>
-            </div>
-            """, unsafe_allow_html=True)
-            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            empty_state(
+                "😌",
+                "Rest Day",
+                f"No workout scheduled for {day_name}. Enjoy your recovery!"
+            )
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
         # Display today's workout plan
@@ -86,6 +89,14 @@ def show():
             return
 
         st.markdown(f"### 🏋️ Today's Workout: {todays_workout.get('date', '')}")
+        
+        # Show progress bar for completion tracking
+        logged_count = sum(1 for ex in exercises if ex.get('log', '').strip())
+        if logged_count > 0 or 'workout_logs' in st.session_state:
+            session_logged = sum(1 for idx in range(len(exercises)) if st.session_state.get('workout_logs', {}).get(f"log_{idx}", ""))
+            total_logged = max(logged_count, session_logged)
+            progress_bar(total_logged, len(exercises))
+        
         st.markdown("---")
 
         # Initialize session state for logging
@@ -215,13 +226,19 @@ def show():
 
         # Count how many exercises have logs
         logs_count = sum(1 for idx in range(len(exercises)) if st.session_state.workout_logs.get(f"log_{idx}", ""))
+        
+        colors = get_colors()
 
-        # Show save status
+        # Show save status with accent color
         if 'last_save_time' in st.session_state and st.session_state.last_save_time:
             save_time = st.session_state.last_save_time
             st.success(f"✅ Last saved: {save_time} ({logs_count}/{len(exercises)} exercises logged)")
         elif logs_count > 0:
-            st.info(f"📝 {logs_count}/{len(exercises)} exercises logged - Don't forget to save!")
+            st.markdown(f"""
+            <div style="background: rgba(0, 212, 170, 0.1); border-left: 4px solid {colors['accent']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                📝 <strong>{logs_count}/{len(exercises)} exercises logged</strong> - Don't forget to save!
+            </div>
+            """, unsafe_allow_html=True)
         else:
             st.info("💡 Enter your workout data above, then click Save to store it in Google Sheets")
 
@@ -229,10 +246,11 @@ def show():
         col1, col2, col3 = st.columns([1, 2, 1])
 
         with col1:
-            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
 
         with col2:
-            if st.button("💾 Save to Google Sheets", type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet"):
+            save_button_key = "save_workout_main"
+            if st.button("💾 Save to Google Sheets", type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet", key=save_button_key):
                 # Prepare log data to write back to sheets
                 logs_to_save = []
 
@@ -277,4 +295,4 @@ def show():
         st.error(f"Unable to load workout plan: {e}")
         st.info("Make sure you have a workout plan generated in Google Sheets.")
 
-        nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)

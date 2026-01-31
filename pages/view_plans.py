@@ -6,7 +6,8 @@ import streamlit as st
 import os
 import glob
 import re
-from src.ui_utils import render_page_header, nav_button
+from src.ui_utils import render_page_header, action_button, empty_state
+from src.design_system import get_colors
 
 def get_all_plans():
     """Get all workout plan files sorted by date (newest first)"""
@@ -101,14 +102,12 @@ def show():
     plans = get_all_plans()
 
     if not plans:
-        st.markdown("""
-        <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
-            <div style="font-size:4rem;margin-bottom:1rem;">📋</div>
-            <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Plans Yet</div>
-            <div style="color:#666;margin-bottom:1.5rem;">Create your first workout plan to start tracking!</div>
-        </div>
-        """, unsafe_allow_html=True)
-        nav_button("Generate Plan Now", "generate", "🚀", type="primary")
+        empty_state(
+            "📋",
+            "No Plans Yet",
+            "Create your first workout plan to start tracking!"
+        )
+        action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
         return
 
     # Plan selector
@@ -157,49 +156,53 @@ def show():
     day_content = days[selected_day]
     exercises = parse_exercises(day_content)
 
+    colors = get_colors()
+    
     if not exercises:
-        st.markdown("""
-        <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
-            <div style="font-size:3rem;margin-bottom:1rem;">😌</div>
-            <div style="font-weight:600;margin-bottom:0.5rem;">Rest Day</div>
-            <div style="color:#666;">No exercises scheduled - time to recover!</div>
-        </div>
-        """, unsafe_allow_html=True)
+        empty_state(
+            "😌",
+            "Rest Day",
+            "No exercises scheduled - time to recover!"
+        )
         # Show raw content for rest days
         st.markdown(day_content)
     else:
         # Display exercises in clean format
         for idx, ex in enumerate(exercises):
-            bg_color = '#FFF' if idx % 2 == 0 else '#f8f8f8'
-
             with st.container():
                 st.markdown(f"""
-                <div class="exercise-block" style="background-color: {bg_color};">
-                    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid #000; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                <div class="exercise-card" style="
+                    background-color: {colors['surface']};
+                    border: 2px solid {colors['border_strong']};
+                    border-radius: 8px;
+                    padding: 1rem;
+                    margin-bottom: 1rem;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid {colors['accent']}; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
                         <div style="flex: 1;">
-                            <div style="font-size: 1.5rem; color: #000; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">{ex['block']}</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: #000; text-transform: uppercase;">{ex['name']}</div>
+                            <div style="font-size: 1.5rem; color: {colors['text_primary']}; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">{ex['block']}</div>
+                            <div style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: {colors['text_primary']}; text-transform: uppercase;">{ex['name']}</div>
                         </div>
                     </div>
                     <div style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
-                        <div style="border: 2px solid #000; padding: 0.5rem; background-color: #FFF;">
-                            <div style="font-size: 0.7rem; color: #000; font-weight: 700; text-transform: uppercase;">SETS</div>
-                            <div style="font-weight: 700; color: #000; font-size: 1.2rem;">{ex['sets'] if ex['sets'] else '-'}</div>
+                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                            <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">SETS</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['sets'] if ex['sets'] else '-'}</div>
                         </div>
-                        <div style="border: 2px solid #000; padding: 0.5rem; background-color: #FFF;">
-                            <div style="font-size: 0.7rem; color: #000; font-weight: 700; text-transform: uppercase;">REPS</div>
-                            <div style="font-weight: 700; color: #000; font-size: 1.2rem;">{ex['reps'] if ex['reps'] else '-'}</div>
+                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                            <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">REPS</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['reps'] if ex['reps'] else '-'}</div>
                         </div>
-                        <div style="border: 2px solid #000; padding: 0.5rem; background-color: #FFF;">
-                            <div style="font-size: 0.7rem; color: #000; font-weight: 700; text-transform: uppercase;">LOAD</div>
-                            <div style="font-weight: 700; color: #000; font-size: 1.2rem;">{ex['load'] if ex['load'] else '-'}</div>
+                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                            <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">LOAD</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['load'] if ex['load'] else '-'}</div>
                         </div>
-                        <div style="border: 2px solid #000; padding: 0.5rem; background-color: #FFF;">
-                            <div style="font-size: 0.7rem; color: #000; font-weight: 700; text-transform: uppercase;">REST</div>
-                            <div style="font-weight: 700; color: #000; font-size: 1.2rem;">{ex['rest'] if ex['rest'] else '-'}</div>
+                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                            <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">REST</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['rest'] if ex['rest'] else '-'}</div>
                         </div>
                     </div>
-                    {f'<div style="margin-top: 0.75rem; padding: 0.75rem; background-color: #000; color: #0F0; border: 3px solid #0F0; font-size: 0.9rem; font-weight: 700;">📝 {ex["notes"]}</div>' if ex['notes'] else ''}
+                    {f'<div style="margin-top: 0.75rem; padding: 0.75rem; background-color: ' + colors['accent'] + '; color: ' + colors['primary'] + '; border: 2px solid ' + colors['accent'] + '; border-radius: 4px; font-size: 0.9rem; font-weight: 700;">📝 ' + ex['notes'] + '</div>' if ex['notes'] else ''}
                 </div>
                 """, unsafe_allow_html=True)
 
@@ -228,6 +231,4 @@ def show():
                 st.error(f"Error reading file: {e}")
 
     with col3:
-        if st.button("🏠 Back to Dashboard", use_container_width=True):
-            st.session_state.current_page = 'dashboard'
-            st.rerun()
+        action_button("🏠 Back to Dashboard", "dashboard", use_container_width=True)

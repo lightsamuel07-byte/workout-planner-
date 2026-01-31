@@ -102,127 +102,38 @@ def check_password():
 if not check_password():
     st.stop()
 
-# CSS - Critical Fixes + Mobile Responsiveness
+# Load external CSS
+try:
+    with open('assets/styles.css', 'r') as f:
+        css_content = f.read()
+    st.markdown(f"<style>{css_content}</style>", unsafe_allow_html=True)
+except FileNotFoundError:
+    st.warning("Custom styles not found. Using default styling.")
+
+# Apply dark mode theme if enabled
+if st.session_state.get('dark_mode', False):
+    st.markdown('<div data-theme="dark" style="display:none;"></div>', unsafe_allow_html=True)
+
+# Additional page-specific styles
 st.markdown("""
     <style>
     /* Fix text area overlapping labels */
     .stTextArea label[data-testid="stWidgetLabel"] {
         display: none;
     }
-
-    /* Clean corners */
-    button, input, textarea, select {
-        border-radius: 0 !important;
-    }
-
-    /* Mobile responsiveness */
-    @media (max-width: 768px) {
-        .main-header {
-            font-size: 1.5rem !important;
-        }
-        .sub-header {
-            font-size: 1rem !important;
-        }
-        /* Ensure minimum readable font sizes */
-        body, p, span, div {
-            font-size: max(0.9rem, 14px) !important;
-        }
-        /* Make day cards stack better on mobile */
-        .day-card {
-            min-width: 80px !important;
-            padding: 0.5rem !important;
-            font-size: 0.85rem !important;
-        }
-        /* Responsive exercise metric grids */
-        div[style*="grid-template-columns: repeat(4"] {
-            grid-template-columns: repeat(2, 1fr) !important;
-        }
-        /* Stack columns on very small screens */
-        [data-testid="column"] {
-            min-width: 100% !important;
-        }
+    
+    /* Page header styles */
+    .main-header {
+        font-size: 2.5rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+        font-family: 'Space Grotesk', sans-serif;
     }
     
-    @media (max-width: 480px) {
-        .main-header {
-            font-size: 1.25rem !important;
-        }
-        /* Single column grid on very small screens */
-        div[style*="grid-template-columns: repeat(4"] {
-            grid-template-columns: repeat(2, 1fr) !important;
-            gap: 0.25rem !important;
-        }
-        div[style*="grid-template-columns: repeat(4"] > div {
-            padding: 0.35rem !important;
-        }
-    }
-
-    /* Ensure touch targets are large enough */
-    button {
-        min-height: 44px !important;
-        padding: 0.75rem !important;
-        transition: all 0.2s ease !important;
-    }
-    
-    /* Subtle hover effects */
-    button:hover {
-        transform: translateY(-1px) !important;
-        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
-    }
-    
-    button:active {
-        transform: translateY(1px) !important;
-        box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
-    }
-    
-    /* Exercise card consistency */
-    .exercise-card {
-        border: 2px solid #000;
-        background: #fff;
-        transition: transform 0.15s ease, box-shadow 0.15s ease;
-    }
-    
-    .exercise-card:hover {
-        transform: translateY(-2px);
-        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
-    }
-    
-    /* Today's card pulse animation */
-    .day-card.today {
-        animation: pulse 2s infinite;
-    }
-    
-    @keyframes pulse {
-        0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,0,0.4); }
-        50% { box-shadow: 0 0 0 4px rgba(0,255,0,0); }
-    }
-    
-    /* Smooth metric transitions */
-    [data-testid="stMetric"] {
-        transition: transform 0.2s ease;
-    }
-    
-    [data-testid="stMetric"]:hover {
-        transform: scale(1.02);
-    }
-    
-    /* Consistent accent colors */
-    .stButton>button {
-        background-color: #000 !important;
-        color: #fff !important;
-    }
-    
-    .stButton>button:hover {
-        background-color: #333 !important;
-    }
-    
-    .stButton>button[kind="primary"] {
-        background-color: #000 !important;
-        border: 2px solid #000 !important;
-    }
-
-    input, textarea {
-        min-height: 44px !important;
+    .sub-header {
+        font-size: 1.125rem;
+        color: var(--color-text-secondary);
+        margin-bottom: 2rem;
     }
     </style>
 """, unsafe_allow_html=True)
@@ -230,43 +141,69 @@ st.markdown("""
 # Initialize session state
 if 'current_page' not in st.session_state:
     st.session_state.current_page = 'dashboard'
+if 'dark_mode' not in st.session_state:
+    st.session_state.dark_mode = False
 
 # Sidebar navigation
 with st.sidebar:
     st.markdown("# 💪 Workout Planner")
     st.markdown("---")
-    # Deployment trigger: v1.0.1
-
-    if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard"):
+    
+    # THIS WEEK section
+    st.markdown('<div class="nav-section-header">THIS WEEK</div>', unsafe_allow_html=True)
+    
+    if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard", 
+                 type="primary" if st.session_state.current_page == 'dashboard' else "secondary"):
         st.session_state.current_page = 'dashboard'
         st.rerun()
 
-    if st.button("📝 Log Workout", use_container_width=True, key="nav_log_workout"):
+    if st.button("📝 Log Workout", use_container_width=True, key="nav_log_workout",
+                 type="primary" if st.session_state.current_page == 'log_workout' else "secondary"):
         st.session_state.current_page = 'log_workout'
         st.rerun()
 
-    if st.button("🆕 Generate Plan", use_container_width=True, key="nav_generate"):
-        st.session_state.current_page = 'generate'
-        st.rerun()
-
-    if st.button("📋 View Plans", use_container_width=True, key="nav_plans"):
+    if st.button("📋 View Plan", use_container_width=True, key="nav_plans",
+                 type="primary" if st.session_state.current_page == 'plans' else "secondary"):
         st.session_state.current_page = 'plans'
         st.rerun()
+    
+    # PLANNING section
+    st.markdown('<div class="nav-section-header">PLANNING</div>', unsafe_allow_html=True)
+    
+    if st.button("🆕 Generate Plan", use_container_width=True, key="nav_generate",
+                 type="primary" if st.session_state.current_page == 'generate' else "secondary"):
+        st.session_state.current_page = 'generate'
+        st.rerun()
+    
+    # ANALYTICS section
+    st.markdown('<div class="nav-section-header">ANALYTICS</div>', unsafe_allow_html=True)
 
-    if st.button("📈 Progress", use_container_width=True, key="nav_progress"):
+    if st.button("📈 Progress", use_container_width=True, key="nav_progress",
+                 type="primary" if st.session_state.current_page == 'progress' else "secondary"):
         st.session_state.current_page = 'progress'
         st.rerun()
 
-    if st.button("📅 Weekly Review", use_container_width=True, key="nav_weekly_review"):
+    if st.button("📅 Weekly Review", use_container_width=True, key="nav_weekly_review",
+                 type="primary" if st.session_state.current_page == 'weekly_review' else "secondary"):
         st.session_state.current_page = 'weekly_review'
         st.rerun()
 
-    if st.button("📋 Exercise History", use_container_width=True, key="nav_exercise_history"):
+    if st.button("📋 Exercise History", use_container_width=True, key="nav_exercise_history",
+                 type="primary" if st.session_state.current_page == 'exercise_history' else "secondary"):
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
     st.markdown("---")
-    st.markdown("### ⚙️ Quick Settings")
+    
+    # SETTINGS section
+    st.markdown('<div class="nav-section-header">SETTINGS</div>', unsafe_allow_html=True)
+    
+    # Dark mode toggle
+    dark_mode = st.checkbox("🌙 Dark Mode", value=st.session_state.dark_mode, key="dark_mode_toggle")
+    if dark_mode != st.session_state.dark_mode:
+        st.session_state.dark_mode = dark_mode
+        st.rerun()
+    
     st.markdown(f"**User:** Samuel")
     st.markdown(f"**Goal:** Strength + Aesthetics")
 

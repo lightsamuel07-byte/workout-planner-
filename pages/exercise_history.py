@@ -5,8 +5,9 @@ Exercise History page - View detailed history for any exercise
 import streamlit as st
 import pandas as pd
 import re
-from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
+from src.ui_utils import render_page_header, get_authenticated_reader, action_button, empty_state
 from src.analytics import WorkoutAnalytics
+from src.design_system import get_colors
 
 
 def show():
@@ -22,14 +23,12 @@ def show():
         analytics.load_historical_data(weeks_back=16)
 
         if not analytics.historical_data:
-            st.markdown("""
-            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
-                <div style="font-size:4rem;margin-bottom:1rem;">📋</div>
-                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Exercise History</div>
-                <div style="color:#666;margin-bottom:1.5rem;">Log your workouts to track progress on individual exercises!</div>
-            </div>
-            """, unsafe_allow_html=True)
-            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            empty_state(
+                "📋",
+                "No Exercise History",
+                "Log your workouts to track progress on individual exercises!"
+            )
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
         # Get unique exercise list
@@ -41,14 +40,12 @@ def show():
                     all_exercises.add(exercise_name)
 
         if not all_exercises:
-            st.markdown("""
-            <div style="text-align:center;padding:2rem;color:#888;">
-                <div style="font-size:3rem;margin-bottom:1rem;">🔍</div>
-                <div style="font-weight:600;margin-bottom:0.5rem;">No Exercises Found</div>
-                <div style="font-size:0.9rem;">Your workout history doesn't contain any exercise data yet.</div>
-            </div>
-            """, unsafe_allow_html=True)
-            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            empty_state(
+                "🔍",
+                "No Exercises Found",
+                "Your workout history doesn't contain any exercise data yet."
+            )
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
         # Search/Filter UI
@@ -229,4 +226,4 @@ def show():
     st.markdown("---")
 
     # Back button
-    nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+    action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)

@@ -6,7 +6,14 @@ import streamlit as st
 from datetime import datetime, timedelta
 import os
 import glob
-from src.ui_utils import render_page_header, nav_button
+from src.ui_utils import (
+    render_page_header, 
+    nav_button, 
+    empty_state,
+    action_button,
+    completion_badge
+)
+from src.design_system import get_colors
 
 
 def get_fallback_stats():
@@ -120,14 +127,12 @@ def show():
     plan_summary = parse_plan_summary(latest_plan)
 
     if not latest_plan and not latest_sheet_plan:
-        st.markdown("""
-        <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
-            <div style="font-size:4rem;margin-bottom:1rem;">🎯</div>
-            <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Workout Plan Yet</div>
-            <div style="color:#666;margin-bottom:1.5rem;">Generate your first personalized plan to get started!</div>
-        </div>
-        """, unsafe_allow_html=True)
-        nav_button("Generate Plan Now", "generate", "🚀", type="primary")
+        empty_state(
+            "🎯",
+            "No Workout Plan Yet",
+            "Generate your first personalized plan to get started!"
+        )
+        action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
         return
 
     # Weekly Calendar View
@@ -146,6 +151,8 @@ def show():
         ('💪', 'UPPER', '+ Arms'),
         ('😌', 'REST', 'Recovery')
     ]
+    
+    colors = get_colors()
 
     for i, (col, day, date, workout) in enumerate(zip(cols, days, week_dates, workouts)):
         with col:
@@ -153,20 +160,37 @@ def show():
 
             # Check if this is today
             is_today = date.date() == datetime.now().date()
+            
+            # Check if completed (simplified - could be enhanced with actual data)
+            is_completed = date.date() < datetime.now().date()
+            
+            completion_icon = completion_badge(is_completed)
 
             # Simple alternating colors
-            bg_color = '#FFF' if i % 2 == 0 else '#f8f8f8'
+            bg_color = colors['surface']
+            border_color = colors['accent'] if is_today else colors['border_strong']
+            border_width = '3px' if is_today else '2px'
 
             card_class = "day-card today" if is_today else "day-card"
 
             st.markdown(f"""
-                <div class="{card_class}" style="background-color: {bg_color};">
-                    <div style="font-weight: 700; color: #000; font-size: 1.1rem; border-bottom: 3px solid #000; padding-bottom: 0.25rem; margin-bottom: 0.5rem;">{day}</div>
-                    <div style="font-size: 0.9rem; color: #000; margin-bottom: 0.5rem;">{date.strftime('%m/%d')}</div>
-                    <div style="font-size: 2.5rem; margin: 0.5rem 0; transform: rotate({(i - 3) * 5}deg);">{emoji}</div>
-                    <div style="font-weight: 700; color: #000; text-transform: uppercase; font-size: 0.9rem;">{title}</div>
-                    <div style="font-size: 0.85rem; color: #000;">{subtitle}</div>
-                    {'<div style="margin-top: 0.5rem; background-color: #000; color: #0F0; padding: 0.25rem; font-weight: 700; border: 2px solid #0F0;">⏰ TODAY</div>' if is_today else ''}
+                <div class="{card_class}" style="
+                    background-color: {bg_color};
+                    border: {border_width} solid {border_color};
+                    padding: 1rem;
+                    border-radius: 8px;
+                    text-align: center;
+                    min-width: 100px;
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                        <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.1rem;">{day}</div>
+                        {completion_icon}
+                    </div>
+                    <div style="font-size: 0.9rem; color: {colors['text_secondary']}; margin-bottom: 0.5rem;">{date.strftime('%m/%d')}</div>
+                    <div style="font-size: 2.5rem; margin: 0.5rem 0;">{emoji}</div>
+                    <div style="font-weight: 700; color: {colors['text_primary']}; text-transform: uppercase; font-size: 0.9rem;">{title}</div>
+                    <div style="font-size: 0.85rem; color: {colors['text_secondary']};">{subtitle}</div>
+                    {'<div style="margin-top: 0.5rem; background-color: ' + colors['accent'] + '; color: ' + colors['primary'] + '; padding: 0.25rem; font-weight: 700; border-radius: 4px;">TODAY</div>' if is_today else ''}
                 </div>
             """, unsafe_allow_html=True)
 
@@ -262,13 +286,13 @@ def show():
     with col3:
         st.markdown("### 🎯 Quick Actions")
 
-        nav_button("Generate New Week Plan", "generate", "🆕", use_container_width=True, type="primary")
+        action_button("Log Today's Workout", "log_workout", "📝", accent=True, use_container_width=True)
 
-        nav_button("View Full Week Plan", "plans", "📋", use_container_width=True)
+        action_button("View Full Week Plan", "plans", "📋", use_container_width=True)
+        
+        action_button("View Progress Charts", "progress", "�", use_container_width=True)
 
-        nav_button("Log Today's Workout", "log_workout", "📝", use_container_width=True)
-
-        nav_button("View Progress Charts", "progress", "📈", use_container_width=True)
+        action_button("Generate New Week Plan", "generate", "🆕", use_container_width=True)
 
     st.markdown("---")
 
@@ -298,10 +322,10 @@ def show():
                 """)
         else:
             st.markdown("""
-            <div style="text-align:center;padding:2rem;color:#888;">
+            <div style="text-align:center;padding:2rem;">
                 <div style="font-size:3rem;margin-bottom:1rem;">🏋️</div>
-                <div style="font-weight:600;margin-bottom:0.5rem;">No Workouts Logged Yet</div>
-                <div style="font-size:0.9rem;">Start logging your workouts to see your history here!</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;color: var(--color-text-primary);">No Workouts Logged Yet</div>
+                <div style="font-size:0.9rem;color: var(--color-text-secondary);">Start logging your workouts to see your history here!</div>
             </div>
             """)
 
@@ -313,11 +337,11 @@ def show():
             st.write(f"**Generated:** {plan_date[:8]}")
             st.write(f"📄 {plan_summary.get('total_exercises', 0)} exercises")
             st.write("✅ Saved to Google Sheets")
-            nav_button("View Plan →", "plans")
+            action_button("View Plan →", "plans")
         elif latest_sheet_plan:
             # Show plan from Google Sheets if no markdown file
             plan_date = latest_sheet_plan.replace('Weekly Plan (', '').replace('(Weekly Plan) ', '').replace(')', '')
             st.write(f"**Sheet:** {plan_date}")
             st.write(f"📊 Plan in Google Sheets")
             st.write("✅ Ready to log workouts")
-            nav_button("View Plan →", "plans")
+            action_button("View Plan →", "plans")

@@ -3,7 +3,8 @@ Weekly Review page - Browse and review past workout weeks
 """
 
 import streamlit as st
-from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
+from src.ui_utils import render_page_header, get_authenticated_reader, action_button, empty_state
+from src.design_system import get_colors
 from datetime import datetime
 import re
 
@@ -21,14 +22,12 @@ def show():
         all_sheets = reader.get_all_weekly_plan_sheets()
 
         if not all_sheets:
-            st.markdown("""
-            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
-                <div style="font-size:4rem;margin-bottom:1rem;">📅</div>
-                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No History Yet</div>
-                <div style="color:#666;margin-bottom:1.5rem;">Complete your first week of workouts to see reviews here!</div>
-            </div>
-            """, unsafe_allow_html=True)
-            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            empty_state(
+                "📅",
+                "No History Yet",
+                "Complete your first week of workouts to see reviews here!"
+            )
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
         # Reverse order so most recent is first
