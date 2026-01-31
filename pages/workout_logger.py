@@ -80,12 +80,27 @@ def show():
 
         if not exercises:
             st.markdown("""
-            <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+            <div style="text-align:center;padding:2rem;background:linear-gradient(135deg, #f0f2f6 0%, #e8eaf0 100%);border-radius:12px;border:2px solid #ddd;">
                 <div style="font-size:3rem;margin-bottom:1rem;">🤔</div>
-                <div style="font-weight:600;margin-bottom:0.5rem;">No Exercises</div>
-                <div style="color:#666;">Today's workout is empty - check your plan.</div>
+                <div style="font-weight:700;margin-bottom:0.5rem;font-size:1.3rem;">No Exercises Found</div>
+                <div style="color:#666;margin-bottom:1.5rem;">Today's workout appears empty.</div>
+                <div style="text-align:left;display:inline-block;background:white;padding:1rem;border-radius:8px;border-left:4px solid #00D4AA;">
+                    <div style="font-weight:600;margin-bottom:0.5rem;">💡 Troubleshooting:</div>
+                    <div style="font-size:0.9rem;color:#666;">
+                        • Check if your plan is generated in Google Sheets<br>
+                        • Verify the correct week is selected<br>
+                        • Make sure today's date matches the plan<br>
+                        • Try refreshing the page
+                    </div>
+                </div>
             </div>
             """, unsafe_allow_html=True)
+            st.markdown("<br>", unsafe_allow_html=True)
+            col1, col2 = st.columns(2)
+            with col1:
+                action_button("View Plan", "plans", "📋", use_container_width=True)
+            with col2:
+                action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
         # Progress display with bar
