@@ -105,6 +105,23 @@ def show():
                         load = float(load_match.group(1))
                         total_volume += sets * reps * load
 
+            # Add link to Google Sheets
+            sheet_url = f"https://docs.google.com/spreadsheets/d/{reader.spreadsheet_id}/edit#gid=0"
+            st.markdown(f"""
+            <a href="{sheet_url}" target="_blank" style="
+                display: inline-block;
+                padding: 0.5rem 1rem;
+                background: #4285F4;
+                color: white;
+                text-decoration: none;
+                border-radius: 4px;
+                font-weight: 500;
+                margin-bottom: 1rem;
+            ">📊 Open in Google Sheets</a>
+            """, unsafe_allow_html=True)
+            
+            st.markdown("---")
+
             # Display summary metrics
             col1, col2, col3, col4 = st.columns(4)
 
