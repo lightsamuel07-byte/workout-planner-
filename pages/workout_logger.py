@@ -305,6 +305,21 @@ def show():
         else:
             st.info("💡 Enter your workout data above, then click Save to store it in Google Sheets")
 
+        # Add pulsing animation CSS for save button when unsaved changes
+        if logs_count > 0 and not st.session_state.get('last_save_time'):
+            st.markdown("""
+            <style>
+            @keyframes pulse {
+                0% { box-shadow: 0 0 0 0 rgba(0, 212, 170, 0.7); }
+                70% { box-shadow: 0 0 0 10px rgba(0, 212, 170, 0); }
+                100% { box-shadow: 0 0 0 0 rgba(0, 212, 170, 0); }
+            }
+            button[kind="primary"] {
+                animation: pulse 2s infinite;
+            }
+            </style>
+            """, unsafe_allow_html=True)
+        
         # Save button
         col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -313,7 +328,8 @@ def show():
 
         with col2:
             save_button_key = "save_workout_main"
-            if st.button("💾 Save to Google Sheets", type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet", key=save_button_key):
+            save_button_label = "💾 Save to Google Sheets" if logs_count == 0 else f"💾 Save {logs_count} Exercise{'s' if logs_count != 1 else ''}"
+            if st.button(save_button_label, type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet", key=save_button_key):
                 # Prepare log data to write back to sheets
                 logs_to_save = []
 
