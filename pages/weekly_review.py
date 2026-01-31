@@ -228,10 +228,27 @@ def show():
 
                 # Check if workout was completed
                 has_logs = any(ex.get('log', '').strip() for ex in exercises)
-                completion_badge = "✅ COMPLETED" if has_logs else "⏸️ Planned"
-
-                # Create expandable section for each day
-                with st.expander(f"{emoji} **{workout_date}** - {completion_badge}", expanded=False):
+                completion_status = "✅ COMPLETED" if has_logs else "⏸️ PLANNED"
+                status_color = "#00C853" if has_logs else "#FFA726"
+                
+                # Create expandable section with enhanced styling
+                expander_label = f"{emoji} **{workout_date}**"
+                with st.expander(expander_label, expanded=False):
+                    # Show status badge at top
+                    st.markdown(f"""
+                    <div style="
+                        display: inline-block;
+                        padding: 0.5rem 1rem;
+                        background: {status_color}15;
+                        border-left: 4px solid {status_color};
+                        border-radius: 4px;
+                        margin-bottom: 1rem;
+                        font-weight: 600;
+                        color: {status_color};
+                    ">
+                        {completion_status}
+                    </div>
+                    """, unsafe_allow_html=True)
                     if not exercises:
                         st.markdown("""
                         <div style="text-align:center;padding:1.5rem;background:#f8f9fa;border-radius:8px;">
