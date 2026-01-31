@@ -105,12 +105,21 @@ class SheetsReader:
             # Read all data from the sheet
             # Extended range to include all columns: Block, Exercise, Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes, Log (A:L = 12 columns)
             range_name = f"{self.sheet_name}!A:L"
+            print(f"[READ DEBUG] Reading from sheet: '{self.sheet_name}'")
+            print(f"[READ DEBUG] Range: {range_name}")
+            
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
                 range=range_name
             ).execute()
 
             values = result.get('values', [])
+            
+            # Debug: Show first 5 rows
+            print(f"[READ DEBUG] Total rows: {len(values)}")
+            if values:
+                for i, row in enumerate(values[:5]):
+                    print(f"[READ DEBUG] Row {i} length={len(row)}: {row[:min(9, len(row))]}")
 
             if not values:
                 print("No data found in sheet.")
