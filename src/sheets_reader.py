@@ -500,15 +500,6 @@ class SheetsReader:
         if not self.service:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
 
-        print(f"\n{'='*60}")
-        print(f"[SAVE DEBUG] write_workout_logs called")
-        print(f"  Sheet name: '{self.sheet_name}'")
-        print(f"  Workout date: '{workout_date}'")
-        print(f"  Number of logs: {len(logs)}")
-        for i, log in enumerate(logs):
-            print(f"    Log {i}: '{log['exercise']}' → '{log['log']}'")
-        print(f"{'='*60}\n")
-
         try:
             # Read current sheet data to find the correct rows
             # Extended range to include all columns: Block, Exercise, Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes, Log (A:L = 12 columns)
@@ -520,13 +511,6 @@ class SheetsReader:
 
             values = result.get('values', [])
 
-            print(f"[SAVE DEBUG] Loaded {len(values)} rows from sheet")
-            if values:
-                print(f"[SAVE DEBUG] First 15 row[0] values:")
-                for i, row in enumerate(values[:15]):
-                    if row:
-                        print(f"  Row {i}: '{row[0][:80]}...' (length: {len(row[0])})")
-
             if not values:
                 print(f"No data found in {self.sheet_name}")
                 return False
@@ -534,16 +518,12 @@ class SheetsReader:
             # Find the workout date section
             date_row = None
             for i, row in enumerate(values):
-                if len(row) > 0:
-                    if workout_date in row[0]:
-                        date_row = i
-                        print(f"[SAVE DEBUG] ✓ FOUND DATE at row {i}")
-                        break
+                if len(row) > 0 and workout_date in row[0]:
+                    date_row = i
+                    break
 
             if date_row is None:
-                print(f"[SAVE DEBUG] ✗ DATE NOT FOUND")
-                print(f"[SAVE DEBUG] Searched for: '{workout_date}'")
-                print(f"[SAVE DEBUG] In {len(values)} rows")
+                print(f"Could not find workout date: {workout_date}")
                 return False
 
             # Build update data
@@ -563,17 +543,13 @@ class SheetsReader:
                 # Check if this row has an exercise name matching our log
                 if len(row) > 1:
                     exercise_name = row[1].strip() if len(row) > 1 else ""
-                    print(f"[SAVE DEBUG] Row {current_row}: Sheet has '{exercise_name}'")
 
                     # Match with our log
                     if log_index < len(logs):
                         log_entry = logs[log_index]
-                        print(f"[SAVE DEBUG]   Comparing with log[{log_index}]: '{log_entry['exercise']}'")
-                        print(f"[SAVE DEBUG]   Log value: '{log_entry['log']}'")
 
                         # Check if exercise names match (allow partial match)
                         if log_entry['exercise'].lower() in exercise_name.lower() or exercise_name.lower() in log_entry['exercise'].lower():
-                            print(f"[SAVE DEBUG]   ✓ MATCH!")
                             # Column H is the LOG column (user's actual sheet structure)
                             # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Log
                             if log_entry['log']:  # Only update if there's actual log data
@@ -582,21 +558,12 @@ class SheetsReader:
                                     'range': cell_range,
                                     'values': [[log_entry['log']]]
                                 })
-                                print(f"[SAVE DEBUG]   ✓ Added update: {cell_range} = '{log_entry['log']}'")
-                            else:
-                                print(f"[SAVE DEBUG]   ✗ Skipped: log value is empty")
 
                             log_index += 1
-                        else:
-                            print(f"[SAVE DEBUG]   ✗ No match")
 
                 current_row += 1
 
             # Perform batch update
-            print(f"\n[SAVE DEBUG] Prepared {len(updates)} updates:")
-            for upd in updates:
-                print(f"  {upd['range']}: '{upd['values'][0][0]}'")
-
             if updates:
                 body = {
                     'valueInputOption': 'USER_ENTERED',
@@ -608,11 +575,10 @@ class SheetsReader:
                     body=body
                 ).execute()
 
-                print(f"[SAVE DEBUG] ✓ Successfully updated {len(updates)} exercise logs")
+                print(f"✓ Updated {len(updates)} exercise logs")
                 return True
             else:
-                print(f"[SAVE DEBUG] ✗ No updates to save (updates list is empty)")
-                print(f"[SAVE DEBUG] Checked {log_index} out of {len(logs)} logs")
+                print("No logs to update")
                 return False
 
         except HttpError as err:
