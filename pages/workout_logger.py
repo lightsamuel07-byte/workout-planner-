@@ -191,6 +191,12 @@ def show():
                         # Show existing log if present
                         if existing_log:
                             st.markdown(f"<div style='background-color: #d4edda; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;'><span style='color: #155724; font-size: 0.9rem;'>✅ Logged: {html.escape(existing_log)}</span></div>", unsafe_allow_html=True)
+                            
+                            # Quick action to clear this log
+                            if st.button("✏️ Edit", key=f"edit_{idx}", use_container_width=True):
+                                if log_key in st.session_state.workout_logs:
+                                    del st.session_state.workout_logs[log_key]
+                                st.rerun()
                         else:
                             # Detect exercise type for smart placeholder
                             exercise_lower = exercise_name.lower()
@@ -203,6 +209,17 @@ def show():
                                 placeholder = "e.g., 12,12,11,10 @ 7kg or 12,12,11,10"
                                 help_text = "Log reps per set @ weight OR just reps (e.g., 12,12,11,10)"
 
+                            # Quick action buttons
+                            qcol1, qcol2 = st.columns(2)
+                            with qcol1:
+                                if st.button("✓ Done", key=f"done_{idx}", use_container_width=True, help="Mark as completed as prescribed"):
+                                    st.session_state.workout_logs[log_key] = "Done"
+                                    st.rerun()
+                            with qcol2:
+                                if st.button("⊗ Skip", key=f"skip_{idx}", use_container_width=True, help="Mark as skipped"):
+                                    st.session_state.workout_logs[log_key] = "Skipped"
+                                    st.rerun()
+                            
                             # Input for new log
                             default_value = st.session_state.workout_logs.get(log_key, "")
                             log_input = st.text_input(
@@ -210,7 +227,8 @@ def show():
                                 value=default_value,
                                 placeholder=placeholder,
                                 key=f"input_{log_key}",
-                                help=help_text
+                                help=help_text,
+                                label_visibility="collapsed"
                             )
 
                             # Store in session state
