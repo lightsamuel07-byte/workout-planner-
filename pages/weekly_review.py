@@ -62,6 +62,10 @@ def show():
             st.markdown(f"## 🗓️ Week of {week_display}")
 
             # Calculate week metrics
+            # Debug: Show log values for first workout
+            if week_data and week_data[0].get('exercises'):
+                st.info(f"DEBUG: First workout has {len(week_data[0]['exercises'])} exercises. First exercise log value: '{week_data[0]['exercises'][0].get('log', 'NO LOG KEY')}' | Keys: {list(week_data[0]['exercises'][0].keys())}")
+            
             completed_days = len([w for w in week_data if any(ex.get('log', '').strip() for ex in w.get('exercises', []))])
             total_days = len(week_data)
             total_exercises = sum(len(w.get('exercises', [])) for w in week_data)
