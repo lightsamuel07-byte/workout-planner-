@@ -232,10 +232,14 @@ def show():
         # Show save status with accent color
         if 'last_save_time' in st.session_state and st.session_state.last_save_time:
             save_time = st.session_state.last_save_time
-            st.success(f"✅ Last saved: {save_time} ({logs_count}/{len(exercises)} exercises logged)")
+            st.markdown(f"""
+            <div style="background: rgba(0, 200, 83, 0.1); border-left: 4px solid #00C853; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+                ✅ <strong>Last saved: {save_time}</strong> ({logs_count}/{len(exercises)} exercises logged)
+            </div>
+            """, unsafe_allow_html=True)
         elif logs_count > 0:
             st.markdown(f"""
-            <div style="background: rgba(0, 212, 170, 0.1); border-left: 4px solid {colors['accent']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+            <div style="background: rgba(255, 152, 0, 0.1); border-left: 4px solid {colors['accent']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
                 📝 <strong>{logs_count}/{len(exercises)} exercises logged</strong> - Don't forget to save!
             </div>
             """, unsafe_allow_html=True)
