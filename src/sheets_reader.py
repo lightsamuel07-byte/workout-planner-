@@ -530,7 +530,7 @@ class SheetsReader:
             updates = []
 
             # Start checking rows after the date row
-            current_row = date_row + 1
+            current_row = date_row + 2  # Skip the header row
             log_index = 0
             
             # Collect all exercise rows first
