@@ -136,24 +136,24 @@ def show():
                         # Exercise name
                         st.markdown(f"**{exercise_name}**")
 
-                        # 4-column grid for metrics (like view_plans.py)
+                        # 4-column grid for metrics with improved styling
                         st.markdown(f"""
-                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.25rem; margin: 0.5rem 0;">
-                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">SETS</div>
-                                <div style="font-weight: 700;">{html.escape(sets) if sets else '-'}</div>
+                        <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0.75rem 0;">
+                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">SETS</div>
+                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(sets) if sets else '-'}</div>
                             </div>
-                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">REPS</div>
-                                <div style="font-weight: 700;">{html.escape(reps) if reps else '-'}</div>
+                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">REPS</div>
+                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(reps) if reps else '-'}</div>
                             </div>
-                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">LOAD</div>
-                                <div style="font-weight: 700;">{html.escape(load) if load else '-'}</div>
+                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">LOAD</div>
+                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(load) if load else '-'}</div>
                             </div>
-                            <div style="border: 2px solid #000; padding: 0.5rem; background: #fff;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666;">REST</div>
-                                <div style="font-weight: 700;">{html.escape(rest) if rest else '-'}</div>
+                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">REST</div>
+                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(rest) if rest else '-'}</div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
