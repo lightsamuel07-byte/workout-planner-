@@ -29,43 +29,41 @@ def show():
         bench_prog = analytics.get_main_lift_progression('bench', weeks=8)
         deadlift_prog = analytics.get_main_lift_progression('deadlift', weeks=8)
 
-        # Build chart data
-        if squat_prog and bench_prog and deadlift_prog:
-            # Convert weekly data to chart format
-            weeks = sorted(squat_prog['weekly_data'].keys())
-
-            chart_data = pd.DataFrame({
-                'Week': list(range(1, len(weeks) + 1)),
-                'Back Squat': [squat_prog['weekly_data'][w] for w in weeks],
-                'Bench Press': [bench_prog['weekly_data'][w] for w in weeks],
-                'Deadlift': [deadlift_prog['weekly_data'][w] for w in weeks]
-            })
-
-            st.line_chart(chart_data.set_index('Week'))
-
-            # Show current metrics
+        # Show current metrics for each lift that has data
+        has_any_data = squat_prog or bench_prog or deadlift_prog
+        
+        if has_any_data:
             col1, col2, col3 = st.columns(3)
 
             with col1:
-                st.metric(
-                    "Back Squat",
-                    f"{squat_prog['current_load']} kg",
-                    f"+{squat_prog['progression_kg']} kg ({squat_prog['progression_pct']}%)"
-                )
+                if squat_prog:
+                    st.metric(
+                        "Back Squat",
+                        f"{squat_prog['current_load']} kg",
+                        f"+{squat_prog['progression_kg']} kg ({squat_prog['progression_pct']}%)"
+                    )
+                else:
+                    st.metric("Back Squat", "No data", "")
 
             with col2:
-                st.metric(
-                    "Bench Press",
-                    f"{bench_prog['current_load']} kg",
-                    f"+{bench_prog['progression_kg']} kg ({bench_prog['progression_pct']}%)"
-                )
+                if bench_prog:
+                    st.metric(
+                        "Bench Press",
+                        f"{bench_prog['current_load']} kg",
+                        f"+{bench_prog['progression_kg']} kg ({bench_prog['progression_pct']}%)"
+                    )
+                else:
+                    st.metric("Bench Press", "No data", "")
 
             with col3:
-                st.metric(
-                    "Deadlift",
-                    f"{deadlift_prog['current_load']} kg",
-                    f"+{deadlift_prog['progression_kg']} kg ({deadlift_prog['progression_pct']}%)"
-                )
+                if deadlift_prog:
+                    st.metric(
+                        "Deadlift",
+                        f"{deadlift_prog['current_load']} kg",
+                        f"+{deadlift_prog['progression_kg']} kg ({deadlift_prog['progression_pct']}%)"
+                    )
+                else:
+                    st.metric("Deadlift", "No data", "")
         else:
             st.markdown("""
             <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
@@ -196,16 +194,6 @@ def show():
             """, unsafe_allow_html=True)
 
     st.markdown("---")
-
-    # Coming soon features
-    st.info("""
-    🚧 **Coming Soon:**
-    - Body composition photo tracking
-    - Detailed exercise history
-    - Volume per muscle group charts
-    - Injury risk indicators
-    - Export to PDF reports
-    """)
 
     # Back button
     nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)

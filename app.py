@@ -234,7 +234,6 @@ if 'current_page' not in st.session_state:
 # Sidebar navigation
 with st.sidebar:
     st.markdown("# 💪 Workout Planner")
-    st.markdown("*Powered by Claude AI*")
     st.markdown("---")
     # Deployment trigger: v1.0.1
 
