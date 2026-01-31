@@ -258,15 +258,11 @@ def show():
 
         nav_button("Generate New Week Plan", "generate", "🆕", use_container_width=True, type="primary")
 
-        if st.button("📋 View Full Week Plan", use_container_width=True):
-            st.session_state.current_page = 'plans'
-            st.rerun()
+        nav_button("View Full Week Plan", "plans", "📋", use_container_width=True)
 
         nav_button("Log Today's Workout", "log_workout", "📝", use_container_width=True)
 
-        if st.button("📈 View Progress Charts", use_container_width=True):
-            st.session_state.current_page = 'progress'
-            st.rerun()
+        nav_button("View Progress Charts", "progress", "📈", use_container_width=True)
 
     st.markdown("---")
 
@@ -300,15 +296,11 @@ def show():
             st.write(f"**Generated:** {plan_date[:8]}")
             st.write(f"📄 {plan_summary.get('total_exercises', 0)} exercises")
             st.write("✅ Saved to Google Sheets")
-            if st.button("View Plan →"):
-                st.session_state.current_page = 'plans'
-                st.rerun()
+            nav_button("View Plan →", "plans")
         elif latest_sheet_plan:
             # Show plan from Google Sheets if no markdown file
             plan_date = latest_sheet_plan.replace('Weekly Plan (', '').replace('(Weekly Plan) ', '').replace(')', '')
             st.write(f"**Sheet:** {plan_date}")
             st.write(f"📊 Plan in Google Sheets")
             st.write("✅ Ready to log workouts")
-            if st.button("View Plan →"):
-                st.session_state.current_page = 'plans'
-                st.rerun()
+            nav_button("View Plan →", "plans")
