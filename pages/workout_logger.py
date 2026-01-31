@@ -353,11 +353,29 @@ def show():
                         st.code(traceback.format_exc())
 
         with col3:
-            if st.button("Clear All", use_container_width=True, help="Clear all unsaved logs"):
-                st.session_state.workout_logs = {}
-                if 'last_save_time' in st.session_state:
-                    del st.session_state.last_save_time
-                st.rerun()
+            # Initialize confirm state
+            if 'confirm_clear' not in st.session_state:
+                st.session_state.confirm_clear = False
+            
+            if st.session_state.confirm_clear:
+                # Show confirmation
+                st.warning("⚠️ Clear all unsaved logs?")
+                ccol1, ccol2 = st.columns(2)
+                with ccol1:
+                    if st.button("Yes, Clear", type="primary", use_container_width=True, key="confirm_clear_yes"):
+                        st.session_state.workout_logs = {}
+                        if 'last_save_time' in st.session_state:
+                            del st.session_state.last_save_time
+                        st.session_state.confirm_clear = False
+                        st.rerun()
+                with ccol2:
+                    if st.button("Cancel", use_container_width=True, key="confirm_clear_no"):
+                        st.session_state.confirm_clear = False
+                        st.rerun()
+            else:
+                if st.button("🗑️ Clear All", use_container_width=True, help="Clear all unsaved logs"):
+                    st.session_state.confirm_clear = True
+                    st.rerun()
 
     except Exception as e:
         st.error(f"Unable to load workout plan: {e}")
