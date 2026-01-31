@@ -48,16 +48,42 @@ def show():
             action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
-        # Search/Filter UI
+        # Search/Filter UI with improved styling
         st.markdown("### 🔍 Search Exercises")
+        
+        colors = get_colors()
+        
+        st.markdown(f"""
+        <div style="
+            background: {colors['surface']};
+            border: 2px solid {colors['border_strong']};
+            border-radius: 8px;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+        ">
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">💡 Quick Tip</div>
+            <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
+                Search for any exercise to see your progression over time. Track weights, reps, and performance trends.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         col1, col2 = st.columns([3, 1])
 
         with col1:
-            search_query = st.text_input("Search exercise name:", placeholder="e.g., bench press, curl, squat")
+            search_query = st.text_input(
+                "Search exercise name:", 
+                placeholder="e.g., bench press, curl, squat",
+                help="Type any part of the exercise name"
+            )
 
         with col2:
-            weeks_filter = st.selectbox("Time Range", [4, 8, 12, 16], index=2)
+            weeks_filter = st.selectbox(
+                "Time Range", 
+                [4, 8, 12, 16], 
+                index=2,
+                help="How many weeks of history to load"
+            )
 
         # Filter exercises based on search
         filtered_exercises = sorted(all_exercises)
@@ -65,7 +91,11 @@ def show():
             search_lower = search_query.lower()
             filtered_exercises = [ex for ex in filtered_exercises if search_lower in ex.lower()]
 
-        st.markdown(f"**Found {len(filtered_exercises)} exercise(s)**")
+        st.markdown(f"""
+        <div style="padding: 0.5rem 0; font-size: 0.9rem; color: {colors['text_secondary']};">
+            📊 Found <strong style="color: {colors['accent']};">{len(filtered_exercises)}</strong> exercise(s) in your history
+        </div>
+        """, unsafe_allow_html=True)
 
         if not filtered_exercises:
             st.markdown("""
