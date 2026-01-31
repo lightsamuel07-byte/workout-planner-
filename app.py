@@ -74,15 +74,36 @@ def check_password():
             st.session_state["password_correct"] = False
 
     if "password_correct" not in st.session_state:
-        # First run, show password input
-        st.markdown("## 🔒 Authentication Required")
-        st.text_input(
-            "Enter password to access the app:",
-            type="password",
-            on_change=password_entered,
-            key="password"
-        )
-        st.markdown("*This app is password-protected for authorized users only.*")
+        # First run, show enhanced password input
+        st.markdown("""
+        <div style="
+            max-width: 400px;
+            margin: 4rem auto;
+            text-align: center;
+        ">
+            <div style="font-size: 4rem; margin-bottom: 1rem;">💪</div>
+            <h1 style="
+                font-family: 'Space Grotesk', sans-serif;
+                font-size: 2rem;
+                font-weight: 700;
+                margin-bottom: 0.5rem;
+            ">Samuel's Workout Planner</h1>
+            <p style="
+                color: #6B7280;
+                margin-bottom: 2rem;
+            ">Track your strength journey</p>
+        </div>
+        """, unsafe_allow_html=True)
+        
+        col1, col2, col3 = st.columns([1, 2, 1])
+        with col2:
+            st.text_input(
+                "Password", 
+                type="password", 
+                on_change=password_entered, 
+                key="password",
+                placeholder="Enter password to continue"
+            )
         return False
     elif not st.session_state["password_correct"]:
         # Password incorrect, show input again
