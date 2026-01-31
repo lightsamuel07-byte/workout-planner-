@@ -53,28 +53,32 @@ st.set_page_config(
 # Password Protection
 def check_password():
     """Returns True if the user has entered the correct password."""
+    
+    # Get correct password
+    try:
+        correct_password = st.secrets.get("APP_PASSWORD", "workout2026")
+    except (AttributeError, KeyError):
+        correct_password = "workout2026"
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # Try to get password from secrets, fall back to default for local dev
-        try:
-            correct_password = st.secrets.get("APP_PASSWORD", "workout2026")
-        except (AttributeError, KeyError):
-            correct_password = "workout2026"
-
-        # Use .get() to safely access the password - it may not exist yet in callback
         entered_password = st.session_state.get("password", "")
         
         if entered_password == correct_password:
             st.session_state["password_correct"] = True
-            # Clear password from session state for security
-            if "password" in st.session_state:
-                del st.session_state["password"]
+            st.session_state["auth_token"] = "authenticated"  # Backup flag
         else:
             st.session_state["password_correct"] = False
+            st.session_state["auth_token"] = None
 
-    if "password_correct" not in st.session_state:
-        # First run, show password input
+    # Check both flags for redundancy
+    is_authenticated = (
+        st.session_state.get("password_correct", False) or 
+        st.session_state.get("auth_token") == "authenticated"
+    )
+    
+    if not is_authenticated:
+        # Show password input
         st.markdown("## 🔒 Authentication Required")
         st.text_input(
             "Enter password to access the app:",
@@ -82,21 +86,17 @@ def check_password():
             on_change=password_entered,
             key="password"
         )
-        st.markdown("*This app is password-protected for authorized users only.*")
-        return False
-    elif not st.session_state["password_correct"]:
-        # Password incorrect, show input again
-        st.markdown("## 🔒 Authentication Required")
-        st.text_input(
-            "Enter password to access the app:",
-            type="password",
-            on_change=password_entered,
-            key="password"
-        )
-        st.error("😕 Password incorrect. Please try again.")
+        
+        if st.session_state.get("password_correct") == False:
+            st.error("😕 Password incorrect. Please try again.")
+        else:
+            st.markdown("*This app is password-protected for authorized users only.*")
+        
         return False
     else:
-        # Password correct
+        # Ensure both flags are set
+        st.session_state["password_correct"] = True
+        st.session_state["auth_token"] = "authenticated"
         return True
 
 if not check_password():
