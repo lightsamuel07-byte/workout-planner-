@@ -87,15 +87,9 @@ def show():
 
     with st.expander("View Last Week's Log"):
         st.markdown("""
-        📊 **Auto-loaded from Google Sheets: (Weekly Plan) 1/18/2026**
+        📊 **Auto-loaded from Google Sheets**
 
-        **Last Week's Data:**
-        - 60 total supplemental exercises logged
-        - Tuesday: 27 exercises
-        - Thursday: 23 exercises
-        - Saturday: 10 exercises
-
-        *This data will be automatically used for progressive overload recommendations.*
+        *Last week's data will be automatically loaded and used for progressive overload recommendations.*
         """)
 
     st.markdown("---")
@@ -120,9 +114,9 @@ def show():
         with st.spinner("🤖 Generating your personalized workout plan..."):
             try:
                 # Import after user clicks to avoid loading on page load
-                from plan_generator import PlanGenerator
-                from sheets_reader import SheetsReader
-                from sheets_writer import SheetsWriter
+                from src.plan_generator import PlanGenerator
+                from src.sheets_reader import SheetsReader
+                from src.sheets_writer import SheetsWriter
                 import yaml
                 from dotenv import load_dotenv
 

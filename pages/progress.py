@@ -130,10 +130,13 @@ def show():
                     volumes = list(group_volume.values())
                     first_week = volumes[0]
                     last_week = volumes[-1]
-                    pct_increase = ((last_week - first_week) / first_week) * 100
-
+                    
                     emoji = {'arms': '💪', 'shoulders': '🔥', 'chest': '📈', 'back': '💪'}.get(group, '✅')
-                    st.write(f"{emoji} {group.title()}: +{pct_increase:.0f}% volume")
+                    if first_week > 0:
+                        pct_increase = ((last_week - first_week) / first_week) * 100
+                        st.write(f"{emoji} {group.title()}: +{pct_increase:.0f}% volume")
+                    else:
+                        st.write(f"{emoji} {group.title()}: {last_week:.0f} kg volume")
                 else:
                     st.write(f"✅ {group.title()}: insufficient data")
 

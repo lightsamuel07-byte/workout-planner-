@@ -122,6 +122,34 @@ st.markdown("""
         body, p, span, div {
             font-size: max(0.9rem, 14px) !important;
         }
+        /* Make day cards stack better on mobile */
+        .day-card {
+            min-width: 80px !important;
+            padding: 0.5rem !important;
+            font-size: 0.85rem !important;
+        }
+        /* Responsive exercise metric grids */
+        div[style*="grid-template-columns: repeat(4"] {
+            grid-template-columns: repeat(2, 1fr) !important;
+        }
+        /* Stack columns on very small screens */
+        [data-testid="column"] {
+            min-width: 100% !important;
+        }
+    }
+    
+    @media (max-width: 480px) {
+        .main-header {
+            font-size: 1.25rem !important;
+        }
+        /* Single column grid on very small screens */
+        div[style*="grid-template-columns: repeat(4"] {
+            grid-template-columns: repeat(2, 1fr) !important;
+            gap: 0.25rem !important;
+        }
+        div[style*="grid-template-columns: repeat(4"] > div {
+            padding: 0.35rem !important;
+        }
     }
 
     /* Ensure touch targets are large enough */

@@ -257,7 +257,6 @@ def show():
 
             # Find heaviest lifts and best performances
             heaviest_lifts = {}
-            top_volumes = {}
 
             for workout in week_data:
                 for exercise in workout.get('exercises', []):

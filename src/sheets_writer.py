@@ -8,6 +8,14 @@ import os
 import re
 from datetime import datetime
 
+try:
+    import streamlit as st
+    HAS_STREAMLIT = True
+except ImportError:
+    HAS_STREAMLIT = False
+
+SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+
 
 class SheetsWriter:
     """Handles writing workout plans to Google Sheets."""
@@ -28,13 +36,35 @@ class SheetsWriter:
 
     def authenticate(self):
         """
-        Authenticate with Google Sheets API using existing token.
-        Assumes authentication already done by SheetsReader.
+        Authenticate with Google Sheets API.
+        Supports both local token.json and Streamlit Cloud service accounts.
         """
-        if not os.path.exists('token.json'):
-            raise Exception("token.json not found. Please run authentication first.")
+        creds = None
 
-        creds = Credentials.from_authorized_user_file('token.json')
+        # Check if running in Streamlit Cloud with service account
+        use_service_account = False
+        if HAS_STREAMLIT and hasattr(st, 'secrets'):
+            try:
+                if 'gcp_service_account' in st.secrets:
+                    use_service_account = True
+            except (AttributeError, KeyError):
+                pass
+
+        if use_service_account:
+            # Use service account (Streamlit Cloud)
+            from google.oauth2 import service_account
+
+            credentials_dict = dict(st.secrets['gcp_service_account'])
+            creds = service_account.Credentials.from_service_account_info(
+                credentials_dict,
+                scopes=SCOPES
+            )
+        else:
+            # Use local token.json
+            if not os.path.exists('token.json'):
+                raise Exception("token.json not found. Please run authentication first.")
+            creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+
         self.service = build('sheets', 'v4', credentials=creds)
 
     def write_workout_plan(self, plan_text):

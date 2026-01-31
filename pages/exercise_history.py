@@ -116,7 +116,7 @@ def show():
                         st.metric("Load Progression", f"{loads[-1]} kg", f"+{volume_change:.1f} kg" if volume_change >= 0 else f"{volume_change:.1f} kg")
                     else:
                         st.metric("Load Progression", "N/A")
-                except:
+                except Exception:
                     st.metric("Load Progression", "N/A")
 
             with col3:
@@ -124,9 +124,13 @@ def show():
                 rpe_values = [session['rpe'] for session in exercise_history if session.get('rpe')]
                 if rpe_values:
                     try:
-                        avg_rpe = sum(float(re.search(r'(\d+)', rpe).group(1)) for rpe in rpe_values if re.search(r'(\d+)', rpe)) / len(rpe_values)
-                        st.metric("Avg RPE", f"{avg_rpe:.1f}/10")
-                    except:
+                        rpe_nums = [float(re.search(r'(\d+)', rpe).group(1)) for rpe in rpe_values if re.search(r'(\d+)', rpe)]
+                        if rpe_nums:
+                            avg_rpe = sum(rpe_nums) / len(rpe_nums)
+                            st.metric("Avg RPE", f"{avg_rpe:.1f}/10")
+                        else:
+                            st.metric("Avg RPE", "N/A")
+                    except Exception:
                         st.metric("Avg RPE", "N/A")
                 else:
                     st.metric("Avg RPE", "Not tracked")

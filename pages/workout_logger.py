@@ -229,7 +229,6 @@ def show():
 
                     if success:
                         # Store save time
-                        from datetime import datetime
                         st.session_state.last_save_time = datetime.now().strftime("%I:%M %p")
 
                         st.success(f"✅ Saved {logs_count} exercise logs to Google Sheets!")
