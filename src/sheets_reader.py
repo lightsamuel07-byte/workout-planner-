@@ -530,63 +530,38 @@ class SheetsReader:
             updates = []
 
             # Start checking rows after the date row
-            current_row = date_row + 2  # Skip the header row
+            current_row = date_row + 1
             log_index = 0
-            
-            # Collect all exercise rows first
-            exercise_rows = []
-            temp_row = current_row
-            while temp_row < len(values):
-                row = values[temp_row]
-                
-                # Stop if we hit another date header
-                if len(row) > 0 and any(day in str(row[0]) for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']):
-                    break
-                    
-                # Check if this row has an exercise (column B has content)
-                if len(row) > 1 and row[1].strip():
-                    # Skip header rows
-                    col_b = row[1].strip().lower()
-                    col_a = row[0].strip().lower() if len(row) > 0 else ""
-                    
-                    # Skip if it's clearly a header (Exercise, Block, Sets, etc.)
-                    is_header = (
-                        col_b in ['exercise', 'block', 'sets', 'reps', 'load', 'rest', 'notes', 'log'] or
-                        col_a in ['block', 'exercise'] or
-                        'exercise' in col_b.lower()
-                    )
-                    
-                    if not is_header:
-                        exercise_rows.append(temp_row)
-                        print(f"[SAVE DEBUG] Added exercise row {temp_row}: '{row[1][:50]}'")
-                    else:
-                        print(f"[SAVE DEBUG] Skipped header row {temp_row}: '{row[1][:50]}'")
-                temp_row += 1
-            
-            print(f"[SAVE DEBUG] Found {len(exercise_rows)} exercise rows, have {len(logs)} logs to save")
 
-            # Match logs to exercises sequentially (simpler and more reliable)
-            for i, log_entry in enumerate(logs):
-                if i >= len(exercise_rows):
-                    print(f"[SAVE DEBUG] Log {i}: No more rows available")
+            while current_row < len(values) and log_index < len(logs):
+                row = values[current_row]
+
+                # Stop if we hit another date header or empty row
+                if len(row) == 0 or (len(row) > 0 and any(day in row[0] for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'])):
                     break
-                    
-                row_num = exercise_rows[i]
-                exercise_name = values[row_num][1].strip() if len(values[row_num]) > 1 else ""
-                
-                print(f"[SAVE DEBUG] Log {i}: '{log_entry['exercise']}' → Row {row_num}: '{exercise_name}'")
-                print(f"[SAVE DEBUG]   Log value: '{log_entry['log']}'")
-                
-                # Only save if there's actual log data
-                if log_entry['log'] and log_entry['log'].strip():
-                    cell_range = f"'{self.sheet_name}'!H{row_num + 1}"
-                    updates.append({
-                        'range': cell_range,
-                        'values': [[log_entry['log']]]
-                    })
-                    print(f"[SAVE DEBUG]   ✓ Will update {cell_range}")
-                else:
-                    print(f"[SAVE DEBUG]   ✗ Skipped: empty log value")
+
+                # Check if this row has an exercise name matching our log
+                if len(row) > 1:
+                    exercise_name = row[1].strip() if len(row) > 1 else ""
+
+                    # Match with our log
+                    if log_index < len(logs):
+                        log_entry = logs[log_index]
+
+                        # Check if exercise names match (allow partial match)
+                        if log_entry['exercise'].lower() in exercise_name.lower() or exercise_name.lower() in log_entry['exercise'].lower():
+                            # Column H is the LOG column (user's actual sheet structure)
+                            # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Log
+                            if log_entry['log']:  # Only update if there's actual log data
+                                cell_range = f"'{self.sheet_name}'!H{current_row + 1}"
+                                updates.append({
+                                    'range': cell_range,
+                                    'values': [[log_entry['log']]]
+                                })
+
+                            log_index += 1
+
+                current_row += 1
 
             # Perform batch update
             if updates:
