@@ -68,6 +68,8 @@ def show():
         # Initialize session state for logging
         if 'workout_logs' not in st.session_state:
             st.session_state.workout_logs = {}
+        if 'last_save_time' not in st.session_state:
+            st.session_state.last_save_time = None
 
         # Group exercises by block
         blocks = {}
@@ -163,11 +165,51 @@ def show():
 
         st.markdown("---")
 
+        # Sticky save bar for mobile - always visible at bottom
+        st.markdown("""
+        <style>
+        .save-button-container {
+            position: sticky;
+            bottom: 0;
+            background: white;
+            padding: 1rem;
+            border-top: 2px solid #000;
+            z-index: 999;
+            margin: 0 -1rem;
+        }
+        @media (max-width: 768px) {
+            .save-button-container {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                right: 0;
+                padding: 1rem;
+                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+            }
+        }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # Count how many exercises have logs
+        logs_count = sum(1 for idx in range(len(exercises)) if st.session_state.workout_logs.get(f"log_{idx}", ""))
+
+        # Show save status
+        if 'last_save_time' in st.session_state and st.session_state.last_save_time:
+            save_time = st.session_state.last_save_time
+            st.success(f"✅ Last saved: {save_time} ({logs_count}/{len(exercises)} exercises logged)")
+        elif logs_count > 0:
+            st.info(f"📝 {logs_count}/{len(exercises)} exercises logged - Don't forget to save!")
+        else:
+            st.info("💡 Enter your workout data above, then click Save to store it in Google Sheets")
+
         # Save button
         col1, col2, col3 = st.columns([1, 2, 1])
 
+        with col1:
+            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+
         with col2:
-            if st.button("💾 Save Workout Log", type="primary", use_container_width=True):
+            if st.button("💾 Save to Google Sheets", type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet"):
                 # Prepare log data to write back to sheets
                 logs_to_save = []
 
@@ -182,29 +224,32 @@ def show():
 
                 # Write logs to Google Sheets
                 try:
-                    success = reader.write_workout_logs(todays_workout.get('date', ''), logs_to_save)
+                    with st.spinner("Saving to Google Sheets..."):
+                        success = reader.write_workout_logs(todays_workout.get('date', ''), logs_to_save)
 
                     if success:
-                        st.success("✅ Workout logged successfully!")
+                        # Store save time
+                        from datetime import datetime
+                        st.session_state.last_save_time = datetime.now().strftime("%I:%M %p")
+
+                        st.success(f"✅ Saved {logs_count} exercise logs to Google Sheets!")
                         st.balloons()
 
-                        # Clear session state
-                        st.session_state.workout_logs = {}
-
-                        # Wait a moment then redirect to dashboard
-                        import time
-                        time.sleep(2)
-                        st.session_state.current_page = 'dashboard'
+                        # Don't clear session state or redirect - let user stay on page
                         st.rerun()
                     else:
-                        st.error("Failed to save workout log. Please try again.")
+                        st.error("❌ Failed to save workout log. Please check your connection and try again.")
 
                 except Exception as e:
-                    st.error(f"Error saving workout: {e}")
+                    st.error(f"❌ Error saving workout: {str(e)}")
+                    st.info("💡 Tip: Check that you have internet connection and Google Sheets access.")
 
-        # Cancel button
-        with col1:
-            nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        with col3:
+            if st.button("Clear All", use_container_width=True, help="Clear all unsaved logs"):
+                st.session_state.workout_logs = {}
+                if 'last_save_time' in st.session_state:
+                    del st.session_state.last_save_time
+                st.rerun()
 
     except Exception as e:
         st.error(f"Unable to load workout plan: {e}")
