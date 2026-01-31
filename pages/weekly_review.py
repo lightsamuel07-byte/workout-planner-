@@ -62,7 +62,7 @@ def show():
             st.markdown(f"## 🗓️ Week of {week_display}")
 
             # Calculate week metrics
-            completed_days = len([w for w in week_data if any(ex.get('form', '').strip() for ex in w.get('exercises', []))])
+            completed_days = len([w for w in week_data if any(ex.get('log', '').strip() for ex in w.get('exercises', []))])
             total_days = len(week_data)
             total_exercises = sum(len(w.get('exercises', [])) for w in week_data)
 
@@ -148,7 +148,7 @@ def show():
                         )
 
                     with col2:
-                        prev_completed = len([w for w in prev_week_data if any(ex.get('form', '').strip() for ex in w.get('exercises', []))])
+                        prev_completed = len([w for w in prev_week_data if any(ex.get('log', '').strip() for ex in w.get('exercises', []))])
                         completion_change = completed_days - prev_completed
                         st.metric(
                             "Days Trained",
@@ -193,7 +193,7 @@ def show():
                 emoji = day_emojis.get(day_name, '📋') if day_name else '📋'
 
                 # Check if workout was completed
-                has_logs = any(ex.get('form', '').strip() for ex in exercises)
+                has_logs = any(ex.get('log', '').strip() for ex in exercises)
                 completion_badge = "✅ COMPLETED" if has_logs else "⏸️ Planned"
 
                 # Create expandable section for each day
@@ -227,7 +227,7 @@ def show():
                             load = ex.get('load', '')
                             rest = ex.get('rest', '')
                             notes = ex.get('notes', '')
-                            log = ex.get('form', '')
+                            log = ex.get('log', '')
 
                             # Build exercise info string
                             info_parts = []
@@ -318,6 +318,6 @@ def show():
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
     with col2:
-        action_button("View Progress", "progress", "📈", use_container_width=True)
+        nav_button("View Progress", "progress", "📈", use_container_width=True)
