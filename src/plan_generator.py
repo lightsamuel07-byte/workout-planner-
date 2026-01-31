@@ -350,6 +350,10 @@ The workout history section contains prior week's logged performance. Use this d
 5. **MANDATORY HARD RULES - YOU MUST FOLLOW THESE:**
 
    **Equipment & Exercise Selection:**
+   - **Equipment Preference Hierarchy (CRITICAL):**
+     1. FIRST CHOICE: Dumbbells, straight bars, EZ bars
+     2. SECOND CHOICE: Cable machines
+     3. AVOID: Plate-loaded machines (use free weights or cables instead)
    - NO belt on pulls/deadlifts
    - Standing calf raises ONLY (NEVER seated calves)
    - NO split squats (any variant) - use alternatives from swap library
@@ -411,6 +415,7 @@ The workout history section contains prior week's logged performance. Use this d
 
 10. **OUTPUT FORMAT:**
 
+<<<<<<< HEAD
 You must generate TWO output files:
 
 **FILE 1: workout_plan_[timestamp].md** (The actual workout plan)
@@ -438,6 +443,11 @@ The reasoning file must include:
   * Reason for swap (equipment preference, injury prevention, better stimulus, etc.)
 
 Format both files as markdown.
+=======
+You must generate TWO separate outputs:
+
+**OUTPUT 1: WORKOUT PLAN (Primary Output)**
+>>>>>>> 492a5a1 (improve: add reasoning output file and update equipment preferences)
 
 Use American spelling throughout. Format as markdown with ## for day headers and ### for exercises:
 
@@ -549,9 +559,143 @@ Focus: Strength + Aesthetics (arms, medial delts, upper chest, back detail)
 
 ```
 
-**CRITICAL**: Every single exercise (Fort and supplemental) MUST use the ### A1. format with bullet points for sets/reps/load/rest/notes. This ensures consistent parsing to Google Sheets.
+**OUTPUT 2: PROGRAMMING REASONING DOCUMENT**
 
-Generate the complete weekly workout plan now, following ALL rules above:
+After generating the workout plan, create a separate reasoning document that explains:
+
+```
+# WORKOUT PROGRAMMING REASONING
+Generated: [current date]
+
+---
+
+## FORT PROGRAM ANALYSIS & SWAPS
+
+**Exercise Swaps Applied:**
+- [List any swaps made to Fort workouts and why]
+- [Equipment substitutions and rationale]
+- [Any modifications to meet equipment preferences]
+
+**Fort Intensity Assessment:**
+- [Analysis of Fort program intensity this week]
+- [How Fort workouts informed supplemental programming decisions]
+- [Any volume/intensity adjustments made based on Fort demands]
+
+---
+
+## TUESDAY SUPPLEMENTAL - REASONING
+
+**Goal Alignment:**
+- [How Tuesday workout supports overall goals: aesthetics, arms, delts, etc.]
+- [Why these specific exercises were chosen]
+
+**Progressive Overload Strategy:**
+- [If continuing program: How each exercise progresses from last week]
+- [Load increases, rep increases, or volume changes and justification]
+- [If new program: Starting point selection rationale]
+
+**Recovery Considerations:**
+- [Why these exercises won't interfere with Monday Fort or Wednesday Fort]
+- [Muscle group targeting and fatigue management]
+
+**Equipment Selection:**
+- [Why dumbbells/bars/cables were chosen for each movement]
+- [How equipment preferences were honored]
+
+---
+
+## THURSDAY SUPPLEMENTAL - REASONING
+
+**Goal Alignment:**
+- [How Thursday workout supports goals]
+- [Exercise selection rationale]
+
+**Progressive Overload Strategy:**
+- [Progression approach for each movement]
+- [Load/volume decisions explained]
+
+**Recovery Considerations:**
+- [Why no grip-intensive work before Friday deadlifts]
+- [How exercises preserve Friday Fort performance]
+
+**Equipment Selection:**
+- [Equipment choices justified]
+
+---
+
+## SATURDAY SUPPLEMENTAL - REASONING
+
+**Goal Alignment:**
+- [How Saturday workout targets focus areas]
+- [Why this upper body emphasis post-Friday deadlift]
+
+**Progressive Overload Strategy:**
+- [Progression strategy for each exercise]
+- [Volume and intensity rationale]
+
+**Recovery Considerations:**
+- [CNS recovery from Friday considered]
+- [Lower back loading avoided]
+
+**Equipment Selection:**
+- [Equipment preference hierarchy applied]
+
+---
+
+## WEEKLY BICEP GRIP ROTATION
+
+- Tuesday: [Grip type used - supinated/neutral/pronated]
+- Thursday: [Grip type used]
+- Saturday: [Grip type used]
+- Reasoning: [Why this rotation pattern]
+
+---
+
+## PROGRESSIVE OVERLOAD SUMMARY
+
+[If continuing same program:]
+- [List key exercises and their progression from last week]
+- [Load increases justified by prior week's performance]
+- [Any exercises maintained at same load with reasoning]
+
+[If new program:]
+- [Starting load selection rationale]
+- [How baseline was established]
+
+---
+
+## ALIGNMENT WITH GOALS
+
+**Strength (Fort Program):**
+- [How Fort workouts drive strength development]
+
+**Aesthetics (Supplemental Focus):**
+- Arms: [Tuesday and Saturday arm volume and approach]
+- Medial Delts: [How lateral raises/delt work is programmed]
+- Upper Chest: [Incline work strategy]
+- Back Detail: [Thursday back accessory reasoning]
+
+---
+
+## SANITY CHECK CONFIRMATION
+
+✓ No same-grip biceps on consecutive days
+✓ Biceps hard sets ≤ 10-12 per rolling 4 days
+✓ Standing calf raises only
+✓ Triceps attachments varied across Tue/Fri/Sat
+✓ No split squats
+✓ Carries on Tuesday at moderate load
+✓ Equipment preferences honored (dumbbells/bars > cables > no plate-loaded)
+✓ Supplemental work won't interfere with Fort performance
+
+```
+
+**CRITICAL**: 
+1. Every single exercise (Fort and supplemental) MUST use the ### A1. format with bullet points for sets/reps/load/rest/notes. This ensures consistent parsing to Google Sheets.
+2. Generate BOTH the workout plan AND the reasoning document.
+3. Clearly separate the two outputs with a delimiter.
+
+Generate the complete weekly workout plan and reasoning document now, following ALL rules above:
 """
 
         return prompt
