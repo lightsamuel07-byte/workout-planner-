@@ -17,15 +17,14 @@ from src.design_system import get_colors
 
 def show():
     """Render the workout logger page"""
-
-    # Get today's date
-    today = datetime.now()
-    day_name = today.strftime("%A")
-    date_str = today.strftime("%B %d, %Y")
-
-    render_page_header("Log Workout", f"{day_name}, {date_str}", "📝")
-
+    
     try:
+        # Get today's date
+        today = datetime.now()
+        day_name = today.strftime("%A")
+        date_str = today.strftime("%B %d, %Y")
+
+        render_page_header("Log Workout", f"{day_name}, {date_str}", "📝")
         # Get authenticated reader
         reader = get_authenticated_reader()
 
@@ -279,18 +278,6 @@ def show():
                         st.rerun()
                     else:
                         st.error("❌ Failed to save workout log. Please check your connection and try again.")
-                        
-                        # Show debug info
-                        with st.expander("🔍 Debug Information (check server logs for details)"):
-                            st.code(f"""Sheet: {reader.sheet_name}
-Workout Date: {todays_workout.get('date', '')}
-Exercises to Save: {len(logs_to_save)}
-
-Logs Being Sent:
-{chr(10).join([f"  {i+1}. {log['exercise']}: '{log['log']}'" for i, log in enumerate(logs_to_save)])}
-
-⚠️ Check Streamlit Cloud logs (Download log button) for [SAVE DEBUG] output to see why it failed.
-""")
 
                 except Exception as e:
                     st.error(f"❌ Error saving workout: {str(e)}")
@@ -304,7 +291,12 @@ Logs Being Sent:
                 st.rerun()
 
     except Exception as e:
-        st.error(f"Unable to load workout plan: {e}")
+        st.error(f"❌ Error loading workout logger: {str(e)}")
         st.info("Make sure you have a workout plan generated in Google Sheets.")
+        
+        # Show full error for debugging
+        import traceback
+        with st.expander("🔍 Error Details"):
+            st.code(traceback.format_exc())
 
         action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
