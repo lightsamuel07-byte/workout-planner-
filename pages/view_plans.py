@@ -20,8 +20,15 @@ def get_all_plans():
 
 def parse_plan_content(plan_path):
     """Parse plan file into structured sections"""
-    with open(plan_path, 'r') as f:
-        content = f.read()
+    try:
+        with open(plan_path, 'r') as f:
+            content = f.read()
+    except FileNotFoundError:
+        st.error(f"Plan file not found: {plan_path}")
+        return {}
+    except Exception as e:
+        st.error(f"Error reading plan file: {e}")
+        return {}
 
     # Split by days
     days = {}
@@ -210,10 +217,15 @@ def show():
 
     with col2:
         if st.button("📄 View Markdown File", use_container_width=True):
-            with open(selected_plan_path, 'r') as f:
-                markdown_content = f.read()
-            with st.expander("Full Markdown Content"):
-                st.code(markdown_content, language='markdown')
+            try:
+                with open(selected_plan_path, 'r') as f:
+                    markdown_content = f.read()
+                with st.expander("Full Markdown Content"):
+                    st.code(markdown_content, language='markdown')
+            except FileNotFoundError:
+                st.error("Plan file not found. It may have been deleted.")
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
 
     with col3:
         if st.button("🏠 Back to Dashboard", use_container_width=True):

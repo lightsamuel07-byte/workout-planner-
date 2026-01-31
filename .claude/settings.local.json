@@ -17,7 +17,8 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(git remote:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(cd:*)"
     ]
   }
 }

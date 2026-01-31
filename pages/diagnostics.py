@@ -35,7 +35,7 @@ def show():
     try:
         has_anthropic = 'ANTHROPIC_API_KEY' in st.secrets
         st.write(f"✅ Anthropic API Key: {'Found' if has_anthropic else '❌ Missing'}")
-    except:
+    except Exception:
         st.write("❌ Anthropic API Key: Cannot access secrets")
 
     try:
@@ -46,7 +46,7 @@ def show():
             # Show some non-sensitive fields
             gcp_keys = list(st.secrets['gcp_service_account'].keys())
             st.write(f"   Keys available: {', '.join(gcp_keys)}")
-    except:
+    except Exception:
         st.write("❌ GCP Service Account: Cannot access secrets")
 
     st.markdown("---")

@@ -86,7 +86,11 @@ class WorkoutAnalytics:
             dates = sorted(weekly_max.keys())
             starting_load = weekly_max[dates[0]]
             current_load = weekly_max[dates[-1]]
-            progression_pct = ((current_load - starting_load) / starting_load) * 100
+            
+            if starting_load > 0:
+                progression_pct = ((current_load - starting_load) / starting_load) * 100
+            else:
+                progression_pct = 0
 
             return {
                 'weekly_data': weekly_max,
@@ -116,7 +120,7 @@ class WorkoutAnalytics:
         for workout in self.historical_data:
             date = workout.get('date', '')
 
-            for exercise in workout['exercises']:
+            for exercise in workout.get('exercises', []):
                 # Parse sets, reps, load
                 sets_str = exercise.get('sets', '')
                 reps_str = exercise.get('reps', '')
@@ -258,7 +262,7 @@ class WorkoutAnalytics:
         for workout in self.historical_data:
             date = workout.get('date', '')
 
-            for exercise in workout['exercises']:
+            for exercise in workout.get('exercises', []):
                 exercise_name = exercise.get('exercise', '').lower()
 
                 # Check if exercise targets this muscle group
