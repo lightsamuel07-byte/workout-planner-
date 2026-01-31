@@ -53,11 +53,20 @@
 }
 
 /* Base Styles */
+html {
+    scroll-behavior: smooth;
+}
+
 body {
     font-family: var(--font-family);
     background-color: var(--color-background);
     color: var(--color-text-primary);
     transition: background-color var(--transition-standard), color var(--transition-standard);
+}
+
+/* Smooth scroll padding for fixed headers */
+html {
+    scroll-padding-top: 2rem;
 }
 
 /* Typography Hierarchy */
@@ -202,9 +211,17 @@ button[kind="primary"]:hover {
     border-radius: 8px !important;
     border: 2px solid var(--color-border-medium) !important;
     min-height: 44px !important;
-    transition: border-color var(--transition-fast) !important;
+    transition: all var(--transition-fast) !important;
     background-color: var(--color-surface) !important;
     color: var(--color-text-primary) !important;
+}
+
+.stTextInput > div > div > input:hover,
+.stTextArea > div > div > textarea:hover,
+.stSelectbox > div > div > select:hover,
+.stNumberInput > div > div > input:hover {
+    border-color: var(--color-accent) !important;
+    background-color: rgba(0, 212, 170, 0.02) !important;
 }
 
 .stTextInput > div > div > input:focus,
@@ -212,7 +229,9 @@ button[kind="primary"]:hover {
 .stSelectbox > div > div > select:focus,
 .stNumberInput > div > div > input:focus {
     border-color: var(--color-accent) !important;
-    box-shadow: 0 0 0 2px rgba(0, 212, 170, 0.2) !important;
+    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.15) !important;
+    transform: translateY(-1px);
+    background-color: var(--color-surface) !important;
 }
 
 /* Success/Error/Info Messages */
