@@ -62,9 +62,14 @@ def check_password():
         except (AttributeError, KeyError):
             correct_password = "workout2026"
 
-        if st.session_state["password"] == correct_password:
+        # Use .get() to safely access the password - it may not exist yet in callback
+        entered_password = st.session_state.get("password", "")
+        
+        if entered_password == correct_password:
             st.session_state["password_correct"] = True
-            del st.session_state["password"]  # Don't store password
+            # Clear password from session state for security
+            if "password" in st.session_state:
+                del st.session_state["password"]
         else:
             st.session_state["password_correct"] = False
 
