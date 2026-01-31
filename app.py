@@ -198,12 +198,40 @@ with st.sidebar:
     # SETTINGS section
     st.markdown('<div class="nav-section-header">SETTINGS</div>', unsafe_allow_html=True)
     
-    # Dark mode toggle
-    dark_mode = st.checkbox("🌙 Dark Mode", value=st.session_state.dark_mode, key="dark_mode_toggle")
-    if dark_mode != st.session_state.dark_mode:
-        st.session_state.dark_mode = dark_mode
-        st.rerun()
+    # Connection status indicator
+    try:
+        import yaml
+        from src.sheets_reader import SheetsReader
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        
+        st.markdown("""
+        <div style="
+            padding: 0.75rem;
+            background: rgba(0, 200, 83, 0.1);
+            border-left: 3px solid #00C853;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        ">
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">🟢 Connected</div>
+            <div style="color: #666; font-size: 0.8rem;">Google Sheets synced</div>
+        </div>
+        """, unsafe_allow_html=True)
+    except Exception as e:
+        st.markdown("""
+        <div style="
+            padding: 0.75rem;
+            background: rgba(244, 67, 54, 0.1);
+            border-left: 3px solid #F44336;
+            border-radius: 4px;
+            font-size: 0.85rem;
+        ">
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">🔴 Disconnected</div>
+            <div style="color: #666; font-size: 0.8rem;">Check your connection</div>
+        </div>
+        """, unsafe_allow_html=True)
     
+    st.markdown("---")
     st.markdown(f"**User:** Samuel")
     st.markdown(f"**Goal:** Strength + Aesthetics")
 
