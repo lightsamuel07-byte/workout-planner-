@@ -21,7 +21,13 @@ def show():
         all_sheets = reader.get_all_weekly_plan_sheets()
 
         if not all_sheets:
-            st.warning("⚠️ No workout history found. Generate your first plan to get started!")
+            st.markdown("""
+            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
+                <div style="font-size:4rem;margin-bottom:1rem;">📅</div>
+                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No History Yet</div>
+                <div style="color:#666;margin-bottom:1.5rem;">Complete your first week of workouts to see reviews here!</div>
+            </div>
+            """, unsafe_allow_html=True)
             nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
@@ -42,7 +48,13 @@ def show():
             week_data = reader.read_workout_history()
 
             if not week_data:
-                st.info("No workout data found for this week.")
+                st.markdown("""
+                <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+                    <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
+                    <div style="font-weight:600;margin-bottom:0.5rem;">No Data for This Week</div>
+                    <div style="color:#666;">This week exists but has no workout entries yet.</div>
+                </div>
+                """, unsafe_allow_html=True)
                 return
 
             # Display week overview
@@ -188,7 +200,12 @@ def show():
                 # Create expandable section for each day
                 with st.expander(f"{emoji} **{workout_date}** - {completion_badge}", expanded=False):
                     if not exercises:
-                        st.info("No exercises planned for this day")
+                        st.markdown("""
+                        <div style="text-align:center;padding:1.5rem;background:#f8f9fa;border-radius:8px;">
+                            <div style="font-size:2rem;margin-bottom:0.5rem;">😴</div>
+                            <div style="color:#666;">Rest day - no exercises planned</div>
+                        </div>
+                        """, unsafe_allow_html=True)
                         continue
 
                     # Group exercises by block
@@ -284,7 +301,12 @@ def show():
                     with cols[i]:
                         st.metric(f"Top {lift}", f"{weight} kg")
             else:
-                st.info("No main lifts tracked this week")
+                st.markdown("""
+                <div style="text-align:center;padding:2rem;color:#888;">
+                    <div style="font-size:2rem;margin-bottom:0.5rem;">💪</div>
+                    <div>No main lift PRs this week - keep pushing!</div>
+                </div>
+                """)
 
     except Exception as e:
         st.error(f"Unable to load workout history: {e}")

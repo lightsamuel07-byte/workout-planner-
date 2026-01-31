@@ -94,7 +94,13 @@ def show():
     plans = get_all_plans()
 
     if not plans:
-        st.warning("⚠️ No workout plans found. Generate your first plan to get started!")
+        st.markdown("""
+        <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
+            <div style="font-size:4rem;margin-bottom:1rem;">📋</div>
+            <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Plans Yet</div>
+            <div style="color:#666;margin-bottom:1.5rem;">Create your first workout plan to start tracking!</div>
+        </div>
+        """, unsafe_allow_html=True)
         nav_button("Generate Plan Now", "generate", "🚀", type="primary")
         return
 
@@ -145,7 +151,13 @@ def show():
     exercises = parse_exercises(day_content)
 
     if not exercises:
-        st.info("No exercises found for this day (might be a rest day)")
+        st.markdown("""
+        <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+            <div style="font-size:3rem;margin-bottom:1rem;">😌</div>
+            <div style="font-weight:600;margin-bottom:0.5rem;">Rest Day</div>
+            <div style="color:#666;">No exercises scheduled - time to recover!</div>
+        </div>
+        """, unsafe_allow_html=True)
         # Show raw content for rest days
         st.markdown(day_content)
     else:

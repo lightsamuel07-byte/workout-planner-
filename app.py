@@ -156,6 +156,64 @@ st.markdown("""
     button {
         min-height: 44px !important;
         padding: 0.75rem !important;
+        transition: all 0.2s ease !important;
+    }
+    
+    /* Subtle hover effects */
+    button:hover {
+        transform: translateY(-1px) !important;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15) !important;
+    }
+    
+    button:active {
+        transform: translateY(1px) !important;
+        box-shadow: 0 1px 2px rgba(0,0,0,0.1) !important;
+    }
+    
+    /* Exercise card consistency */
+    .exercise-card {
+        border: 2px solid #000;
+        background: #fff;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
+    
+    .exercise-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+    }
+    
+    /* Today's card pulse animation */
+    .day-card.today {
+        animation: pulse 2s infinite;
+    }
+    
+    @keyframes pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(0,255,0,0.4); }
+        50% { box-shadow: 0 0 0 4px rgba(0,255,0,0); }
+    }
+    
+    /* Smooth metric transitions */
+    [data-testid="stMetric"] {
+        transition: transform 0.2s ease;
+    }
+    
+    [data-testid="stMetric"]:hover {
+        transform: scale(1.02);
+    }
+    
+    /* Consistent accent colors */
+    .stButton>button {
+        background-color: #000 !important;
+        color: #fff !important;
+    }
+    
+    .stButton>button:hover {
+        background-color: #333 !important;
+    }
+    
+    .stButton>button[kind="primary"] {
+        background-color: #000 !important;
+        border: 2px solid #000 !important;
     }
 
     input, textarea {

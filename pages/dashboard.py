@@ -120,7 +120,13 @@ def show():
     plan_summary = parse_plan_summary(latest_plan)
 
     if not latest_plan and not latest_sheet_plan:
-        st.warning("⚠️ No workout plan found. Generate your first plan to get started!")
+        st.markdown("""
+        <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
+            <div style="font-size:4rem;margin-bottom:1rem;">🎯</div>
+            <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Workout Plan Yet</div>
+            <div style="color:#666;margin-bottom:1.5rem;">Generate your first personalized plan to get started!</div>
+        </div>
+        """, unsafe_allow_html=True)
         nav_button("Generate Plan Now", "generate", "🚀", type="primary")
         return
 
@@ -283,10 +289,21 @@ def show():
                 st.write(f"**{workout_date}**")
                 st.write(f"✅ {exercise_count} exercises")
                 st.write("📊 Data in Google Sheets")
-            except Exception as e:
-                st.write("No workout history available")
+            except Exception:
+                st.markdown("""
+                <div style="color:#888;text-align:center;padding:1rem;">
+                    <div style="font-size:2rem;margin-bottom:0.5rem;">📝</div>
+                    No recent workouts
+                </div>
+                """)
         else:
-            st.write("No workout history yet")
+            st.markdown("""
+            <div style="text-align:center;padding:2rem;color:#888;">
+                <div style="font-size:3rem;margin-bottom:1rem;">🏋️</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;">No Workouts Logged Yet</div>
+                <div style="font-size:0.9rem;">Start logging your workouts to see your history here!</div>
+            </div>
+            """)
 
     with col2:
         st.markdown("#### Latest Plan")

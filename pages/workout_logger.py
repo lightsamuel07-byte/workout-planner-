@@ -26,7 +26,13 @@ def show():
         all_sheets = reader.get_all_weekly_plan_sheets()
 
         if not all_sheets:
-            st.warning("⚠️ No workout plan found. Generate your first plan to start logging!")
+            st.markdown("""
+            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
+                <div style="font-size:4rem;margin-bottom:1rem;">📝</div>
+                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">No Workout Plan</div>
+                <div style="color:#666;margin-bottom:1.5rem;">Generate a plan first, then come back to log your workouts!</div>
+            </div>
+            """, unsafe_allow_html=True)
             nav_button("Generate Plan Now", "generate", "🚀", type="primary")
             return
 
@@ -38,8 +44,13 @@ def show():
         week_data = reader.read_workout_history()
 
         if not week_data:
-            st.warning(f"No workout data found in sheet: `{current_sheet}`")
-            st.info("This usually means the sheet exists but has no workout data, or the sheet format is different than expected.")
+            st.markdown("""
+            <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+                <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;">Empty Sheet</div>
+                <div style="color:#666;">The sheet `{current_sheet}` exists but has no workout data.</div>
+            </div>
+            """, unsafe_allow_html=True)
             return
 
         # Find today's workout (case-insensitive)
@@ -51,7 +62,13 @@ def show():
                 break
 
         if not todays_workout:
-            st.info(f"No workout scheduled for {day_name}. Enjoy your rest day!")
+            st.markdown(f"""
+            <div style="text-align:center;padding:3rem 2rem;background:#e8f5e9;border-radius:12px;margin:2rem 0;">
+                <div style="font-size:4rem;margin-bottom:1rem;">😌</div>
+                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">Rest Day</div>
+                <div style="color:#666;margin-bottom:1.5rem;">No workout scheduled for {day_name}. Enjoy your recovery!</div>
+            </div>
+            """, unsafe_allow_html=True)
             nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
             return
 
@@ -59,7 +76,13 @@ def show():
         exercises = todays_workout.get('exercises', [])
 
         if not exercises:
-            st.info("No exercises found for today.")
+            st.markdown("""
+            <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+                <div style="font-size:3rem;margin-bottom:1rem;">🤔</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;">No Exercises</div>
+                <div style="color:#666;">Today's workout is empty - check your plan.</div>
+            </div>
+            """, unsafe_allow_html=True)
             return
 
         st.markdown(f"### 🏋️ Today's Workout: {todays_workout.get('date', '')}")

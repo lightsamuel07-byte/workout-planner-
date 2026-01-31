@@ -67,7 +67,13 @@ def show():
                     f"+{deadlift_prog['progression_kg']} kg ({deadlift_prog['progression_pct']}%)"
                 )
         else:
-            st.info("Not enough workout history yet. Keep logging workouts to see trends!")
+            st.markdown("""
+            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
+                <div style="font-size:4rem;margin-bottom:1rem;">📈</div>
+                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">Not Enough Data</div>
+                <div style="color:#666;margin-bottom:1.5rem;">Keep logging workouts to see your progress trends!</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Unable to load progress data: {e}")
@@ -105,7 +111,13 @@ def show():
             with col3:
                 st.metric("Peak Week", f"{int(peak_volume):,} kg")
         else:
-            st.info("Not enough workout history to display volume trends yet.")
+            st.markdown("""
+            <div style="text-align:center;padding:2rem;color:#888;">
+                <div style="font-size:3rem;margin-bottom:1rem;">💪</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;">No Volume Data</div>
+                <div style="font-size:0.9rem;">Log more workouts to see volume trends</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Unable to load volume data: {e}")
