@@ -88,13 +88,14 @@ class SheetsReader:
         self.service = build('sheets', 'v4', credentials=creds)
         print("✓ Successfully authenticated with Google Sheets")
 
-    def read_workout_history(self, num_recent_workouts=20):
+    def read_workout_history(self, num_recent_workouts=7, use_cache=True):
         """
-        Read recent workout history from the sheet.
-
+        Read workout history from Google Sheets with optional caching.
+        
         Args:
-            num_recent_workouts: Number of recent workouts to retrieve
-
+            num_recent_workouts: Number of recent workouts to return (default 7 for weekly view)
+            use_cache: Whether to use cached data if available (default True)
+            
         Returns:
             List of workout data as dictionaries
         """
