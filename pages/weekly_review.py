@@ -318,6 +318,6 @@ def show():
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
     with col2:
-        nav_button("View Progress", "progress", "📈", use_container_width=True)
+        action_button("View Progress", "progress", "📈", use_container_width=True)
