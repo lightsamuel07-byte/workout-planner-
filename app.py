@@ -114,7 +114,7 @@ except FileNotFoundError:
 if st.session_state.get('dark_mode', False):
     st.markdown('<div data-theme="dark" style="display:none;"></div>', unsafe_allow_html=True)
 
-# Additional page-specific styles
+# Additional page-specific styles with mobile responsiveness
 st.markdown("""
     <style>
     /* Fix text area overlapping labels */
@@ -134,6 +134,49 @@ st.markdown("""
         font-size: 1.125rem;
         color: var(--color-text-secondary);
         margin-bottom: 2rem;
+    }
+    
+    /* Mobile responsive styles */
+    @media (max-width: 768px) {
+        .main-header {
+            font-size: 1.75rem;
+        }
+        
+        .sub-header {
+            font-size: 1rem;
+        }
+        
+        /* Stack columns on mobile */
+        .row-widget.stHorizontalBlock {
+            flex-direction: column;
+        }
+        
+        /* Full width buttons on mobile */
+        .stButton button {
+            width: 100% !important;
+        }
+        
+        /* Better metric card spacing on mobile */
+        [data-testid="metric-container"] {
+            margin-bottom: 1rem;
+        }
+    }
+    
+    /* Improve scrolling on mobile */
+    @media (max-width: 768px) {
+        .main .block-container {
+            padding-left: 1rem;
+            padding-right: 1rem;
+        }
+    }
+    
+    /* Better input fields on mobile */
+    @media (max-width: 768px) {
+        .stTextInput input,
+        .stTextArea textarea,
+        .stNumberInput input {
+            font-size: 16px !important; /* Prevents zoom on iOS */
+        }
     }
     </style>
 """, unsafe_allow_html=True)
