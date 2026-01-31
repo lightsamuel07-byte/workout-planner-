@@ -4,7 +4,8 @@ Progress page - View training progress and stats
 
 import streamlit as st
 from datetime import datetime, timedelta
-from src.ui_utils import render_page_header, get_authenticated_reader, nav_button
+from src.ui_utils import render_page_header, get_authenticated_reader, action_button, empty_state
+from src.design_system import get_colors
 
 def show():
     """Render the progress page"""
@@ -65,13 +66,11 @@ def show():
                 else:
                     st.metric("Deadlift", "No data", "")
         else:
-            st.markdown("""
-            <div style="text-align:center;padding:3rem 2rem;background:#f8f9fa;border-radius:12px;margin:2rem 0;">
-                <div style="font-size:4rem;margin-bottom:1rem;">📈</div>
-                <div style="font-size:1.25rem;font-weight:600;margin-bottom:0.5rem;">Not Enough Data</div>
-                <div style="color:#666;margin-bottom:1.5rem;">Keep logging workouts to see your progress trends!</div>
-            </div>
-            """, unsafe_allow_html=True)
+            empty_state(
+                "📈",
+                "Not Enough Data",
+                "Keep logging workouts to see your progress trends!"
+            )
 
     except Exception as e:
         st.error(f"Unable to load progress data: {e}")
@@ -110,10 +109,10 @@ def show():
                 st.metric("Peak Week", f"{int(peak_volume):,} kg")
         else:
             st.markdown("""
-            <div style="text-align:center;padding:2rem;color:#888;">
+            <div style="text-align:center;padding:2rem;">
                 <div style="font-size:3rem;margin-bottom:1rem;">💪</div>
-                <div style="font-weight:600;margin-bottom:0.5rem;">No Volume Data</div>
-                <div style="font-size:0.9rem;">Log more workouts to see volume trends</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;color: var(--color-text-primary);">No Volume Data</div>
+                <div style="font-size:0.9rem;color: var(--color-text-secondary);">Log more workouts to see volume trends</div>
             </div>
             """, unsafe_allow_html=True)
 
@@ -174,6 +173,8 @@ def show():
 
     # Achievements
     st.markdown("### 🏆 Achievements")
+    
+    colors = get_colors()
 
     achievements = [
         ("🥇", "8-Week Consistency Streak", "Never missed a scheduled workout"),
@@ -186,14 +187,22 @@ def show():
     for col, (emoji, title, desc) in zip(cols, achievements):
         with col:
             st.markdown(f"""
-            <div style="padding: 1rem; background-color: #f0f2f6; border-radius: 0.5rem; text-align: center; min-height: 120px;">
+            <div style="
+                padding: 1rem; 
+                background-color: {colors['surface']}; 
+                border: 2px solid {colors['border_light']};
+                border-radius: 8px; 
+                text-align: center; 
+                min-height: 120px;
+                transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+            " class="metric-card">
                 <div style="font-size: 2rem; margin-bottom: 0.5rem;">{emoji}</div>
-                <div style="font-weight: bold; margin-bottom: 0.25rem;">{title}</div>
-                <div style="font-size: 0.8rem; color: #666;">{desc}</div>
+                <div style="font-weight: bold; margin-bottom: 0.25rem; color: {colors['text_primary']};">{title}</div>
+                <div style="font-size: 0.8rem; color: {colors['text_secondary']};">{desc}</div>
             </div>
             """, unsafe_allow_html=True)
 
     st.markdown("---")
 
     # Back button
-    nav_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+    action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
