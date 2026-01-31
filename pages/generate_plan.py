@@ -29,13 +29,45 @@ def show():
 
     # Calculate next Monday
     next_monday = get_next_monday()
+    colors = get_colors()
 
-    st.markdown(f"### 📅 Week Starting: {next_monday.strftime('%A, %B %d, %Y')}")
-    st.markdown("---")
+    # Week info card
+    st.markdown(f"""
+    <div style="
+        background: linear-gradient(135deg, {colors['accent']}15 0%, {colors['surface']} 100%);
+        border: 2px solid {colors['accent']};
+        border-radius: 12px;
+        padding: 1.5rem;
+        margin-bottom: 2rem;
+        text-align: center;
+    ">
+        <div style="font-size: 0.85rem; text-transform: uppercase; font-weight: 700; color: {colors['text_secondary']}; letter-spacing: 0.5px; margin-bottom: 0.5rem;">
+            WEEK STARTING
+        </div>
+        <div style="font-size: 1.75rem; font-weight: 700; color: {colors['text_primary']};">
+            📅 {next_monday.strftime('%A, %B %d, %Y')}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     # Step 1: Fort Workouts Input
     st.markdown("### 📋 STEP 1: Fort Workouts (Mon/Wed/Fri)")
-    st.markdown("Paste your Fort trainer workouts from Train Heroic:")
+    
+    st.markdown(f"""
+    <div style="
+        background: {colors['surface']};
+        border: 2px solid {colors['border_light']};
+        border-left: 4px solid {colors['accent']};
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1.5rem;
+    ">
+        <div style="font-weight: 600; margin-bottom: 0.5rem;">💡 How to use:</div>
+        <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
+            Copy your Fort workouts from Train Heroic and paste them into the boxes below. The AI will analyze them and create complementary supplemental exercises.
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
     with st.expander("📝 MONDAY WORKOUT", expanded=True):
         monday_workout = st.text_area(
