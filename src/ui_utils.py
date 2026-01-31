@@ -16,6 +16,31 @@ from src.design_system import (
 )
 
 
+def with_loading(message="Loading..."):
+    """
+    Decorator/context manager for showing loading state during operations
+    
+    Usage as context manager:
+        with with_loading("Fetching workout data..."):
+            data = fetch_data()
+    """
+    class LoadingContext:
+        def __init__(self, msg):
+            self.message = msg
+            self.spinner = None
+            
+        def __enter__(self):
+            self.spinner = st.spinner(self.message)
+            self.spinner.__enter__()
+            return self
+            
+        def __exit__(self, *args):
+            if self.spinner:
+                self.spinner.__exit__(*args)
+    
+    return LoadingContext(message)
+
+
 def get_authenticated_reader():
     """
     Factory function to get pre-authenticated SheetsReader with config loaded.
