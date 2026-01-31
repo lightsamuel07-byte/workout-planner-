@@ -88,15 +88,37 @@ def show():
             """, unsafe_allow_html=True)
             return
 
-        st.markdown(f"### 🏋️ Today's Workout: {todays_workout.get('date', '')}")
-        
-        # Show progress bar for completion tracking
+        # Progress display with bar
         logged_count = sum(1 for ex in exercises if ex.get('log', '').strip())
         if logged_count > 0 or 'workout_logs' in st.session_state:
             session_logged = sum(1 for idx in range(len(exercises)) if st.session_state.get('workout_logs', {}).get(f"log_{idx}", ""))
             total_logged = max(logged_count, session_logged)
-            progress_bar(total_logged, len(exercises))
-        
+            completion_percentage = (total_logged / len(exercises) * 100) if len(exercises) > 0 else 0
+            colors = get_colors()
+            completion_emoji = "🏆" if completion_percentage == 100 else "🏋️"
+
+            st.markdown(f"""
+            <div style="background: linear-gradient(135deg, {colors['surface']} 0%, {colors['background']} 100%); border: 2px solid {colors['border_strong']}; padding: 1.5rem; border-radius: 12px; margin: 2rem 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <div>
+                        <div style="font-size: 2rem; font-weight: 700; color: {colors['text_primary']};">{total_logged}/{len(exercises)} Complete</div>
+                        <div style="color: {colors['text_secondary']}; margin-top: 0.5rem; font-size: 1.1rem;">{completion_percentage:.0f}% Complete</div>
+                    </div>
+                    <div style="font-size: 3rem;">{completion_emoji}</div>
+                </div>
+                <div style="background: #e0e0e0; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 1rem;">
+                    <div style="
+                        background: linear-gradient(90deg, {colors['accent']} 0%, #00e676 100%);
+                        height: 100%;
+                        width: {completion_percentage}%;
+                        transition: width 0.3s ease;
+                        box-shadow: 0 2px 4px rgba(0, 212, 170, 0.3);
+                    "></div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+        st.markdown(f"### 🏋️ Today's Workout: {todays_workout.get('date', '')}")
         st.markdown("---")
 
         # Initialize session state for logging
