@@ -279,6 +279,18 @@ def show():
                         st.rerun()
                     else:
                         st.error("❌ Failed to save workout log. Please check your connection and try again.")
+                        
+                        # Show debug info
+                        with st.expander("🔍 Debug Information (check server logs for details)"):
+                            st.code(f"""Sheet: {reader.sheet_name}
+Workout Date: {todays_workout.get('date', '')}
+Exercises to Save: {len(logs_to_save)}
+
+Logs Being Sent:
+{chr(10).join([f"  {i+1}. {log['exercise']}: '{log['log']}'" for i, log in enumerate(logs_to_save)])}
+
+⚠️ Check Streamlit Cloud logs (Download log button) for [SAVE DEBUG] output to see why it failed.
+""")
 
                 except Exception as e:
                     st.error(f"❌ Error saving workout: {str(e)}")
