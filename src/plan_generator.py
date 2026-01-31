@@ -353,6 +353,12 @@ The workout history section contains prior week's logged performance. Use this d
    - NO belt on pulls/deadlifts
    - Standing calf raises ONLY (NEVER seated calves)
    - NO split squats (any variant) - use alternatives from swap library
+   - **EQUIPMENT PREFERENCE HIERARCHY (for supplemental days):**
+     1. **PREFERRED**: Dumbbells and straight bar or EZ bar exercises
+     2. **ACCEPTABLE**: Cable machine exercises
+     3. **AVOID**: Plate-loaded machines (use free weights or cables instead)
+   - When designing supplemental workouts, prioritize dumbbells and barbells over machines
+   - For arm work, default to dumbbell variations before cables, never plate-loaded machines
 
    **Biceps Programming (CRITICAL):**
    - NEVER same grip two days in a row
@@ -404,6 +410,34 @@ The workout history section contains prior week's logged performance. Use this d
    - ✓ Sauna included after main days
 
 10. **OUTPUT FORMAT:**
+
+You must generate TWO output files:
+
+**FILE 1: workout_plan_[timestamp].md** (The actual workout plan)
+
+**FILE 2: workout_reasoning_[timestamp].md** (The explanation and reasoning)
+
+The reasoning file must include:
+- **Supplemental Workout Rationale**: Explain the logic behind each Tue/Thu/Sat workout design
+  * Why each exercise was selected
+  * How it addresses Samuel's aesthetic goals (arms, medial delts, upper chest, back detail)
+  * How it balances with the Fort workouts (interference check explanation)
+  
+- **Progressive Overload Strategy**: Detail how each supplemental exercise progresses from prior week
+  * Load increases and rationale
+  * Rep range progressions
+  * Volume adjustments based on logged performance
+  
+- **Alignment with Goals**: Connect each day's programming to Samuel's stated goals
+  * Which focus areas are targeted
+  * How volume is distributed across the week
+  * Recovery considerations
+  
+- **Fort Program Swaps**: List every exercise from the original Fort program that was swapped
+  * Original exercise → Replacement
+  * Reason for swap (equipment preference, injury prevention, better stimulus, etc.)
+
+Format both files as markdown.
 
 Use American spelling throughout. Format as markdown with ## for day headers and ### for exercises:
 
@@ -565,17 +599,18 @@ SWAP LIBRARY (if needed):
 
         return config_text
 
-    def save_plan(self, plan, output_folder="output", format="markdown"):
+    def save_plan(self, plan, reasoning=None, output_folder="output", format="markdown"):
         """
-        Save the generated plan to a file.
+        Save the generated plan and reasoning to files.
 
         Args:
             plan: The generated plan text
+            reasoning: The reasoning/explanation text (optional)
             output_folder: Folder to save the plan
             format: File format (markdown, text, json)
 
         Returns:
-            Path to saved file
+            Tuple of (plan_path, reasoning_path) or (plan_path, None)
         """
         if not plan:
             print("No plan to save.")
@@ -587,12 +622,25 @@ SWAP LIBRARY (if needed):
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         extension = "md" if format == "markdown" else "txt"
-        filename = f"workout_plan_{timestamp}.{extension}"
-        filepath = os.path.join(output_folder, filename)
-
-        # Save the plan
-        with open(filepath, 'w') as f:
+        
+        # Save the workout plan
+        plan_filename = f"workout_plan_{timestamp}.{extension}"
+        plan_filepath = os.path.join(output_folder, plan_filename)
+        
+        with open(plan_filepath, 'w') as f:
             f.write(plan)
 
-        print(f"✓ Plan saved to: {filepath}")
-        return filepath
+        print(f"✓ Plan saved to: {plan_filepath}")
+        
+        # Save the reasoning file if provided
+        reasoning_filepath = None
+        if reasoning:
+            reasoning_filename = f"workout_reasoning_{timestamp}.{extension}"
+            reasoning_filepath = os.path.join(output_folder, reasoning_filename)
+            
+            with open(reasoning_filepath, 'w') as f:
+                f.write(reasoning)
+            
+            print(f"✓ Reasoning saved to: {reasoning_filepath}")
+        
+        return (plan_filepath, reasoning_filepath)
