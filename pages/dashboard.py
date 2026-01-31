@@ -175,22 +175,40 @@ def show():
 
             st.markdown(f"""
                 <div class="{card_class}" style="
-                    background-color: {bg_color};
+                    background: {bg_color};
                     border: {border_width} solid {border_color};
-                    padding: 1rem;
-                    border-radius: 8px;
+                    border-radius: 12px;
+                    padding: 1rem 0.5rem;
                     text-align: center;
-                    min-width: 100px;
+                    min-height: 140px;
+                    transition: all 0.2s ease;
+                    box-shadow: {('0 4px 12px rgba(0, 212, 170, 0.15)' if is_today else '0 2px 4px rgba(0,0,0,0.05)')};
                 ">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
-                        <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.1rem;">{day}</div>
-                        {completion_icon}
-                    </div>
-                    <div style="font-size: 0.9rem; color: {colors['text_secondary']}; margin-bottom: 0.5rem;">{date.strftime('%m/%d')}</div>
-                    <div style="font-size: 2.5rem; margin: 0.5rem 0;">{emoji}</div>
-                    <div style="font-weight: 700; color: {colors['text_primary']}; text-transform: uppercase; font-size: 0.9rem;">{title}</div>
-                    <div style="font-size: 0.85rem; color: {colors['text_secondary']};">{subtitle}</div>
-                    {'<div style="margin-top: 0.5rem; background-color: ' + colors['accent'] + '; color: ' + colors['primary'] + '; padding: 0.25rem; font-weight: 700; border-radius: 4px;">TODAY</div>' if is_today else ''}
+                    <div style="
+                        font-size: 0.7rem; 
+                        font-weight: 700; 
+                        color: {colors['text_secondary']}; 
+                        text-transform: uppercase;
+                        letter-spacing: 0.5px;
+                        margin-bottom: 0.25rem;
+                    ">{day}</div>
+                    <div style="
+                        font-size: 0.7rem; 
+                        color: {colors['text_secondary']}; 
+                        margin-bottom: 0.5rem;
+                    ">{date.strftime('%m/%d')}</div>
+                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{emoji}</div>
+                    <div style="
+                        font-size: 0.8rem; 
+                        font-weight: 700; 
+                        color: {colors['text_primary']}; 
+                        margin-bottom: 0.2rem;
+                    ">{title}</div>
+                    <div style="
+                        font-size: 0.7rem; 
+                        color: {colors['text_secondary']};
+                    ">{subtitle}</div>
+                    <div style="margin-top: 0.75rem; font-size: 1.2rem;">{completion_icon}</div>
                 </div>
             """, unsafe_allow_html=True)
 
