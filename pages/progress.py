@@ -11,8 +11,27 @@ def show():
     """Render the progress page"""
 
     render_page_header("Progress Dashboard", "Track your strength gains and training progress", "📈")
+    
+    colors = get_colors()
+    
+    # Info card
+    st.markdown(f"""
+    <div style="
+        background: {colors['surface']};
+        border: 2px solid {colors['border_light']};
+        border-left: 4px solid {colors['accent']};
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 2rem;
+    ">
+        <div style="font-weight: 600; margin-bottom: 0.5rem;">📊 Progress Tracking</div>
+        <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
+            See your strength progression on the main compound lifts over the last 8 weeks. Keep logging your workouts to track improvements!
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    st.markdown("### 📊 Main Lifts Progress (Last 8 Weeks)")
+    st.markdown("### 🏋️ Main Lifts Progress (Last 8 Weeks)")
 
     try:
         import pandas as pd
