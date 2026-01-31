@@ -170,7 +170,13 @@ class SheetsReader:
 
             # This is an exercise row
             if current_workout and len(row) >= 2:
-                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Form, I=Energy, J=Adjustments, K=Notes, L=Log
+                # Debug first exercise of first workout
+                if len(current_workout['exercises']) == 0 and current_workout.get('date', '').startswith('MONDAY'):
+                    print(f"[PARSE DEBUG] First Monday exercise row length: {len(row)}")
+                    print(f"[PARSE DEBUG] Row data: {row[:min(10, len(row))]}")
+                    print(f"[PARSE DEBUG] Column H (row[7]): '{row[7] if len(row) > 7 else 'OUT OF RANGE'}'")
+                
+                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=Notes, H=Log
                 exercise = {
                     'block': row[0] if len(row) > 0 else '',
                     'exercise': row[1] if len(row) > 1 else '',
@@ -178,12 +184,12 @@ class SheetsReader:
                     'reps': row[3] if len(row) > 3 else '',
                     'load': row[4] if len(row) > 4 else '',
                     'rest': row[5] if len(row) > 5 else '',
-                    'rpe': row[6] if len(row) > 6 else '',
-                    'form': row[7] if len(row) > 7 else '',
-                    'energy': row[8] if len(row) > 8 else '',
-                    'adjustments': row[9] if len(row) > 9 else '',
-                    'notes': row[10] if len(row) > 10 else '',
-                    'log': row[11] if len(row) > 11 else ''
+                    'notes': row[6] if len(row) > 6 else '',
+                    'log': row[7] if len(row) > 7 else '',  # Column H is the LOG column
+                    'rpe': row[8] if len(row) > 8 else '',
+                    'energy': row[9] if len(row) > 9 else '',
+                    'adjustments': row[10] if len(row) > 10 else '',
+                    'form': row[11] if len(row) > 11 else ''
                 }
 
                 # Only add if it's not a header or empty
