@@ -545,8 +545,22 @@ class SheetsReader:
                     
                 # Check if this row has an exercise (column B has content)
                 if len(row) > 1 and row[1].strip():
-                    exercise_rows.append(temp_row)
+                    # Skip header rows
+                    col_b = row[1].strip().lower()
+                    col_a = row[0].strip().lower() if len(row) > 0 else ""
                     
+                    # Skip if it's clearly a header (Exercise, Block, Sets, etc.)
+                    is_header = (
+                        col_b in ['exercise', 'block', 'sets', 'reps', 'load', 'rest', 'notes', 'log'] or
+                        col_a in ['block', 'exercise'] or
+                        'exercise' in col_b.lower()
+                    )
+                    
+                    if not is_header:
+                        exercise_rows.append(temp_row)
+                        print(f"[SAVE DEBUG] Added exercise row {temp_row}: '{row[1][:50]}'")
+                    else:
+                        print(f"[SAVE DEBUG] Skipped header row {temp_row}: '{row[1][:50]}'")
                 temp_row += 1
             
             print(f"[SAVE DEBUG] Found {len(exercise_rows)} exercise rows, have {len(logs)} logs to save")
