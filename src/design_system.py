@@ -72,7 +72,7 @@ def get_metric_card_html(label, value, delta=None, icon="", color_scheme=None):
     " class="metric-card">
         <div style="display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.5rem;">
             {f'<span style="font-size: 1.25rem;">{icon}</span>' if icon else ''}
-            <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: {color_scheme['text_secondary']}; letter-spacing: 0.05em;">{label}</div>
+            <div style="font-size: 0.75rem; text-transform: uppercase; font-weight: 700; color: {color_scheme['text_secondary']; letter-spacing: 0.05em;">{label}</div>
         </div>
         <div style="font-size: 1.875rem; font-weight: 700; color: {color_scheme['text_primary']};">{value}</div>
         {delta_html}
