@@ -102,6 +102,10 @@ def check_password():
 if not check_password():
     st.stop()
 
+# Debug: Show session state status (remove after fixing)
+if st.session_state.get("password_correct"):
+    st.sidebar.success(f"✓ Authenticated | Page: {st.session_state.get('current_page', 'unknown')}")
+
 # Load external CSS
 try:
     with open('assets/styles.css', 'r') as f:
