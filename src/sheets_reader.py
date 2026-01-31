@@ -550,10 +550,10 @@ class SheetsReader:
 
                         # Check if exercise names match (allow partial match)
                         if log_entry['exercise'].lower() in exercise_name.lower() or exercise_name.lower() in log_entry['exercise'].lower():
-                            # Column L (index 11) is the LOG column
-                            # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Form, I=Energy, J=Adjustments, K=Notes, L=Log
+                            # Column H is the LOG column (user's actual sheet structure)
+                            # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Log
                             if log_entry['log']:  # Only update if there's actual log data
-                                cell_range = f"'{self.sheet_name}'!L{current_row + 1}"
+                                cell_range = f"'{self.sheet_name}'!H{current_row + 1}"
                                 updates.append({
                                     'range': cell_range,
                                     'values': [[log_entry['log']]]
