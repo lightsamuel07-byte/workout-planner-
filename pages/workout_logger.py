@@ -235,6 +235,10 @@ def show():
                                     st.session_state.workout_logs[log_key] = "Skipped"
                                     st.rerun()
                             
+                            # Show previous log if available from saved data
+                            if existing_log and not st.session_state.workout_logs.get(log_key):
+                                st.caption(f"💭 Last time: {existing_log[:50]}")
+                            
                             # Input for new log
                             default_value = st.session_state.workout_logs.get(log_key, "")
                             log_input = st.text_input(
