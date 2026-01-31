@@ -111,13 +111,24 @@ def show():
             completion_percentage = (total_logged / len(exercises) * 100) if len(exercises) > 0 else 0
             colors = get_colors()
             completion_emoji = "🏆" if completion_percentage == 100 else "🏋️"
+            
+            # Show celebration for 100% completion
+            if completion_percentage == 100:
+                border_color = colors['accent']
+                background = f"linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(0, 230, 118, 0.1) 100%)"
+                message = "🎉 Amazing work! All exercises logged!"
+            else:
+                border_color = colors['border_strong']
+                background = f"linear-gradient(135deg, {colors['surface']} 0%, {colors['background']} 100%)"
+                message = "Keep going! 💪"
 
             st.markdown(f"""
-            <div style="background: linear-gradient(135deg, {colors['surface']} 0%, {colors['background']} 100%); border: 2px solid {colors['border_strong']}; padding: 1.5rem; border-radius: 12px; margin: 2rem 0;">
+            <div style="background: {background}; border: 2px solid {border_color}; padding: 1.5rem; border-radius: 12px; margin: 2rem 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
                         <div style="font-size: 2rem; font-weight: 700; color: {colors['text_primary']};">{total_logged}/{len(exercises)} Complete</div>
                         <div style="color: {colors['text_secondary']}; margin-top: 0.5rem; font-size: 1.1rem;">{completion_percentage:.0f}% Complete</div>
+                        <div style="color: {colors['accent']}; margin-top: 0.5rem; font-weight: 600;">{message}</div>
                     </div>
                     <div style="font-size: 3rem;">{completion_emoji}</div>
                 </div>
