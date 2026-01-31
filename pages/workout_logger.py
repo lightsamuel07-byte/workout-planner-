@@ -272,17 +272,41 @@ def show():
                         # Store save time
                         st.session_state.last_save_time = datetime.now().strftime("%I:%M %p")
 
-                        st.success(f"✅ Saved {logs_count} exercise logs to Google Sheets!")
+                        st.success(f"✅ Saved {logs_count} exercise log{'s' if logs_count != 1 else ''} to Google Sheets!")
                         st.balloons()
 
                         # Don't clear session state or redirect - let user stay on page
                         st.rerun()
                     else:
-                        st.error("❌ Failed to save workout log. Please check your connection and try again.")
+                        st.error("❌ Failed to save workout log")
+                        st.warning("""
+                        **Troubleshooting Steps:**
+                        1. Check your internet connection
+                        2. Verify Google Sheets is accessible
+                        3. Ensure today's workout exists in the sheet
+                        4. Try refreshing the page and logging in again
+                        """)
+                        
+                        # Show what was being saved for debugging
+                        with st.expander("🔍 Debug: What was being saved"):
+                            st.write(f"Date: {todays_workout.get('date', 'Unknown')}")
+                            st.write(f"Number of logs: {len(logs_to_save)}")
+                            for i, log in enumerate(logs_to_save[:3]):
+                                st.write(f"{i+1}. {log['exercise']}: '{log['log'][:50]}'")
 
                 except Exception as e:
                     st.error(f"❌ Error saving workout: {str(e)}")
-                    st.info("💡 Tip: Check that you have internet connection and Google Sheets access.")
+                    st.warning("""
+                    **Troubleshooting Steps:**
+                    1. Check your internet connection
+                    2. Verify Google Sheets is accessible  
+                    3. Try refreshing the page
+                    4. Contact support if issue persists
+                    """)
+                    
+                    with st.expander("🔍 Technical Details"):
+                        import traceback
+                        st.code(traceback.format_exc())
 
         with col3:
             if st.button("Clear All", use_container_width=True, help="Clear all unsaved logs"):
