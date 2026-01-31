@@ -195,6 +195,17 @@ with st.sidebar:
     # THIS WEEK section
     st.markdown('<div class="nav-section-header">THIS WEEK</div>', unsafe_allow_html=True)
     
+    # Add custom CSS for active nav buttons
+    st.markdown("""
+    <style>
+    div[data-testid="stSidebar"] button[kind="primary"] {
+        background: linear-gradient(135deg, #00D4AA 0%, #00B894 100%) !important;
+        font-weight: 700 !important;
+        box-shadow: 0 2px 8px rgba(0, 212, 170, 0.3) !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
     if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard", 
                  type="primary" if st.session_state.current_page == 'dashboard' else "secondary"):
         st.session_state.current_page = 'dashboard'
