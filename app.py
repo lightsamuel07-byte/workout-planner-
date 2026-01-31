@@ -278,6 +278,26 @@ with st.sidebar:
     st.markdown(f"**User:** Samuel")
     st.markdown(f"**Goal:** Strength + Aesthetics")
 
+    # Quick Tips
+    st.markdown("---")
+    with st.expander("💡 Quick Tips"):
+        st.markdown("""
+        **Logging Workouts:**
+        - Use "Done" button for quick logging
+        - Save regularly to avoid data loss
+        - Edit button lets you fix mistakes
+        
+        **Navigation:**
+        - Dashboard = Weekly overview
+        - Log Workout = Record today's session
+        - Weekly Review = See past performance
+        
+        **Features:**
+        - 🟢 = Connected to Google Sheets
+        - Progress bar shows completion %
+        - All data syncs automatically
+        """)
+    
     # 1RM Settings
     st.markdown("---")
     st.markdown("### 🏋️ Current 1RMs")
