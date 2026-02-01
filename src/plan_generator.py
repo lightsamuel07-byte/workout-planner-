@@ -748,12 +748,17 @@ Generated: [current date]
 
 ```
 
-**CRITICAL**: 
+**CRITICAL - MANDATORY TWO-PART OUTPUT**: 
 1. Every single exercise (Fort and supplemental) MUST use the ### A1. format with bullet points for sets/reps/load/rest/notes. This ensures consistent parsing to Google Sheets.
-2. Generate BOTH the workout plan AND the reasoning document.
-3. Clearly separate the two outputs with a delimiter.
+2. You MUST generate BOTH outputs below - the workout plan AND the reasoning document. BOTH are required, NOT optional.
+3. Use this EXACT delimiter to separate them: "---\n\n# WORKOUT PROGRAMMING REASONING\n\n---"
 
-Generate the complete weekly workout plan and reasoning document now, following ALL rules above:
+**YOU MUST GENERATE IN THIS ORDER:**
+- First: Complete weekly workout plan (Monday through Sunday)
+- Second: The delimiter above
+- Third: Complete reasoning document (all sections required)
+
+**DO NOT skip the reasoning document. It is mandatory. Generate both now:**
 """
 
         return prompt
