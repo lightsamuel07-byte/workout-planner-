@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import sys
 import os
+import shutil
 from src.ui_utils import render_page_header, action_button
 from src.design_system import get_colors
 
@@ -26,6 +27,9 @@ def show():
     """Render the generate plan page"""
 
     render_page_header("Generate New Workout Plan", "Create your personalized weekly workout plan", "🆕")
+
+    if 'plan_generation_in_progress' not in st.session_state:
+        st.session_state.plan_generation_in_progress = False
 
     # Calculate next Monday
     next_monday = get_next_monday()
@@ -142,11 +146,15 @@ def show():
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
+        def _start_plan_generation():
+            st.session_state.plan_generation_in_progress = True
+
         generate_button = st.button(
             "🚀 Generate Workout Plan with AI",
             type="primary",
             use_container_width=True,
-            disabled=not all_workouts_filled
+            disabled=(not all_workouts_filled) or st.session_state.plan_generation_in_progress,
+            on_click=_start_plan_generation
         )
 
     if generate_button:
@@ -228,7 +236,23 @@ USER PREFERENCES:
 
                 if plan:
                     # Save plan to markdown
-                    output_file = plan_gen.save_plan(plan)
+                    output_folder = "output"
+                    os.makedirs(output_folder, exist_ok=True)
+                    week_stamp = next_monday.strftime("%Y%m%d")
+                    output_file = os.path.join(output_folder, f"workout_plan_{week_stamp}.md")
+
+                    if os.path.exists(output_file):
+                        archive_folder = os.path.join(output_folder, "archive")
+                        os.makedirs(archive_folder, exist_ok=True)
+                        archive_stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                        archived_file = os.path.join(
+                            archive_folder,
+                            f"workout_plan_{week_stamp}__archived_{archive_stamp}.md"
+                        )
+                        shutil.move(output_file, archived_file)
+
+                    with open(output_file, 'w') as f:
+                        f.write(plan)
 
                     # Calculate sheet name
                     sheet_name = f"Weekly Plan ({next_monday.month}/{next_monday.day}/{next_monday.year})"
@@ -240,6 +264,9 @@ USER PREFERENCES:
                         sheet_name=sheet_name
                     )
                     sheets_writer.authenticate()
+
+                    archived_sheet_name = f"{sheet_name} [archived {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
+                    sheets_writer.archive_sheet_if_exists(archived_sheet_name)
                     sheets_writer.write_workout_plan(plan)
 
                     st.success("✅ Workout plan generated successfully!")
@@ -278,6 +305,8 @@ USER PREFERENCES:
                 import traceback
                 with st.expander("View Error Details"):
                     st.code(traceback.format_exc())
+            finally:
+                st.session_state.plan_generation_in_progress = False
 
     # Cost estimate
     st.markdown("---")
