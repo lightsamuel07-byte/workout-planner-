@@ -177,6 +177,10 @@ The workout history section contains prior week's logged performance. Use this d
 - **Pay attention to RPE, Form, Energy notes**: If user noted "RPE 9" or "form breakdown", don't increase load
 - **Look for patterns**: If user consistently hits top of rep range, they're ready for load progression
 - **Recovery signals**: If Energy was "Fatigued" or notes mention poor sleep, be conservative with progression
+- **Skip patterns indicate fatigue**: If user skipped warm-up walk, finisher walk, or accessory exercises (e.g., calves), they were managing fatigue intelligently
+  - Thursday skip pattern: If user skipped warm-up + finisher + calves = fatigued week
+  - Consider slightly reducing Thursday volume next week or keeping loads conservative
+- **Circuit/THAW skips**: If user skipped Mon/Fri circuits with note "exhausted", respect this and don't increase main lift volume that caused it
 
 **Integration Principle:** Fort workouts are priority #1. Supplemental work must support, not interfere with, Fort performance.
 
@@ -275,6 +279,13 @@ The workout history section contains prior week's logged performance. Use this d
    - 3 x 12 @ 28-32 kg
    - **Rest:** 60s
    - **Notes:** Glute emphasis; last set = myo-rep (1 RIR, rest 10-15s, 3-4 more reps x 3 rounds)
+   
+   **IMPORTANT: MYO-REP PROTOCOL CLARIFICATION:**
+   - When "LAST SET = MYO-REP" or similar notation appears, this is OPTIONAL based on user's energy/fatigue
+   - User execution pattern shows ~60% compliance with prescribed myo reps
+   - If user is fatigued or time-constrained, they intelligently skip myo reps
+   - This is acceptable and does not affect progressive overload decisions
+   - DO NOT reduce loads if user skipped myo reps but hit the main working sets
    ```
 
    **CRITICAL: CALCULATING FORT AUXILIARY EXERCISE WEIGHTS:**
@@ -291,10 +302,13 @@ The workout history section contains prior week's logged performance. Use this d
       - What RPE/Form/Energy did they note?
    
    3. **Apply progressive overload intelligently:**
+      - **If prior week had FAILURE** (log shows "FAIL" or incomplete reps): REDUCE load by 5-10% (e.g., 22kg failed → 20kg next week)
+      - **If prior week notes say "felt VERY heavy"**: MAINTAIN same load (don't progress yet)
       - If prior week showed good performance (hit reps, RPE ≤8, good form): Increase by 2.5-5kg
       - If prior week was exact reps with RPE 8-9: Maintain load or add 2.5kg conservatively
       - If prior week was a struggle or new exercise: Use same load or slightly reduce
       - If no prior data: Use conservative starting weight based on exercise type and rep range
+      - **CRITICAL**: Honor fractional weights (6.25kg, 8.75kg, 11.25kg, etc.) - user logs precise increments
    
    4. **Cross-reference with similar movements:**
       - If no direct match in history, look for similar exercises
@@ -405,6 +419,9 @@ The workout history section contains prior week's logged performance. Use this d
      1. FIRST CHOICE: Dumbbells, straight bars, EZ bars
      2. SECOND CHOICE: Cable machines
      3. AVOID: Plate-loaded machines (use free weights or cables instead)
+   - **NEVER use Machine Lateral Raises** - User explicitly dislikes these; always use DB Lateral Raises or cable variants
+   - **Provide cable attachment alternatives** - If exercise requires specific attachment (V-bar, rope, etc.), note a fallback (e.g., "V-Bar or Rope if unavailable")
+   - **EZ Bar dependency** - If EZ bar exercise is prescribed, note alternative if equipment unavailable (e.g., "or straight bar/DB variant")
    - NO belt on pulls/deadlifts
    - Standing calf raises ONLY (NEVER seated calves)
    - NO split squats (any variant) - use alternatives from swap library
