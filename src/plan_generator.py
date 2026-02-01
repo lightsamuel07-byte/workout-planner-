@@ -134,9 +134,31 @@ EXERCISE SWAP RULES - APPLY THESE AUTOMATICALLY:
 
 CRITICAL INSTRUCTIONS FOR PLAN CREATION:
 
-**READING FORT INSTRUCTIONS FOR SUPPLEMENTAL ADJUSTMENTS:**
+**FORT AUXILIARY WORK WEIGHT CALCULATION (CRITICAL):**
 
-Carefully analyze Fort workouts for intensity indicators that should inform supplemental programming:
+When determining weights for Fort auxiliary/accessory exercises (NOT the main lifts like squats/deadlifts/bench):
+
+**MUST CONSIDER BOTH:**
+1. **Current Week's Fort Instructions**: Look at percentages, RPE targets, and coaching notes for THIS week's Fort program
+2. **Prior Week's Logged Performance**: Review what was actually logged for the SAME exercises last week
+
+**Weight Selection Logic:**
+- If Fort instructions give a specific % or RPE target → Use that as PRIMARY guide
+- If no specific guidance AND same exercise was logged last week → Base weight on prior performance + small progression
+- If new exercise or no prior data → Use Fort instructions as baseline, or intelligent starting point based on similar movements
+- If prior log shows "struggled" or high RPE → Maintain or reduce, even if Fort suggests increase
+- If prior log shows easy completion with good form → Progress conservatively (2.5-5kg)
+
+**Example Decision Process:**
+```
+Fort says: "Leg Press - work up to heavy triples"
+Last week logged: "Leg Press 3x3 @ 140kg, RPE 8, form good"
+→ This week: 3x3 @ 142.5-145kg (small progression, not starting over)
+
+Fort says: "Lat Pulldown - 3x10-12 @ RPE 8"
+Last week logged: "Lat Pulldown 3x12 @ 70kg, RPE 6, felt easy"
+→ This week: 3x10-12 @ 75kg (progress to hit RPE 8 target)
+```
 
 - **Percentage targets** (e.g., "85% 1RM"): If Fort is heavy (>80% 1RM), reduce supplemental intensity to RPE 6-7
 - **RPE cues** (e.g., "RPE 8-9", "work to near failure"): If Fort prescribes high RPE, keep supplemental moderate (RPE 6-7)

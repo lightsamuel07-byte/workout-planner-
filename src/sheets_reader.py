@@ -293,9 +293,51 @@ class SheetsReader:
             print(f"Error finding weekly plan sheets: {err}")
             return None
 
+    def read_prior_week_complete_plan(self):
+        """
+        Read the COMPLETE prior week's plan (all 7 days: Mon/Tue/Wed/Thu/Fri/Sat/Sun).
+        This is the ELEGANT solution - fetch only what's needed instead of 20 scattered workouts.
+
+        Returns:
+            Dictionary with all days and their exercises with logged performance data
+        """
+        sheet_name = self.find_most_recent_weekly_plan()
+
+        if not sheet_name:
+            print("No prior weekly plan found.")
+            return None
+
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+
+        try:
+            # Read all data from the weekly plan sheet
+            range_name = f"'{sheet_name}'!A:L"
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=range_name
+            ).execute()
+
+            values = result.get('values', [])
+
+            if not values:
+                print(f"No data found in {sheet_name}")
+                return None
+
+            # Parse ALL days (Mon through Sun)
+            complete_plan = self._parse_complete_weekly_plan(values)
+
+            print(f"✓ Read complete prior week's plan from {sheet_name}")
+            return complete_plan
+
+        except HttpError as err:
+            print(f"Error reading prior week's plan: {err}")
+            return None
+
     def read_prior_week_supplemental(self):
         """
         Read the supplemental workouts (Tue/Thu/Sat) from the most recent Weekly Plan sheet.
+        DEPRECATED: Use read_prior_week_complete_plan() instead for better efficiency.
 
         Returns:
             Dictionary with Tuesday, Thursday, Saturday workouts and logged data
@@ -333,6 +375,76 @@ class SheetsReader:
         except HttpError as err:
             print(f"Error reading prior week's plan: {err}")
             return None
+
+    def _parse_complete_weekly_plan(self, values):
+        """
+        Parse COMPLETE weekly plan (all 7 days: Mon/Tue/Wed/Thu/Fri/Sat/Sun) from sheet.
+
+        Args:
+            values: Raw values from the sheet
+
+        Returns:
+            Dictionary with all days and their workout data
+        """
+        complete_plan = {
+            'Monday': [],
+            'Tuesday': [],
+            'Wednesday': [],
+            'Thursday': [],
+            'Friday': [],
+            'Saturday': [],
+            'Sunday': []
+        }
+
+        current_day = None
+        in_exercise_section = False
+
+        for i, row in enumerate(values):
+            if not row:
+                continue
+
+            first_col = row[0] if len(row) > 0 else ""
+
+            # Detect day headers (all 7 days)
+            day_detected = None
+            for day in ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']:
+                if day in first_col.upper():
+                    day_detected = day.capitalize()
+                    break
+            
+            if day_detected:
+                current_day = day_detected
+                in_exercise_section = False
+                continue
+
+            # Detect column headers (Block, Exercise, Sets, etc.)
+            if first_col.lower() == 'block' and current_day:
+                in_exercise_section = True
+                continue
+
+            # Parse exercise rows
+            if in_exercise_section and current_day and len(row) >= 2:
+                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Form, I=Energy, J=Adjustments, K=Notes, L=Log
+                exercise_data = {
+                    'block': row[0] if len(row) > 0 else '',
+                    'exercise': row[1] if len(row) > 1 else '',
+                    'sets': row[2] if len(row) > 2 else '',
+                    'reps': row[3] if len(row) > 3 else '',
+                    'load': row[4] if len(row) > 4 else '',
+                    'rest': row[5] if len(row) > 5 else '',
+                    'rpe': row[6] if len(row) > 6 else '',
+                    'form': row[7] if len(row) > 7 else '',
+                    'energy': row[8] if len(row) > 8 else '',
+                    'adjustments': row[9] if len(row) > 9 else '',
+                    'notes': row[10] if len(row) > 10 else '',
+                    'log': row[11] if len(row) > 11 else ''
+                }
+
+                # Only add if it has an exercise name
+                if exercise_data['exercise'] and exercise_data['exercise'].lower() != 'exercise':
+                    complete_plan[current_day].append(exercise_data)
+
+        return complete_plan
 
     def _parse_supplemental_workouts(self, values):
         """
@@ -448,9 +560,68 @@ class SheetsReader:
             print(f"Error getting weekly plan sheets: {err}")
             return []
 
+    def format_complete_plan_for_ai(self, complete_plan):
+        """
+        Format complete prior week's plan for AI prompt (ELEGANT SOLUTION).
+        
+        Args:
+            complete_plan: Dictionary with all 7 days and their exercises
+
+        Returns:
+            Formatted string for AI with all relevant performance data
+        """
+        if not complete_plan:
+            return "No prior week data available."
+
+        formatted = "PRIOR WEEK'S COMPLETE PLAN (All 7 Days):\n\n"
+
+        for day in ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']:
+            exercises = complete_plan.get(day, [])
+            if not exercises:
+                formatted += f"=== {day.upper()} ===\nNo workout logged\n\n"
+                continue
+
+            formatted += f"=== {day.upper()} ===\n"
+
+            for ex in exercises:
+                # Format: Block Exercise: Sets x Reps @ Load [RPE, Log Status, Form Notes]
+                line = f"  {ex['block']} {ex['exercise']}"
+                
+                if ex['sets'] and ex['reps']:
+                    line += f": {ex['sets']} x {ex['reps']}"
+                elif ex['sets']:
+                    line += f": {ex['sets']} sets"
+                
+                if ex['load']:
+                    line += f" @ {ex['load']}"
+                
+                # Add critical feedback
+                feedback = []
+                if ex.get('rpe'):
+                    feedback.append(f"RPE {ex['rpe']}")
+                if ex.get('log'):
+                    feedback.append(f"Status: {ex['log']}")
+                if ex.get('form') and ex['form'].strip():
+                    feedback.append(f"Form: {ex['form']}")
+                if ex.get('energy') and ex['energy'].strip():
+                    feedback.append(f"Energy: {ex['energy']}")
+                
+                if feedback:
+                    line += f" [{', '.join(feedback)}]"
+                
+                if ex.get('notes') and ex['notes'].strip():
+                    line += f"\n    Notes: {ex['notes']}"
+                
+                formatted += line + "\n"
+            
+            formatted += "\n"
+
+        return formatted
+
     def format_supplemental_for_ai(self, supplemental_data):
         """
         Format prior week's supplemental workouts for AI prompt.
+        DEPRECATED: Use format_complete_plan_for_ai() instead.
 
         Args:
             supplemental_data: Dictionary with Tuesday, Thursday, Saturday data
