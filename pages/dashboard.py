@@ -308,7 +308,7 @@ def show():
 
         action_button("View Full Week Plan", "plans", "📋", use_container_width=True)
         
-        action_button("View Progress Charts", "progress", "�", use_container_width=True)
+        action_button("View Progress Charts", "progress", "📈", use_container_width=True)
 
         action_button("Generate New Week Plan", "generate", "🆕", use_container_width=True)
 

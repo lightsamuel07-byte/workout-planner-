@@ -383,9 +383,9 @@ The workout history section contains prior week's logged performance. Use this d
    - **Use Energy tracking**: If prior week showed "Fatigued", be conservative with progression
 
 7. **1RM REFERENCES (for calculating percentages if needed):**
-   - Back Squat: 129 kg
-   - Bench Press: 94 kg
-   - Deadlift: 168 kg
+   - Back Squat: {self.config.get('reference_1rms', {}).get('back_squat', 129)} kg
+   - Bench Press: {self.config.get('reference_1rms', {}).get('bench_press', 94)} kg
+   - Deadlift: {self.config.get('reference_1rms', {}).get('deadlift', 168)} kg
 
 8. **FINISHERS:**
    - Include incline walking on supplemental days
