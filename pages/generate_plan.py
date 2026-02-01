@@ -35,6 +35,73 @@ def extract_fort_workout_title(workout_text):
         return match.group(1).strip()
     return None
 
+def strip_fort_preamble(workout_text):
+    if not workout_text:
+        return workout_text
+
+    lines = workout_text.splitlines()
+    nonempty = [i for i, line in enumerate(lines) if line.strip()]
+    if not nonempty:
+        return workout_text
+
+    import re
+
+    # Keep the header (date + gameday) but drop long narrative blocks.
+    # Start from the first actual training section if we can find one.
+    section_re = re.compile(
+        r'^\s*(PREP|PRIMARY|SECONDARY|AUXILIARY|CLUSTER|MYO|T\.H\.A\.W\.|THAW)\b',
+        flags=re.IGNORECASE,
+    )
+
+    section_start = None
+    for i, line in enumerate(lines[:250]):
+        if section_re.search(line):
+            section_start = i
+            break
+
+    if section_start is None:
+        return workout_text
+
+    # Preserve up to ~12 lines of header before the first section
+    header_start = nonempty[0]
+    header_slice_start = max(header_start, section_start - 12)
+    kept = lines[header_slice_start:]
+
+    # Trim excessive leading blank lines
+    while kept and not kept[0].strip():
+        kept = kept[1:]
+
+    return "\n".join(kept).strip() + "\n"
+
+def extract_fort_preamble(workout_text):
+    if not workout_text:
+        return None
+
+    lines = workout_text.splitlines()
+    nonempty = [i for i, line in enumerate(lines) if line.strip()]
+    if not nonempty:
+        return None
+
+    import re
+    section_re = re.compile(
+        r'^\s*(PREP|PRIMARY|SECONDARY|AUXILIARY|CLUSTER|MYO|T\.H\.A\.W\.|THAW)\b',
+        flags=re.IGNORECASE,
+    )
+
+    section_start = None
+    for i, line in enumerate(lines[:250]):
+        if section_re.search(line):
+            section_start = i
+            break
+
+    if section_start is None:
+        return None
+
+    header_start = nonempty[0]
+    preamble_lines = lines[header_start:section_start]
+    preamble = "\n".join(preamble_lines).strip()
+    return preamble or None
+
 def show():
     """Render the generate plan page"""
 
@@ -291,9 +358,17 @@ def show():
                     return
 
                 # Format trainer workouts
-                monday_title = extract_fort_workout_title(monday_workout)
-                wednesday_title = extract_fort_workout_title(wednesday_workout)
-                friday_title = extract_fort_workout_title(friday_workout)
+                monday_workout_clean = strip_fort_preamble(monday_workout)
+                wednesday_workout_clean = strip_fort_preamble(wednesday_workout)
+                friday_workout_clean = strip_fort_preamble(friday_workout)
+
+                monday_preamble = extract_fort_preamble(monday_workout)
+                wednesday_preamble = extract_fort_preamble(wednesday_workout)
+                friday_preamble = extract_fort_preamble(friday_workout)
+
+                monday_title = extract_fort_workout_title(monday_workout_clean)
+                wednesday_title = extract_fort_workout_title(wednesday_workout_clean)
+                friday_title = extract_fort_workout_title(friday_workout_clean)
 
                 monday_header = f"Monday ({monday_title})" if monday_title else "Monday"
                 wednesday_header = f"Wednesday ({wednesday_title})" if wednesday_title else "Wednesday"
@@ -309,13 +384,13 @@ def show():
 TRAINER WORKOUTS FROM TRAIN HEROIC:
 
 === {monday_header} ===
-{monday_workout}
+{monday_workout_clean}
 
 === {wednesday_header} ===
-{wednesday_workout}
+{wednesday_workout_clean}
 
 === {friday_header} ===
-{friday_workout}
+{friday_workout_clean}
 """
 
                 # Fixed preferences
@@ -344,11 +419,16 @@ USER PREFERENCES:
 
                 # Generate plan
                 plan_gen = PlanGenerator(api_key=api_key, config=config)
-                plan = plan_gen.generate_plan(workout_history, formatted_workouts, preferences)
+                fort_preamble_blocks = [p for p in [monday_preamble, wednesday_preamble, friday_preamble] if p]
+                fort_preamble_text = "\n\n---\n\n".join(fort_preamble_blocks) if fort_preamble_blocks else None
+                fort_week_constraints = plan_gen.summarize_fort_preamble(fort_preamble_text) if fort_preamble_text else None
 
-                explanation = None
-                if plan:
-                    explanation = plan_gen.generate_explanation(plan, max_bullets=15)
+                plan, explanation = plan_gen.generate_plan(
+                    workout_history,
+                    formatted_workouts,
+                    preferences,
+                    fort_week_constraints=fort_week_constraints,
+                )
 
                 if plan:
                     # Save plan to markdown

@@ -59,7 +59,7 @@ class PlanGenerator:
 
         return formatted
 
-    def generate_plan(self, workout_history, trainer_workouts, preferences):
+    def generate_plan(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
         """
         Generate a weekly workout plan using Claude AI.
 
@@ -74,7 +74,7 @@ class PlanGenerator:
         print("\n🤖 Generating your personalized workout plan with Claude AI...")
 
         # Construct the prompt
-        prompt = self._build_prompt(workout_history, trainer_workouts, preferences)
+        prompt = self._build_prompt(workout_history, trainer_workouts, preferences, fort_week_constraints=fort_week_constraints)
 
         try:
             # Call Claude API
@@ -125,97 +125,37 @@ Return the COMPLETE corrected plan."""
 
         except Exception as e:
             print(f"Error generating plan: {e}")
+            return None, None
+
+    def summarize_fort_preamble(self, preamble_text):
+        if not preamble_text or not preamble_text.strip():
             return None
 
-    def generate_explanation(self, plan_text, max_bullets=15):
-        prompt = f"""Write a short explanation for this weekly workout plan.
+        prompt = f"""Summarize the following Fort week/program preamble into concise constraints for programming.
 
-Rules:
-- Use 5-{max_bullets} bullet points.
-- Be concrete (mention key swaps/constraints and progressive overload choices).
-- Do NOT include tables.
-- Do NOT include ranges.
+Output rules:
+- 6-12 bullet points max.
+- Only include actionable constraints (clusters, rest intervals, progression intent, rep scheme changes, load guidance, fatigue intent).
+- Preserve key numeric details.
+- No tables.
 
-PLAN:
-{plan_text}
+PREAMBLE:
+{preamble_text}
 """
 
         try:
             message = self.client.messages.create(
                 model=self.model,
-                max_tokens=400,
+                max_tokens=300,
                 messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
+                    {"role": "user", "content": prompt}
                 ]
             )
             text = message.content[0].text
-            if not text:
-                return None
-            return text.strip()
+            return text.strip() if text else None
         except Exception as e:
-            print(f"Error generating explanation: {e}")
+            print(f"Error summarizing Fort preamble: {e}")
             return None
-
-    def _contains_ranges(self, text):
-        if not text:
-            return False
-        reps_range = re.search(r"\bx\s*\d+\s*-\s*\d+\b", text)
-        load_range = re.search(r"@\s*\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\b", text)
-        return bool(reps_range or load_range)
-
-    def _retry_remove_ranges(self, plan_text):
-        retry_prompt = f"""Rewrite the plan below so that it contains NO ranges anywhere.
-
-Hard rules:
-- Reps must be a single value (e.g. 12 not 10-12).
-- Loads must be a single value (e.g. 24 kg not 22-26 kg).
-- Keep the exact same structure and exercise order.
-- Do not add or remove exercises.
-
-PLAN TO FIX:
-{plan_text}
-"""
-
-        try:
-            message = self.client.messages.create(
-                model=self.model,
-                max_tokens=min(self.max_tokens, 2000),
-                messages=[
-                    {
-                        "role": "user",
-                        "content": retry_prompt
-                    }
-                ]
-            )
-            fixed = message.content[0].text
-            return fixed or plan_text
-        except Exception:
-            return plan_text
-
-    def _collapse_ranges(self, text):
-        # Collapse reps ranges: choose top of range (e.g., 12-15 -> 15)
-        def _reps_repl(match):
-            top = match.group(3)
-            return f"{match.group(1)}{top}"
-
-        text = re.sub(r"(\bx\s*)(\d+)\s*-\s*(\d+)\b", _reps_repl, text)
-
-        # Collapse load ranges: choose midpoint (e.g., 22-26 -> 24)
-        def _load_repl(match):
-            a = float(match.group(2))
-            b = float(match.group(3))
-            mid = (a + b) / 2.0
-            if mid.is_integer():
-                mid_str = str(int(mid))
-            else:
-                mid_str = f"{mid:.1f}".rstrip('0').rstrip('.')
-            return f"{match.group(1)}{mid_str}"
-
-        text = re.sub(r"(@\s*)(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\b", _load_repl, text)
-        return text
 
     def _apply_exercise_swaps_to_text(self, text):
         swaps_file = 'exercise_swaps.yaml'
@@ -309,7 +249,7 @@ PLAN TO FIX:
 
         return "\n".join(f"• {b}" for b in bullets[:15])  # Cap at 15 bullets
 
-    def _build_prompt(self, workout_history, trainer_workouts, preferences):
+    def _build_prompt(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
         """
         Build the AI prompt for plan generation.
 
@@ -324,12 +264,18 @@ PLAN TO FIX:
         # Extract athlete profile and rules from config
         athlete_config = self._format_athlete_config()
 
+        fort_constraints_block = ""
+        if fort_week_constraints:
+            fort_constraints_block = f"""\nFORT WEEK CONSTRAINTS (from program preamble; treat as high priority):\n{fort_week_constraints}\n"""
+
         prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
 
 CRITICAL OUTPUT RULES:
 - **NO RANGES**: Use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
 
 {athlete_config}
+
+{fort_constraints_block}
 
 ---
 
@@ -683,21 +629,22 @@ SWAP LIBRARY (if needed):
 
         return config_text
 
-    def save_plan(self, plan, output_folder="output", format="markdown"):
+    def save_plan(self, plan, explanation=None, output_folder="output", format="markdown"):
         """
-        Save the generated plan to a file.
+        Save the generated plan and optional explanation to files.
 
         Args:
             plan: The generated plan text
+            explanation: The explanation text (optional)
             output_folder: Folder to save the plan
             format: File format (markdown, text, json)
 
         Returns:
-            Path to saved file
+            Tuple of (plan_path, explanation_path or None)
         """
         if not plan:
             print("No plan to save.")
-            return None
+            return None, None
 
         # Create output folder if it doesn't exist
         os.makedirs(output_folder, exist_ok=True)
@@ -705,12 +652,21 @@ SWAP LIBRARY (if needed):
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         extension = "md" if format == "markdown" else "txt"
+
+        # Save main plan
         filename = f"workout_plan_{timestamp}.{extension}"
         filepath = os.path.join(output_folder, filename)
-
-        # Save the plan
         with open(filepath, 'w') as f:
             f.write(plan)
-
         print(f"✓ Plan saved to: {filepath}")
-        return filepath
+
+        # Save explanation if provided
+        expl_path = None
+        if explanation:
+            expl_filename = f"workout_plan_{timestamp}_explanation.{extension}"
+            expl_path = os.path.join(output_folder, expl_filename)
+            with open(expl_path, 'w') as f:
+                f.write(explanation)
+            print(f"✓ Explanation saved to: {expl_path}")
+
+        return filepath, expl_path
