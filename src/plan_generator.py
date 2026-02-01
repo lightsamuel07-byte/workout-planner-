@@ -5,6 +5,7 @@ AI-powered workout plan generation using Claude API.
 import anthropic
 import os
 import yaml
+import re
 from datetime import datetime
 
 
@@ -89,12 +90,30 @@ class PlanGenerator:
             )
 
             plan = message.content[0].text
+            plan = self._apply_exercise_swaps_to_text(plan)
             print("✓ Workout plan generated successfully!\n")
             return plan
 
         except Exception as e:
             print(f"Error generating plan: {e}")
             return None
+
+    def _apply_exercise_swaps_to_text(self, text):
+        swaps_file = 'exercise_swaps.yaml'
+        if not os.path.exists(swaps_file):
+            return text
+
+        with open(swaps_file, 'r') as f:
+            swaps_config = yaml.safe_load(f) or {}
+
+        swaps = swaps_config.get('exercise_swaps', {}) or {}
+        for original, replacement in swaps.items():
+            if not original or not replacement:
+                continue
+            pattern = re.compile(re.escape(str(original)), re.IGNORECASE)
+            text = pattern.sub(str(replacement), text)
+
+        return text
 
     def _build_prompt(self, workout_history, trainer_workouts, preferences):
         """
