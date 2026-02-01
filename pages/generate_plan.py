@@ -10,8 +10,8 @@ import shutil
 from src.ui_utils import render_page_header, action_button
 from src.design_system import get_colors
 
-# Add src to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
+# Ensure project root is on path so `import src.*` resolves consistently (local + Streamlit Cloud)
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 def get_next_monday():
     """Calculate the next Monday date"""
@@ -106,6 +106,16 @@ def show():
     """Render the generate plan page"""
 
     render_page_header("Generate New Workout Plan", "Create your personalized weekly workout plan", "🆕")
+
+    with st.expander("Debug: App Version / Imports"):
+        try:
+            import src.plan_generator as _pg
+            st.write({
+                "plan_generator_file": getattr(_pg, "__file__", None),
+                "has_summarize_fort_preamble": hasattr(_pg.PlanGenerator, "summarize_fort_preamble"),
+            })
+        except Exception as e:
+            st.write({"error": str(e)})
 
     if 'plan_generation_in_progress' not in st.session_state:
         st.session_state.plan_generation_in_progress = False
