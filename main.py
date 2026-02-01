@@ -109,33 +109,23 @@ def main():
 
     try:
         sheets_reader.authenticate()
-        workout_history = sheets_reader.read_workout_history(num_recent_workouts=20)
         
-        # Use compressed format to save 60-70% tokens
-        from src.history_compressor import compress_workout_history, compress_supplemental_history, get_token_savings_estimate
+        # ELEGANT SOLUTION: Fetch only the prior week's complete plan (all 7 days)
+        # This gives us everything we need: Fort workouts + supplemental + logged performance
+        # Much more efficient than fetching 20 scattered workouts
+        prior_week_plan = sheets_reader.read_prior_week_complete_plan()
         
-        formatted_history_full = sheets_reader.format_history_for_ai(workout_history)
-        formatted_history = compress_workout_history(workout_history, focus_on_prior_week=True)
-        
-        # Show token savings
-        savings = get_token_savings_estimate(formatted_history_full, formatted_history)
-        print(f"✓ Compressed workout history: {savings['tokens_saved']} tokens saved ({savings['savings_percent']}% reduction)")
-
-        # Read prior week's supplemental workouts for progressive overload
-        prior_week_supplemental = sheets_reader.read_prior_week_supplemental()
-        if prior_week_supplemental:
-            formatted_prior_supplemental_full = sheets_reader.format_supplemental_for_ai(prior_week_supplemental)
-            formatted_prior_supplemental = compress_supplemental_history(prior_week_supplemental)
-            
-            supp_savings = get_token_savings_estimate(formatted_prior_supplemental_full, formatted_prior_supplemental)
-            print(f"✓ Compressed supplemental history: {supp_savings['tokens_saved']} tokens saved ({supp_savings['savings_percent']}% reduction)")
+        if prior_week_plan:
+            formatted_history = sheets_reader.format_complete_plan_for_ai(prior_week_plan)
+            print(f"✓ Using prior week's complete plan (all 7 days with logged performance)")
         else:
-            formatted_prior_supplemental = "No prior week supplemental data available."
+            formatted_history = "No prior week data available (this may be a new program)."
+            print("ℹ️  No prior week found - generating fresh plan")
+            
     except Exception as e:
-        print(f"\n❌ Error reading workout history: {e}")
+        print(f"\n❌ Error reading prior week's plan: {e}")
         print("\nContinuing without workout history...")
-        formatted_history = "No workout history available."
-        formatted_prior_supplemental = "No prior week supplemental data available."
+        formatted_history = "No prior week data available."
 
     # Step 2: Collect trainer workouts
     trainer_workouts = input_handler.collect_trainer_workouts()
@@ -170,11 +160,10 @@ def main():
     if input_handler.is_new_program:
         program_context = "\n\nNEW FORT PROGRAM: Design fresh supplemental workouts that complement this new program.\n"
     else:
-        program_context = "\n\nCONTINUING FORT PROGRAM: Maintain the same supplemental workout structure with progressive overload based on prior week's data.\n"
-        program_context += f"\n{formatted_prior_supplemental}\n"
+        program_context = "\n\nCONTINUING FORT PROGRAM: Apply progressive overload to supplemental exercises based on prior week's logged performance.\n"
 
     plan = plan_generator.generate_plan(
-        workout_history=formatted_history,
+        workout_history=formatted_history,  # Now contains complete prior week with all logged data
         trainer_workouts=formatted_trainer_workouts + program_context,
         preferences=""  # Already included in formatted_trainer_workouts
     )
