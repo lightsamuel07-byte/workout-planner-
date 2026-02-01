@@ -30,10 +30,54 @@ def show():
 
     if 'plan_generation_in_progress' not in st.session_state:
         st.session_state.plan_generation_in_progress = False
+    if 'plan_existence_checks' not in st.session_state:
+        st.session_state.plan_existence_checks = {}
+    if 'last_week_log_text' not in st.session_state:
+        st.session_state.last_week_log_text = None
+    if 'last_week_log_error' not in st.session_state:
+        st.session_state.last_week_log_error = None
 
     # Calculate next Monday
     next_monday = get_next_monday()
     colors = get_colors()
+
+    week_stamp = next_monday.strftime("%Y%m%d")
+    output_folder = "output"
+    output_file = os.path.join(output_folder, f"workout_plan_{week_stamp}.md")
+    sheet_name = f"Weekly Plan ({next_monday.month}/{next_monday.day}/{next_monday.year})"
+
+    def _run_plan_existence_checks():
+        local_exists = os.path.exists(output_file)
+
+        sheets_exists = False
+        sheets_error = None
+        try:
+            import yaml
+            from src.sheets_reader import SheetsReader
+
+            config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+
+            sheets_reader = SheetsReader(
+                credentials_file=config['google_sheets']['credentials_file'],
+                spreadsheet_id=config['google_sheets']['spreadsheet_id'],
+                sheet_name=config['google_sheets']['sheet_name']
+            )
+            sheets_reader.authenticate()
+            all_weekly_sheets = sheets_reader.get_all_weekly_plan_sheets()
+            sheets_exists = sheet_name in all_weekly_sheets
+        except Exception as e:
+            sheets_error = str(e)
+
+        st.session_state.plan_existence_checks[week_stamp] = {
+            'local_exists': local_exists,
+            'sheets_exists': sheets_exists,
+            'sheets_error': sheets_error
+        }
+
+    if week_stamp not in st.session_state.plan_existence_checks:
+        _run_plan_existence_checks()
 
     # Week info card
     st.markdown(f"""
@@ -123,11 +167,39 @@ def show():
     st.markdown("### 📊 STEP 3: Last Week's Performance (Optional)")
 
     with st.expander("View Last Week's Log"):
-        st.markdown("""
-        📊 **Auto-loaded from Google Sheets**
+        if is_new_program:
+            st.markdown("""
+            🆕 **New program selected**
 
-        *Last week's data will be automatically loaded and used for progressive overload recommendations.*
-        """)
+            Prior week data won't be used when designing a fresh supplemental program.
+            """)
+        else:
+            if st.button("📊 Load Last Week's Log", use_container_width=True, key="load_last_week_log"):
+                try:
+                    import yaml
+                    from src.sheets_reader import SheetsReader
+
+                    config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+                    with open(config_path, 'r') as f:
+                        config = yaml.safe_load(f)
+
+                    sheets_reader = SheetsReader(
+                        credentials_file=config['google_sheets']['credentials_file'],
+                        spreadsheet_id=config['google_sheets']['spreadsheet_id'],
+                        sheet_name=config['google_sheets']['sheet_name']
+                    )
+                    sheets_reader.authenticate()
+                    prior_supplemental = sheets_reader.read_prior_week_supplemental()
+                    st.session_state.last_week_log_text = sheets_reader.format_supplemental_for_ai(prior_supplemental)
+                    st.session_state.last_week_log_error = None
+                except Exception as e:
+                    st.session_state.last_week_log_error = str(e)
+                    st.session_state.last_week_log_text = None
+
+            if st.session_state.last_week_log_error:
+                st.warning(f"Could not load prior week data: {st.session_state.last_week_log_error}")
+            elif st.session_state.last_week_log_text:
+                st.code(st.session_state.last_week_log_text)
 
     st.markdown("---")
 
@@ -135,7 +207,27 @@ def show():
     all_workouts_filled = monday_workout and wednesday_workout and friday_workout
 
     colors = get_colors()
-    
+
+    checks = st.session_state.plan_existence_checks.get(week_stamp, {})
+    local_exists = checks.get('local_exists', False)
+    sheets_exists = checks.get('sheets_exists', False)
+    sheets_error = checks.get('sheets_error')
+
+    if local_exists or sheets_exists:
+        st.warning(
+            f"A plan already exists for the week starting {next_monday.strftime('%B %d, %Y')}. "
+            "Generating will archive the existing plan (local file + Google Sheets tab) and create a new current-week plan."
+        )
+        if local_exists:
+            st.markdown(f"**Local:** `{output_file}`")
+        if sheets_exists:
+            st.markdown(f"**Google Sheets tab:** `{sheet_name}`")
+        if sheets_error:
+            st.info(f"Google Sheets check error: {sheets_error}")
+
+        if st.button("🔄 Refresh plan checks", use_container_width=True, key="refresh_plan_checks"):
+            _run_plan_existence_checks()
+
     if not all_workouts_filled:
         st.markdown(f"""
         <div style="background: rgba(255, 107, 53, 0.1); border-left: 4px solid {colors['warning']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
@@ -236,11 +328,7 @@ USER PREFERENCES:
 
                 if plan:
                     # Save plan to markdown
-                    output_folder = "output"
                     os.makedirs(output_folder, exist_ok=True)
-                    week_stamp = next_monday.strftime("%Y%m%d")
-                    output_file = os.path.join(output_folder, f"workout_plan_{week_stamp}.md")
-
                     if os.path.exists(output_file):
                         archive_folder = os.path.join(output_folder, "archive")
                         os.makedirs(archive_folder, exist_ok=True)
@@ -255,8 +343,6 @@ USER PREFERENCES:
                         f.write(plan)
 
                     # Calculate sheet name
-                    sheet_name = f"Weekly Plan ({next_monday.month}/{next_monday.day}/{next_monday.year})"
-
                     # Write to Google Sheets
                     sheets_writer = SheetsWriter(
                         credentials_file=config['google_sheets']['credentials_file'],

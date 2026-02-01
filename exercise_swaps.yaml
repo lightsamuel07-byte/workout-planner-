@@ -10,6 +10,9 @@ exercise_swaps:
   "Ab Rollout": "Dead Bug or Pallof Press"
   "Hamstring Slider": "Physioball Leg Curl"
 
+  # Machine Lateral Raise - NEVER use, swap to Cable
+  "Machine Lateral Raise": "Cable Lateral Raise"
+
   # Carry Equipment Rules - Always kettlebell, never dumbbell
   "Dumbbell Farmer Carry": "Kettlebell Farmer Carry"
   "Dumbbell Farmers Carry": "Kettlebell Farmer Carry"
@@ -37,6 +40,7 @@ hard_preferences:
   - "No split squats (any variant)"
   - "Carries on Tuesday by default; load = moderate to preserve Friday deadlift grip"
   - "American spelling only"
+  - "NO Machine Lateral Raise - use Cable Lateral Raise or DB Lateral Raise instead"
 
 # Lateral raise guardrail
 lateral_raise_rule: "If Monday used DB laterals, avoid DB laterals on Tuesday (use rear-delt/low-trap variants instead)"
