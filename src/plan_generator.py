@@ -255,6 +255,35 @@ The workout history section contains prior week's logged performance. Use this d
    - **Notes:** Glute emphasis; last set = myo-rep (1 RIR, rest 10-15s, 3-4 more reps x 3 rounds)
    ```
 
+   **CRITICAL: CALCULATING FORT AUXILIARY EXERCISE WEIGHTS:**
+   
+   When setting loads for Fort auxiliary exercises (like MYO REP finishers, accessory work, etc.), you MUST:
+   
+   1. **Check CURRENT week's Fort instructions** for guidance on intensity/load
+      - Look for RPE targets, percentage prescriptions, or coaching notes
+      - Example: "MYO REP at 1 RIR" = choose load where set leaves 1 rep in reserve
+   
+   2. **Review PRIOR week's Fort workout logs** (if available in history)
+      - What load did user use for the same or similar exercise last week?
+      - Did they hit the prescribed reps? Log more? Struggle?
+      - What RPE/Form/Energy did they note?
+   
+   3. **Apply progressive overload intelligently:**
+      - If prior week showed good performance (hit reps, RPE ≤8, good form): Increase by 2.5-5kg
+      - If prior week was exact reps with RPE 8-9: Maintain load or add 2.5kg conservatively
+      - If prior week was a struggle or new exercise: Use same load or slightly reduce
+      - If no prior data: Use conservative starting weight based on exercise type and rep range
+   
+   4. **Cross-reference with similar movements:**
+      - If no direct match in history, look for similar exercises
+      - Example: If new exercise is "30° Incline DB Press" but history shows "45° Incline DB Press @ 28kg", start conservatively at 24-26kg
+   
+   **Example Decision Process:**
+   - Fort says: "MYO REP FINISHER: 30° Incline DB Press - 8 reps"
+   - Prior week log shows: "30° Incline DB Press: 3 x 8 @ 24kg, RPE 7, Form: Good"
+   - This week: Increase to 26kg (user ready for progression based on RPE 7)
+   - If prior week was RPE 9 or form broke down: Keep at 24kg
+
    **REST PERIOD RULES:**
    - **Fort Days (Mon/Wed/Fri)**: Follow trainer's prescribed rest periods. If not specified:
      * Main lifts (squats, deadlifts, presses): 3-5 minutes

@@ -110,11 +110,27 @@ def main():
     try:
         sheets_reader.authenticate()
         workout_history = sheets_reader.read_workout_history(num_recent_workouts=20)
-        formatted_history = sheets_reader.format_history_for_ai(workout_history)
+        
+        # Use compressed format to save 60-70% tokens
+        from src.history_compressor import compress_workout_history, compress_supplemental_history, get_token_savings_estimate
+        
+        formatted_history_full = sheets_reader.format_history_for_ai(workout_history)
+        formatted_history = compress_workout_history(workout_history, focus_on_prior_week=True)
+        
+        # Show token savings
+        savings = get_token_savings_estimate(formatted_history_full, formatted_history)
+        print(f"✓ Compressed workout history: {savings['tokens_saved']} tokens saved ({savings['savings_percent']}% reduction)")
 
         # Read prior week's supplemental workouts for progressive overload
         prior_week_supplemental = sheets_reader.read_prior_week_supplemental()
-        formatted_prior_supplemental = sheets_reader.format_supplemental_for_ai(prior_week_supplemental) if prior_week_supplemental else "No prior week supplemental data available."
+        if prior_week_supplemental:
+            formatted_prior_supplemental_full = sheets_reader.format_supplemental_for_ai(prior_week_supplemental)
+            formatted_prior_supplemental = compress_supplemental_history(prior_week_supplemental)
+            
+            supp_savings = get_token_savings_estimate(formatted_prior_supplemental_full, formatted_prior_supplemental)
+            print(f"✓ Compressed supplemental history: {supp_savings['tokens_saved']} tokens saved ({supp_savings['savings_percent']}% reduction)")
+        else:
+            formatted_prior_supplemental = "No prior week supplemental data available."
     except Exception as e:
         print(f"\n❌ Error reading workout history: {e}")
         print("\nContinuing without workout history...")
