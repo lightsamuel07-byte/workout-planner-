@@ -157,6 +157,21 @@ def show():
     # Parse and display the selected plan
     days = parse_plan_content(selected_plan_path)
 
+    if not days:
+        st.error("Could not parse this plan into day sections. Please open the markdown view to inspect the raw content.")
+        if st.button("📄 View Markdown File", use_container_width=True):
+            try:
+                with open(selected_plan_path, 'r') as f:
+                    markdown_content = f.read()
+                with st.expander("Full Markdown Content"):
+                    st.code(markdown_content, language='markdown')
+            except FileNotFoundError:
+                st.error("Plan file not found. It may have been deleted.")
+            except Exception as e:
+                st.error(f"Error reading file: {e}")
+        action_button("🏠 Back to Dashboard", "dashboard", use_container_width=True)
+        return
+
     # Day navigation tabs
     day_names = list(days.keys())
     selected_day = st.radio(
@@ -165,6 +180,9 @@ def show():
         horizontal=True,
         key="day_selector"
     )
+
+    if selected_day not in days:
+        selected_day = day_names[0]
 
     st.markdown("---")
 

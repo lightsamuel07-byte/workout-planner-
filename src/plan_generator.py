@@ -92,6 +92,33 @@ class PlanGenerator:
             plan = message.content[0].text
             plan = self._apply_exercise_swaps_to_text(plan)
 
+            missing_days = self._missing_required_days(plan)
+            if missing_days:
+                correction_prompt = (
+                    "Your previous output is INCOMPLETE. You must return a COMPLETE weekly plan.\n\n"
+                    "Requirements:\n"
+                    "- Include sections for every day: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY.\n"
+                    "- Each day must start with a markdown header like: ## MONDAY ...\n"
+                    "- Preserve the Fort days exactly, and add supplemental days around them.\n"
+                    "- Return the COMPLETE corrected plan only.\n\n"
+                    f"Missing day sections: {', '.join(missing_days)}"
+                )
+                message_fix = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    messages=[
+                        {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": plan},
+                        {"role": "user", "content": correction_prompt},
+                    ],
+                )
+                plan = message_fix.content[0].text
+                plan = self._apply_exercise_swaps_to_text(plan)
+
+                missing_days = self._missing_required_days(plan)
+                if missing_days:
+                    raise ValueError(f"Generated plan is incomplete. Missing day sections: {', '.join(missing_days)}")
+
             # Validate and enforce no ranges (hybrid: retry once, then collapse)
             plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
             if violations and not was_collapsed:
@@ -126,6 +153,23 @@ Return the COMPLETE corrected plan."""
         except Exception as e:
             print(f"Error generating plan: {e}")
             return None, None
+
+    def _missing_required_days(self, text):
+        required = [
+            'MONDAY',
+            'TUESDAY',
+            'WEDNESDAY',
+            'THURSDAY',
+            'FRIDAY',
+            'SATURDAY',
+            'SUNDAY',
+        ]
+        present = set()
+        for line in (text or '').splitlines():
+            m = re.match(r'^\s*##\s*([A-Z]+DAY)\b', line.strip().upper())
+            if m:
+                present.add(m.group(1))
+        return [d for d in required if d not in present]
 
     def summarize_fort_preamble(self, preamble_text):
         if not preamble_text or not preamble_text.strip():
