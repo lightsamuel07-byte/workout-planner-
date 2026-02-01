@@ -143,9 +143,14 @@ PREAMBLE:
 {preamble_text}
 """
 
+        summarizer_model = (
+            (self.config.get('claude', {}) or {}).get('summarizer_model')
+            or self.model
+        )
+
         try:
             message = self.client.messages.create(
-                model=self.model,
+                model=summarizer_model,
                 max_tokens=300,
                 messages=[
                     {"role": "user", "content": prompt}

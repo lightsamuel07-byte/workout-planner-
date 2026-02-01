@@ -12,6 +12,7 @@ google_sheets:
 claude:
   api_key_env: "ANTHROPIC_API_KEY"  # Will read from environment variable
   model: "claude-sonnet-4-5-20250929"
+  summarizer_model: "claude-3-5-haiku-20241022"
   max_tokens: 3000
 
 # Output Configuration
