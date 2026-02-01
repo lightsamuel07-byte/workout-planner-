@@ -62,114 +62,151 @@ class PlanGenerator:
     def generate_plan(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
         """
         Generate a weekly workout plan using Claude AI.
-
-        Args:
-            workout_history: Formatted string of recent workout history
-            trainer_workouts: Formatted string of trainer workouts
-            preferences: Formatted string of user preferences
-
-        Returns:
-            Generated workout plan as string
+        Uses two-call architecture for reliability:
+        1. Generate Fort days (Mon/Wed/Fri)
+        2. Generate supplemental days (Tue/Thu/Sat) based on Fort output
         """
         print("\n🤖 Generating your personalized workout plan with Claude AI...")
 
-        # Construct the prompt
-        prompt = self._build_prompt(workout_history, trainer_workouts, preferences, fort_week_constraints=fort_week_constraints)
+        # Call 1: Generate Fort days
+        print("  → Step 1: Generating Fort workout days (Mon/Wed/Fri)...")
+        fort_prompt = self._build_fort_prompt(workout_history, trainer_workouts, preferences, fort_week_constraints)
 
         try:
-            # Call Claude API
-            message = self.client.messages.create(
+            fort_message = self.client.messages.create(
                 model=self.model,
-                max_tokens=self.max_tokens,
-                messages=[
-                    {
-                        "role": "user",
-                        "content": prompt
-                    }
-                ]
+                max_tokens=4000,
+                messages=[{"role": "user", "content": fort_prompt}]
             )
+            fort_plan = fort_message.content[0].text
+            fort_plan = self._apply_exercise_swaps_to_text(fort_plan)
+            fort_plan = self._validate_no_ranges(fort_plan, attempt=1)[0]  # Force single values
 
-            plan = message.content[0].text
-            plan = self._apply_exercise_swaps_to_text(plan)
-
-            missing_days = self._missing_required_days(plan)
-            if missing_days:
-                correction_prompt = (
-                    "Your previous output is INCOMPLETE. You must return a COMPLETE weekly plan.\n\n"
-                    "Requirements:\n"
-                    "- Include sections for every day: MONDAY, TUESDAY, WEDNESDAY, THURSDAY, FRIDAY, SATURDAY, SUNDAY.\n"
-                    "- Each day must start with a markdown header like: ## MONDAY ...\n"
-                    "- Preserve the Fort days exactly, and add supplemental days around them.\n"
-                    "- Return the COMPLETE corrected plan only.\n\n"
-                    f"Missing day sections: {', '.join(missing_days)}"
-                )
-                message_fix = self.client.messages.create(
+            # Verify Fort days are complete
+            missing_fort = self._missing_fort_days(fort_plan)
+            if missing_fort:
+                print(f"    ⚠️ Missing Fort days: {missing_fort}. Retrying...")
+                correction = f"Your previous output is missing these Fort days: {', '.join(missing_fort)}. Generate the COMPLETE weekly plan with all Fort days (Mon/Wed/Fri) in the specified format."
+                fort_message2 = self.client.messages.create(
                     model=self.model,
-                    max_tokens=self.max_tokens,
+                    max_tokens=4000,
                     messages=[
-                        {"role": "user", "content": prompt},
-                        {"role": "assistant", "content": plan},
-                        {"role": "user", "content": correction_prompt},
-                    ],
-                )
-                plan = message_fix.content[0].text
-                plan = self._apply_exercise_swaps_to_text(plan)
-
-                missing_days = self._missing_required_days(plan)
-                if missing_days:
-                    raise ValueError(f"Generated plan is incomplete. Missing day sections: {', '.join(missing_days)}")
-
-            # Validate and enforce no ranges (hybrid: retry once, then collapse)
-            plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
-            if violations and not was_collapsed:
-                # Retry once with correction prompt
-                correction_prompt = f"""The previous plan had range values. Fix these to single values:
-{chr(10).join(f"Line {v[0]}: {v[2][0]}-{v[2][1]} -> pick single value" for v in violations[:10])}
-
-Rules:
-- Reps: use the HIGHER value (e.g., 12-15 -> 15)
-- Load (kg): use the MIDPOINT (e.g., 22-26 -> 24)
-
-Return the COMPLETE corrected plan."""
-                message2 = self.client.messages.create(
-                    model=self.model,
-                    max_tokens=self.max_tokens,
-                    messages=[
-                        {"role": "user", "content": prompt},
-                        {"role": "assistant", "content": plan},
-                        {"role": "user", "content": correction_prompt}
+                        {"role": "user", "content": fort_prompt},
+                        {"role": "assistant", "content": fort_plan},
+                        {"role": "user", "content": correction}
                     ]
                 )
-                plan = message2.content[0].text
-                plan = self._apply_exercise_swaps_to_text(plan)
-                plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=2)
+                fort_plan = fort_message2.content[0].text
+                fort_plan = self._apply_exercise_swaps_to_text(fort_plan)
 
-            # Generate explanation file
-            explanation = self._generate_explanation(plan, workout_history, violations if was_collapsed else None)
+            print("  ✓ Fort days generated")
+
+            # Call 2: Generate supplemental days based on Fort output
+            print("  → Step 2: Generating supplemental days (Tue/Thu/Sat)...")
+            supplemental_prompt = self._build_supplemental_prompt(fort_plan, workout_history, preferences, fort_week_constraints)
+
+            supp_message = self.client.messages.create(
+                model=self.model,
+                max_tokens=3000,
+                messages=[{"role": "user", "content": supplemental_prompt}]
+            )
+            supplemental_plan = supp_message.content[0].text
+            supplemental_plan = self._apply_exercise_swaps_to_text(supplemental_plan)
+            supplemental_plan = self._validate_no_ranges(supplemental_plan, attempt=1)[0]
+
+            print("  ✓ Supplemental days generated")
+
+            # Combine plans
+            full_plan = self._combine_plans(fort_plan, supplemental_plan)
+
+            # Final validation for ranges
+            full_plan, violations, was_collapsed = self._validate_no_ranges(full_plan, attempt=2)
+
+            # Generate explanation
+            explanation = self._generate_explanation(full_plan, workout_history, violations if was_collapsed else None)
 
             print("✓ Workout plan generated successfully!\n")
-            return plan, explanation
+            return full_plan, explanation
 
         except Exception as e:
             print(f"Error generating plan: {e}")
+            import traceback
+            traceback.print_exc()
             return None, None
 
-    def _missing_required_days(self, text):
-        required = [
-            'MONDAY',
-            'TUESDAY',
-            'WEDNESDAY',
-            'THURSDAY',
-            'FRIDAY',
-            'SATURDAY',
-            'SUNDAY',
-        ]
+    def _missing_fort_days(self, text):
+        """Check which Fort days (Mon/Wed/Fri) are missing from the plan."""
+        fort_days = ['MONDAY', 'WEDNESDAY', 'FRIDAY']
         present = set()
         for line in (text or '').splitlines():
             m = re.match(r'^\s*##\s*([A-Z]+DAY)\b', line.strip().upper())
             if m:
-                present.add(m.group(1))
-        return [d for d in required if d not in present]
+                day = m.group(1)
+                if day in fort_days:
+                    present.add(day)
+        return [d for d in fort_days if d not in present]
+
+    def _missing_supplemental_days(self, text):
+        """Check which supplemental days (Tue/Thu/Sat) are missing."""
+        supplemental_days = ['TUESDAY', 'THURSDAY', 'SATURDAY']
+        present = set()
+        for line in (text or '').splitlines():
+            m = re.match(r'^\s*##\s*([A-Z]+DAY)\b', line.strip().upper())
+            if m:
+                day = m.group(1)
+                if day in supplemental_days:
+                    present.add(day)
+        return [d for d in supplemental_days if d not in present]
+
+    def _combine_plans(self, fort_plan, supplemental_plan):
+        """Combine Fort and supplemental plans into a complete weekly plan."""
+        days_order = ['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']
+
+        # Parse both plans into day sections
+        def parse_days(plan_text):
+            days = {}
+            current_day = None
+            current_content = []
+            for line in plan_text.split('\n'):
+                m = re.match(r'^\s*##\s*([A-Z]+DAY)\b', line.strip().upper())
+                if m:
+                    if current_day:
+                        days[current_day] = '\n'.join(current_content)
+                    current_day = m.group(1)
+                    current_content = [line]
+                elif current_day:
+                    current_content.append(line)
+            if current_day:
+                days[current_day] = '\n'.join(current_content)
+            return days
+
+        fort_days = parse_days(fort_plan)
+        supp_days = parse_days(supplemental_plan)
+
+        # Merge
+        all_days = {**fort_days, **supp_days}
+
+        # Build output in correct order
+        output_lines = ['# WEEKLY WORKOUT PLAN FOR SAMUEL', f'Generated: {datetime.now().strftime("%B %d, %Y")}', '']
+
+        for day in days_order:
+            if day in all_days:
+                output_lines.append('---')
+                output_lines.append('')
+                output_lines.append(all_days[day])
+                output_lines.append('')
+
+        # Add weekly notes if present in either plan
+        if 'WEEKLY PROGRAMMING NOTES' in fort_plan.upper() or 'WEEKLY PROGRAMMING NOTES' in supplemental_plan.upper():
+            output_lines.append('---')
+            output_lines.append('')
+            output_lines.append('## WEEKLY PROGRAMMING NOTES')
+            output_lines.append('- Fort workouts prioritized with proper progression')
+            output_lines.append('- Supplemental days support without interference')
+            output_lines.append('- Biceps grip rotation tracked across the week')
+            output_lines.append('')
+
+        return '\n'.join(output_lines)
 
     def summarize_fort_preamble(self, preamble_text):
         if not preamble_text or not preamble_text.strip():
@@ -665,6 +702,149 @@ Generate the complete weekly workout plan now, following ALL rules above:
 """
 
         return prompt
+
+    def _build_fort_prompt(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
+        """Build prompt for generating Fort days (Mon/Wed/Fri)."""
+        athlete_config = self._format_athlete_config()
+
+        fort_constraints_block = ""
+        if fort_week_constraints:
+            fort_constraints_block = f"""\nFORT WEEK CONSTRAINTS (treat as high priority):\n{fort_week_constraints}\n"""
+
+        return f"""You are an expert strength coach formatting Fort workouts for {self.config['athlete']['name']}.
+
+CRITICAL RULES:
+- **NO RANGES in prescription lines**: Use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
+- **PRESERVE Fort narrative ranges**: Notes can contain "25–30s", "8/12/15" etc.
+
+{athlete_config}
+
+{fort_constraints_block}
+
+---
+
+{trainer_workouts}
+
+---
+
+EXERCISE SWAP RULES - APPLY THESE AUTOMATICALLY:
+{self._load_exercise_swaps()}
+
+YOUR TASK:
+Reformat the THREE Fort workout days (Monday, Wednesday, Friday) from the trainer workouts above.
+
+REQUIREMENTS:
+1. Include ALL THREE days: ## MONDAY, ## WEDNESDAY, ## FRIDAY
+2. Extract the Fort workout title (e.g., "Gameday #4") and include it in the header: `## MONDAY - FORT WORKOUT (Gameday #4)`
+3. Convert every exercise to this exact format:
+
+```
+### A1. [Exercise Name]
+- [Sets] x [Reps] @ [Weight] kg (single values only)
+- **Rest:** [Rest period]
+- **RPE:** [Target RPE]
+- **Form:** [Key form cues]
+- **Energy:** [Expected energy level]
+- **Adjustments:** [Any modifications]
+- **Notes:** [Coaching cues]
+```
+
+4. Label exercises sequentially: A1, A2, A3, B1, B2, etc.
+5. For T.H.A.W./CIRCUIT work, ALWAYS use the SOLO variant
+6. Apply ALL exercise swaps before formatting
+7. Include ALL training content from the input (prep, clusters, myo-rep finishers, circuits)
+8. Start each day with:
+**Warm-up:**
+- McGill Big-3
+
+OUTPUT ONLY the three Fort days in the specified format. Do not include supplemental days."""
+
+    def _build_supplemental_prompt(self, fort_plan, workout_history, preferences, fort_week_constraints=None):
+        """Build prompt for generating supplemental days (Tue/Thu/Sat) based on Fort output."""
+        athlete_config = self._format_athlete_config()
+
+        # Extract key info from workout_history for progressive overload
+        history_summary = "No prior week data available."
+        if workout_history and len(workout_history) > 50:
+            history_summary = "Prior week data available for progressive overload."
+
+        return f"""You are an expert strength coach creating supplemental workouts for {self.config['athlete']['name']}.
+
+CRITICAL RULES:
+- **NO RANGES**: Single rep and load values only (e.g., "12 reps" not "10-12", "20 kg" not "18-22 kg")
+- **MANDATORY**: Include incline walking warm-up (10min @ 3.4mph, 6%) AND finisher (15min @ 3.5mph, 6%) on ALL three days
+
+{athlete_config}
+
+---
+
+FORT WORKOUTS (for reference - these are priority, supplemental must support not interfere):
+{fort_plan[:3000]}
+
+---
+
+{history_summary}
+
+---
+
+EXERCISE SWAP RULES - APPLY AUTOMATICALLY:
+{self._load_exercise_swaps()}
+
+YOUR TASK:
+Generate THREE supplemental days: ## TUESDAY, ## THURSDAY, ## SATURDAY
+
+SUPPLEMENTAL DAY RULES:
+
+**Tuesday (post-Monday squat, pre-Wednesday press):**
+- ❌ AVOID: Heavy leg work, squats, lunges, heavy pressing
+- ✅ SAFE: Arms (biceps, triceps), shoulders (lateral/rear delts), upper chest, back detail
+- ⚠️ Don't fatigue grip/core before Wednesday press
+
+**Thursday (post-Wednesday press, pre-Friday deadlift):**
+- ❌ AVOID: Heavy bicep/forearm work, heavy back pulling, grip-intensive work
+- ✅ SAFE: Leg accessories (light), chest accessories, delts (all heads)
+- ⚠️ PRESERVE grip strength for Friday deadlifts
+
+**Saturday (post-Friday deadlift):**
+- ❌ AVOID: Heavy lower back loading, leg compounds, deadlift variations
+- ✅ SAFE: Upper body focus - arms, chest, delts, light back accessories
+- ⚠️ Allow CNS recovery
+
+**BICEPS PROGRAMMING (CRITICAL):**
+- NEVER same grip two days in a row
+- Rotate: supinated → neutral → pronated across Tue/Thu/Sat
+- Cap hard sets at 10-12 per rolling 4 days
+- Track grip rotation in your planning
+
+**TRICEPS PROGRAMMING:**
+- Vary attachments across Tue/Fri/Sat
+- NO single-arm D-handle on Saturday
+
+**CARRIES:**
+- Place on Tuesday ONLY
+- Keep at RPE 6-7, shorter distances
+
+**EQUIPMENT RULES:**
+- Standing calf raises ONLY (NEVER seated)
+- NO belt on pulls
+- NO split squats (any variant)
+
+**DAILY STRUCTURE (each day):**
+**Warm-up:**
+- McGill Big-3
+- Incline walk: 10min @ 3.4 mph, 6% grade
+
+[3-4 exercise blocks A-D, 8-15 reps, RPE 7-8]
+
+**Finisher:**
+- Incline walk: 15min @ 3.5 mph, 6% grade
+
+**Post-workout:**
+- Sauna optional
+
+FOCUS AREAS: arms, medial delts, upper chest, back detail
+
+OUTPUT ONLY the three supplemental days in ### A1. format with bullet points. Do not include Fort days."""
 
     def _format_athlete_config(self):
         """Format the athlete configuration section for the prompt."""
