@@ -10,6 +10,9 @@ exercise_swaps:
   "Ab Rollout": "Dead Bug or Pallof Press"
   "Hamstring Slider": "Physioball Leg Curl"
   "Machine Lateral Raise": "Cable Lateral Raise"
+  "Machine Lateral Raises": "Cable Lateral Raise"
+  "Lateral Raise Machine": "Cable Lateral Raise"
+  "Lateral Raises (Machine)": "Cable Lateral Raise"
 
   # Carry Equipment Rules - Always kettlebell, never dumbbell
   "Dumbbell Farmer Carry": "Kettlebell Farmer Carry"
