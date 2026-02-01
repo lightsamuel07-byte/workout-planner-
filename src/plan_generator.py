@@ -176,19 +176,34 @@ PREAMBLE:
 
     def _validate_no_ranges(self, text, attempt=1):
         """
-        Validate that the plan contains no rep or load ranges.
+        Validate that the plan contains no rep or load ranges in the
+        exercise prescription line only (the line that looks like:
+        "- 4 x 12 @ 24 kg").
+
+        This intentionally allows Fort narrative ranges like "rest 25–30s"
+        or "rep schemes 8/12/15" in notes.
         Hybrid policy: retry once, then auto-collapse if still failing.
         Returns: (validated_text, violations_found, was_collapsed)
         """
-        # Pattern to match ranges like "12-15", "22-26", "12 - 15"
+        # Pattern to match numeric ranges like "12-15" or "25–30"
         range_pattern = re.compile(r'(\d+)\s*[-–]\s*(\d+)')
         violations = []
 
         lines = text.split('\n')
         for i, line in enumerate(lines):
-            matches = range_pattern.findall(line)
+            stripped = line.strip()
+            # Only enforce on the exercise prescription line.
+            # Example: "- 4 x 12 @ 24 kg" (also works for timed lines "- 1 x 10:00 @ 3.4 mph")
+            if not stripped.startswith('-'):
+                continue
+            if ' x ' not in stripped:
+                continue
+            if '@' not in stripped:
+                continue
+
+            matches = range_pattern.findall(stripped)
             for match in matches:
-                violations.append((i+1, line.strip(), match))
+                violations.append((i + 1, stripped, match))
 
         if not violations:
             return text, [], False
@@ -197,18 +212,34 @@ PREAMBLE:
         if attempt == 1:
             return text, violations, False
 
-        # Auto-collapse: reps -> top value, load -> midpoint
+        # Auto-collapse: reps -> top value, load -> midpoint (only within prescription lines)
         collapsed_text = text
-        for line_num, line, (low, high) in sorted(violations, key=lambda x: len(x[1]), reverse=True):
+        collapsed_lines = collapsed_text.split('\n')
+        for line_num, line, (low, high) in violations:
+            idx = line_num - 1
+            if idx < 0 or idx >= len(collapsed_lines):
+                continue
+
+            current = collapsed_lines[idx]
+            stripped = current.strip()
+            if not stripped.startswith('-') or ' x ' not in stripped or '@' not in stripped:
+                continue
+
             low_val, high_val = int(low), int(high)
-            # For load (has "kg"), use midpoint; for reps, use top value
-            if 'kg' in line.lower():
-                replacement = str((low_val + high_val) // 2)
+
+            # If the range occurs after '@', treat as load; otherwise treat as reps.
+            at_pos = stripped.find('@')
+            range_pos = stripped.find(f"{low}")
+            if at_pos != -1 and range_pos != -1 and range_pos > at_pos:
+                replacement = str(int(round((low_val + high_val) / 2.0)))
             else:
                 replacement = str(high_val)
-            # Replace this specific occurrence
-            pattern = re.compile(re.escape(f"{low}-{high}"))
-            collapsed_text = pattern.sub(replacement, collapsed_text, count=1)
+
+            # Replace first occurrence of the specific range token in that line.
+            current = re.sub(rf"\b{re.escape(low)}\s*[-–]\s*{re.escape(high)}\b", replacement, current, count=1)
+            collapsed_lines[idx] = current
+
+        collapsed_text = "\n".join(collapsed_lines)
 
         return collapsed_text, violations, True
 
