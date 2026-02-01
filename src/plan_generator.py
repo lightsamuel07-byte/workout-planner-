@@ -156,6 +156,14 @@ The workout history section contains prior week's logged performance. Use this d
 - **Look for patterns**: If user consistently hits top of rep range, they're ready for load progression
 - **Recovery signals**: If Energy was "Fatigued" or notes mention poor sleep, be conservative with progression
 
+**Non-Negotiable Swap Directives from User Logs:**
+
+The workout history section may contain lines like "SWAP ...", "never do ...", "hate these", or explicit replacement prescriptions.
+
+- Treat these as HARD CONSTRAINTS.
+- If an exercise has a SWAP directive, do NOT carry it forward for progressive overload.
+- Replace it with the requested alternative while preserving the intent (same muscle) and keep the user-prescribed sets/reps/load when provided.
+
 **Integration Principle:** Fort workouts are priority #1. Supplemental work must support, not interfere with, Fort performance.
 
 1. **MONDAY, WEDNESDAY, FRIDAY (Main Days - Fort Workouts):**

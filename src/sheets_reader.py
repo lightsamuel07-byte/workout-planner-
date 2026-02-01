@@ -255,6 +255,12 @@ class SheetsReader:
 
             formatted += "\n"
 
+        if swap_directives:
+            formatted += "MANDATORY SWAP DIRECTIVES FROM USER LOGS (NON-NEGOTIABLE):\n"
+            for item in swap_directives:
+                formatted += f"- {item}\n"
+            formatted += "\n"
+
         return formatted
 
     def find_most_recent_weekly_plan(self):
@@ -479,6 +485,8 @@ class SheetsReader:
 
         formatted = "PRIOR WEEK'S SUPPLEMENTAL WORKOUTS (Tue/Thu/Sat):\n\n"
 
+        swap_directives = []
+
         for day in ['Tuesday', 'Thursday', 'Saturday']:
             exercises = supplemental_data.get(day, [])
             if not exercises:
@@ -492,12 +500,31 @@ class SheetsReader:
                     formatted += f" | {ex['sets']} x {ex['reps']}"
                 if ex['load']:
                     formatted += f" @ {ex['load']} kg"
-                if ex['log']:
-                    formatted += f" | LOGGED: {ex['log']}"
-                elif ex['notes']:
-                    formatted += f" | {ex['notes']}"
+
+                notes_text = (ex.get('notes') or '').strip()
+                log_text = (ex.get('log') or '').strip()
+                if notes_text:
+                    formatted += f" | NOTES: {notes_text}"
+                if log_text:
+                    formatted += f" | LOGGED: {log_text}"
+
+                combined = f"{notes_text} {log_text}".strip()
+                if combined:
+                    combined_upper = combined.upper()
+                    has_directive = (
+                        ('SWAP' in combined_upper) or
+                        any(token in combined_upper for token in ['NEVER', 'HATE', "DON'T", 'DO NOT', 'AVOID', 'REPLACE', 'INSTEAD'])
+                    )
+                    if has_directive:
+                        swap_directives.append(f"{day}: {ex['exercise']} -> {combined}")
                 formatted += "\n"
 
+            formatted += "\n"
+
+        if swap_directives:
+            formatted += "MANDATORY SWAP DIRECTIVES FROM USER LOGS (NON-NEGOTIABLE):\n"
+            for item in swap_directives:
+                formatted += f"- {item}\n"
             formatted += "\n"
 
         return formatted
