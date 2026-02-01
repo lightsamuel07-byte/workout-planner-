@@ -227,6 +227,8 @@ class SheetsReader:
 
         formatted = "RECENT WORKOUT HISTORY:\n\n"
 
+        swap_directives = []
+
         for workout in workouts:
             formatted += f"=== {workout['date']} ===\n"
 
