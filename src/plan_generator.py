@@ -75,7 +75,7 @@ class PlanGenerator:
         try:
             fort_message = self.client.messages.create(
                 model=self.model,
-                max_tokens=4000,
+                max_tokens=self.max_tokens,
                 messages=[{"role": "user", "content": fort_prompt}]
             )
             fort_plan = fort_message.content[0].text
@@ -89,7 +89,7 @@ class PlanGenerator:
                 correction = f"Your previous output is missing these Fort days: {', '.join(missing_fort)}. Generate the COMPLETE weekly plan with all Fort days (Mon/Wed/Fri) in the specified format."
                 fort_message2 = self.client.messages.create(
                     model=self.model,
-                    max_tokens=4000,
+                    max_tokens=self.max_tokens,
                     messages=[
                         {"role": "user", "content": fort_prompt},
                         {"role": "assistant", "content": fort_plan},
@@ -107,7 +107,7 @@ class PlanGenerator:
 
             supp_message = self.client.messages.create(
                 model=self.model,
-                max_tokens=3000,
+                max_tokens=self.max_tokens,
                 messages=[{"role": "user", "content": supplemental_prompt}]
             )
             supplemental_plan = supp_message.content[0].text
@@ -733,6 +733,12 @@ EXERCISE SWAP RULES - APPLY THESE AUTOMATICALLY:
 YOUR TASK:
 Reformat the THREE Fort workout days (Monday, Wednesday, Friday) from the trainer workouts above.
 
+CRITICAL RULE - DO NOT INVENT WEIGHTS:
+- Use the EXACT weight values provided in the trainer workouts
+- If a weight is listed as "49.2" or "92.2" or "25", use that EXACT number
+- NEVER round, NEVER adjust, NEVER "estimate" - use provided values verbatim
+- If a value is missing, write "Bodyweight" or leave blank - do not invent a number
+
 REQUIREMENTS:
 1. Include ALL THREE days: ## MONDAY, ## WEDNESDAY, ## FRIDAY
 2. Extract the Fort workout title (e.g., "Gameday #4") and include it in the header: `## MONDAY - FORT WORKOUT (Gameday #4)`
@@ -815,6 +821,12 @@ SUPPLEMENTAL DAY RULES:
 - Rotate: supinated → neutral → pronated across Tue/Thu/Sat
 - Cap hard sets at 10-12 per rolling 4 days
 - Track grip rotation in your planning
+
+**WEIGHT SELECTION - USE EXACT VALUES:**
+- For exercises with previous week data: Use the logged load, add 2.5-5kg only if user exceeded reps with good form
+- For new exercises: Choose conservative starting loads (RPE 7-8)
+- NEVER invent percentages or estimates - use specific kg values only
+- Round to nearest available DB/plate weight
 
 **TRICEPS PROGRAMMING:**
 - Vary attachments across Tue/Fri/Sat
