@@ -134,6 +134,32 @@ EXERCISE SWAP RULES - APPLY THESE AUTOMATICALLY:
 
 CRITICAL INSTRUCTIONS FOR PLAN CREATION:
 
+**UNDERSTANDING FORT PROGRAM STRUCTURE:**
+
+Fort programs follow a structured periodization model that you must understand:
+
+1. **4-Week Cycles**: Each Fort program runs in 4-week blocks (Week 1, Week 2, Week 3, Week 4)
+   - Week 1: Typically lighter/moderate intensity
+   - Week 2: Progressive loading increase
+   - Week 3: Peak volume/intensity week
+   - Week 4: Often a deload or transition week
+
+2. **Test Week (Every 3 Cycles)**: After every 3 cycles (12 weeks), there is a TEST WEEK for 1RM testing
+   - Test Week format: Work up to 1RM on main lifts (back squat, bench press, deadlift)
+   - Minimal volume, maximal intensity
+   - **CRITICAL**: If this is Test Week, supplemental work should be VERY light (recovery-focused mobility/stretching only)
+
+3. **Myo Rep Variability**: NOT every Fort program includes myo reps
+   - Some cycles focus on strength (cluster singles/doubles, no myo reps)
+   - Some cycles include myo rep finishers for hypertrophy emphasis
+   - **DO NOT assume myo reps** - only include them if Fort workouts this week prescribe them
+   - Check the Fort workouts provided to determine if this cycle includes myo reps
+
+4. **Cycle Position Matters for Supplemental Work**:
+   - Week 3 or Week 4: Fort volume/intensity is peaking → reduce supplemental intensity/volume
+   - Week 1 or Week 2: More room for supplemental work
+   - Test Week: Minimal supplemental work (just mobility and light recovery)
+
 **FORT AUXILIARY WORK WEIGHT CALCULATION (CRITICAL):**
 
 When determining weights for Fort auxiliary/accessory exercises (NOT the main lifts like squats/deadlifts/bench):
