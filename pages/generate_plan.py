@@ -23,6 +23,18 @@ def get_next_monday():
         next_monday = today + timedelta(days=days_until_monday)
     return next_monday
 
+def extract_fort_workout_title(workout_text):
+    if not workout_text:
+        return None
+
+    lines = [line.strip() for line in workout_text.splitlines() if line.strip()]
+    head = "\n".join(lines[:12])
+    import re
+    match = re.search(r'(Gameday\s*#\s*\d+)', head, flags=re.IGNORECASE)
+    if match:
+        return match.group(1).strip()
+    return None
+
 def show():
     """Render the generate plan page"""
 
@@ -279,6 +291,14 @@ def show():
                     return
 
                 # Format trainer workouts
+                monday_title = extract_fort_workout_title(monday_workout)
+                wednesday_title = extract_fort_workout_title(wednesday_workout)
+                friday_title = extract_fort_workout_title(friday_workout)
+
+                monday_header = f"Monday ({monday_title})" if monday_title else "Monday"
+                wednesday_header = f"Wednesday ({wednesday_title})" if wednesday_title else "Wednesday"
+                friday_header = f"Friday ({friday_title})" if friday_title else "Friday"
+
                 trainer_workouts = {
                     'monday': monday_workout,
                     'wednesday': wednesday_workout,
@@ -288,13 +308,13 @@ def show():
                 formatted_workouts = f"""
 TRAINER WORKOUTS FROM TRAIN HEROIC:
 
-=== Monday ===
+=== {monday_header} ===
 {monday_workout}
 
-=== Wednesday ===
+=== {wednesday_header} ===
 {wednesday_workout}
 
-=== Friday ===
+=== {friday_header} ===
 {friday_workout}
 """
 

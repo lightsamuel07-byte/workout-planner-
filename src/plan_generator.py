@@ -169,6 +169,9 @@ The workout history section may contain lines like "SWAP ...", "never do ...", "
 1. **MONDAY, WEDNESDAY, FRIDAY (Main Days - Fort Workouts):**
    - Use the trainer workouts provided above but REFORMAT them for consistent parsing
    - **IMPORTANT**: Apply all exercise swaps listed above BEFORE formatting
+   - The trainer workout section headers may include a Fort workout title (e.g., "Monday (Gameday #4)")
+     * You MUST carry that title into the day header format: `## MONDAY - FORT WORKOUT (Gameday #4)`
+     * If no title is provided, omit the title and use a generic header (no invented titles)
    - Convert each exercise/drill into the standardized format shown below
    - Preserve ALL training content: sets, reps, weights, rest periods, coaching notes
    - For sections with multiple exercises (like PREP or MYO REP FINISHER), list each exercise individually
