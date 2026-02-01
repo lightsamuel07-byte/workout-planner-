@@ -14,7 +14,9 @@ from datetime import datetime, timedelta
 sys.path.insert(0, os.path.dirname(__file__))
 
 # Import pages using importlib for better Streamlit Cloud compatibility
-# Force reload on every run to pick up code changes
+# Only reload modules in development mode (set DEV_MODE=1 in environment)
+DEV_MODE = os.environ.get('DEV_MODE', '0') == '1'
+
 try:
     # Import pages package first to ensure it's in sys.modules
     import pages
@@ -27,14 +29,15 @@ try:
     exercise_history = importlib.import_module('pages.exercise_history')
     workout_logger = importlib.import_module('pages.workout_logger')
 
-    # Reload modules to pick up code changes (fixes Streamlit Cloud caching)
-    importlib.reload(dashboard)
-    importlib.reload(generate_plan)
-    importlib.reload(view_plans)
-    importlib.reload(progress)
-    importlib.reload(weekly_review)
-    importlib.reload(exercise_history)
-    importlib.reload(workout_logger)
+    # Reload modules only in dev mode to pick up code changes
+    if DEV_MODE:
+        importlib.reload(dashboard)
+        importlib.reload(generate_plan)
+        importlib.reload(view_plans)
+        importlib.reload(progress)
+        importlib.reload(weekly_review)
+        importlib.reload(exercise_history)
+        importlib.reload(workout_logger)
 except ImportError as e:
     st.error(f"Critical error loading pages: {e}")
     st.code(f"Python path: {sys.path}")
@@ -56,13 +59,18 @@ def check_password():
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # Try to get password from secrets, fall back to default for local dev
+        # Get password from secrets, with fallback for local dev
+        correct_password = None
         try:
-            correct_password = st.secrets.get("APP_PASSWORD", "workout2026")
+            correct_password = st.secrets.get("APP_PASSWORD")
         except (AttributeError, KeyError):
+            pass
+        
+        if not correct_password:
             correct_password = "workout2026"
+            if not DEV_MODE:
+                st.warning("⚠️ APP_PASSWORD not configured. Set it in Streamlit secrets for production.")
 
-        # Use .get() to safely access the password - it may not exist yet in callback
         entered_password = st.session_state.get("password", "")
         
         if entered_password == correct_password:
@@ -334,13 +342,18 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("### 🏋️ Current 1RMs")
 
-    # Initialize session state for 1RMs if not exists
+    # Initialize session state for 1RMs from config (only on first load)
     if 'back_squat_1rm' not in st.session_state:
-        st.session_state.back_squat_1rm = 129.0
-    if 'bench_press_1rm' not in st.session_state:
-        st.session_state.bench_press_1rm = 96.5
-    if 'deadlift_1rm' not in st.session_state:
-        st.session_state.deadlift_1rm = 168.0
+        # Load config once when initializing 1RMs
+        try:
+            with open('config.yaml', 'r') as f:
+                app_config = yaml.safe_load(f)
+            default_1rms = app_config.get('reference_1rms', {})
+        except Exception:
+            default_1rms = {'back_squat': 129, 'bench_press': 94, 'deadlift': 168}
+        st.session_state.back_squat_1rm = float(default_1rms.get('back_squat', 129))
+        st.session_state.bench_press_1rm = float(default_1rms.get('bench_press', 94))
+        st.session_state.deadlift_1rm = float(default_1rms.get('deadlift', 168))
 
     st.session_state.back_squat_1rm = st.number_input(
         "Back Squat (kg)",
