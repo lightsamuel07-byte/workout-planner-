@@ -421,7 +421,16 @@ USER PREFERENCES:
                 plan_gen = PlanGenerator(api_key=api_key, config=config)
                 fort_preamble_blocks = [p for p in [monday_preamble, wednesday_preamble, friday_preamble] if p]
                 fort_preamble_text = "\n\n---\n\n".join(fort_preamble_blocks) if fort_preamble_blocks else None
-                fort_week_constraints = plan_gen.summarize_fort_preamble(fort_preamble_text) if fort_preamble_text else None
+                fort_week_constraints = None
+                if fort_preamble_text:
+                    summarize_fn = getattr(plan_gen, "summarize_fort_preamble", None)
+                    if callable(summarize_fn):
+                        fort_week_constraints = summarize_fn(fort_preamble_text)
+                    else:
+                        st.warning(
+                            "Fort preamble summarization is unavailable in the currently running PlanGenerator. "
+                            "Continuing without summarized Fort constraints."
+                        )
 
                 plan, explanation = plan_gen.generate_plan(
                     workout_history,
