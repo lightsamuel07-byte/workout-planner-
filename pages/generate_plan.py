@@ -346,6 +346,10 @@ USER PREFERENCES:
                 plan_gen = PlanGenerator(api_key=api_key, config=config)
                 plan = plan_gen.generate_plan(workout_history, formatted_workouts, preferences)
 
+                explanation = None
+                if plan:
+                    explanation = plan_gen.generate_explanation(plan, max_bullets=15)
+
                 if plan:
                     # Save plan to markdown
                     os.makedirs(output_folder, exist_ok=True)
@@ -361,6 +365,11 @@ USER PREFERENCES:
 
                     with open(output_file, 'w') as f:
                         f.write(plan)
+
+                    if explanation:
+                        explanation_file = os.path.join(output_folder, f"workout_plan_{week_stamp}_explanation.md")
+                        with open(explanation_file, 'w') as f:
+                            f.write(explanation)
 
                     # Calculate sheet name
                     # Write to Google Sheets
@@ -392,6 +401,7 @@ USER PREFERENCES:
                         <div style="color: {colors['text_secondary']}; margin-bottom: 1rem;">
                             Your workout plan has been generated and saved to:<br>
                             📄 Markdown file: <code>{output_file}</code><br>
+                            📝 Explanation file: <code>{os.path.join(output_folder, f'workout_plan_{week_stamp}_explanation.md')}</code><br>
                             📊 Google Sheets: <code>{sheet_name}</code>
                         </div>
                     </div>

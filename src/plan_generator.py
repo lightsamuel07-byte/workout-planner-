@@ -91,12 +91,131 @@ class PlanGenerator:
 
             plan = message.content[0].text
             plan = self._apply_exercise_swaps_to_text(plan)
+
+            # Validate and enforce no ranges (hybrid: retry once, then collapse)
+            plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
+            if violations and not was_collapsed:
+                # Retry once with correction prompt
+                correction_prompt = f"""The previous plan had range values. Fix these to single values:
+{chr(10).join(f"Line {v[0]}: {v[2][0]}-{v[2][1]} -> pick single value" for v in violations[:10])}
+
+Rules:
+- Reps: use the HIGHER value (e.g., 12-15 -> 15)
+- Load (kg): use the MIDPOINT (e.g., 22-26 -> 24)
+
+Return the COMPLETE corrected plan."""
+                message2 = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    messages=[
+                        {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": plan},
+                        {"role": "user", "content": correction_prompt}
+                    ]
+                )
+                plan = message2.content[0].text
+                plan = self._apply_exercise_swaps_to_text(plan)
+                plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=2)
+
+            # Generate explanation file
+            explanation = self._generate_explanation(plan, workout_history, violations if was_collapsed else None)
+
             print("✓ Workout plan generated successfully!\n")
-            return plan
+            return plan, explanation
 
         except Exception as e:
             print(f"Error generating plan: {e}")
             return None
+
+    def generate_explanation(self, plan_text, max_bullets=15):
+        prompt = f"""Write a short explanation for this weekly workout plan.
+
+Rules:
+- Use 5-{max_bullets} bullet points.
+- Be concrete (mention key swaps/constraints and progressive overload choices).
+- Do NOT include tables.
+- Do NOT include ranges.
+
+PLAN:
+{plan_text}
+"""
+
+        try:
+            message = self.client.messages.create(
+                model=self.model,
+                max_tokens=400,
+                messages=[
+                    {
+                        "role": "user",
+                        "content": prompt
+                    }
+                ]
+            )
+            text = message.content[0].text
+            if not text:
+                return None
+            return text.strip()
+        except Exception as e:
+            print(f"Error generating explanation: {e}")
+            return None
+
+    def _contains_ranges(self, text):
+        if not text:
+            return False
+        reps_range = re.search(r"\bx\s*\d+\s*-\s*\d+\b", text)
+        load_range = re.search(r"@\s*\d+(?:\.\d+)?\s*-\s*\d+(?:\.\d+)?\b", text)
+        return bool(reps_range or load_range)
+
+    def _retry_remove_ranges(self, plan_text):
+        retry_prompt = f"""Rewrite the plan below so that it contains NO ranges anywhere.
+
+Hard rules:
+- Reps must be a single value (e.g. 12 not 10-12).
+- Loads must be a single value (e.g. 24 kg not 22-26 kg).
+- Keep the exact same structure and exercise order.
+- Do not add or remove exercises.
+
+PLAN TO FIX:
+{plan_text}
+"""
+
+        try:
+            message = self.client.messages.create(
+                model=self.model,
+                max_tokens=min(self.max_tokens, 2000),
+                messages=[
+                    {
+                        "role": "user",
+                        "content": retry_prompt
+                    }
+                ]
+            )
+            fixed = message.content[0].text
+            return fixed or plan_text
+        except Exception:
+            return plan_text
+
+    def _collapse_ranges(self, text):
+        # Collapse reps ranges: choose top of range (e.g., 12-15 -> 15)
+        def _reps_repl(match):
+            top = match.group(3)
+            return f"{match.group(1)}{top}"
+
+        text = re.sub(r"(\bx\s*)(\d+)\s*-\s*(\d+)\b", _reps_repl, text)
+
+        # Collapse load ranges: choose midpoint (e.g., 22-26 -> 24)
+        def _load_repl(match):
+            a = float(match.group(2))
+            b = float(match.group(3))
+            mid = (a + b) / 2.0
+            if mid.is_integer():
+                mid_str = str(int(mid))
+            else:
+                mid_str = f"{mid:.1f}".rstrip('0').rstrip('.')
+            return f"{match.group(1)}{mid_str}"
+
+        text = re.sub(r"(@\s*)(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\b", _load_repl, text)
+        return text
 
     def _apply_exercise_swaps_to_text(self, text):
         swaps_file = 'exercise_swaps.yaml'
@@ -115,6 +234,81 @@ class PlanGenerator:
 
         return text
 
+    def _validate_no_ranges(self, text, attempt=1):
+        """
+        Validate that the plan contains no rep or load ranges.
+        Hybrid policy: retry once, then auto-collapse if still failing.
+        Returns: (validated_text, violations_found, was_collapsed)
+        """
+        # Pattern to match ranges like "12-15", "22-26", "12 - 15"
+        range_pattern = re.compile(r'(\d+)\s*[-–]\s*(\d+)')
+        violations = []
+
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            matches = range_pattern.findall(line)
+            for match in matches:
+                violations.append((i+1, line.strip(), match))
+
+        if not violations:
+            return text, [], False
+
+        # If this is first attempt, return violations for retry
+        if attempt == 1:
+            return text, violations, False
+
+        # Auto-collapse: reps -> top value, load -> midpoint
+        collapsed_text = text
+        for line_num, line, (low, high) in sorted(violations, key=lambda x: len(x[1]), reverse=True):
+            low_val, high_val = int(low), int(high)
+            # For load (has "kg"), use midpoint; for reps, use top value
+            if 'kg' in line.lower():
+                replacement = str((low_val + high_val) // 2)
+            else:
+                replacement = str(high_val)
+            # Replace this specific occurrence
+            pattern = re.compile(re.escape(f"{low}-{high}"))
+            collapsed_text = pattern.sub(replacement, collapsed_text, count=1)
+
+        return collapsed_text, violations, True
+
+    def _generate_explanation(self, plan, workout_history, violations_collapsed=None):
+        """Generate short explanation file (5-15 bullets)."""
+        bullets = []
+
+        # Basic stats
+        lines = plan.split('\n')
+        exercise_count = sum(1 for l in lines if l.strip().startswith('###'))
+        bullets.append(f"Total exercises: {exercise_count}")
+
+        # Progressive overload summary
+        if workout_history and 'supplemental' in workout_history.lower():
+            bullets.append("Progressive overload applied based on prior week performance")
+
+        # Any swaps applied
+        swaps_file = 'exercise_swaps.yaml'
+        if os.path.exists(swaps_file):
+            with open(swaps_file, 'r') as f:
+                swaps_config = yaml.safe_load(f) or {}
+            swaps = swaps_config.get('exercise_swaps', {})
+            if swaps:
+                bullets.append(f"Exercise swaps enforced: {len(swaps)} rules active")
+
+        # Hard preferences
+        bullets.append("Standing calf raises only (no seated)")
+        bullets.append("No belt on pulls/deadlifts")
+        bullets.append("Biceps grip rotation: supinated → neutral → pronated")
+
+        # Range violations handled
+        if violations_collapsed:
+            bullets.append(f"Auto-corrected {len(violations_collapsed)} range violations to single values")
+
+        # Focus areas
+        bullets.append("Focus: arms, medial delts, upper chest, back detail")
+        bullets.append("Incline walking included on all supplemental days")
+
+        return "\n".join(f"• {b}" for b in bullets[:15])  # Cap at 15 bullets
+
     def _build_prompt(self, workout_history, trainer_workouts, preferences):
         """
         Build the AI prompt for plan generation.
@@ -131,6 +325,9 @@ class PlanGenerator:
         athlete_config = self._format_athlete_config()
 
         prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
+
+CRITICAL OUTPUT RULES:
+- **NO RANGES**: Use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
 
 {athlete_config}
 
@@ -199,91 +396,20 @@ The workout history section may contain lines like "SWAP ...", "never do ...", "
 
    **Required format for EVERY Fort exercise:**
    ```
-   ### A1. [Exercise Name] (specify bench angle if applicable, e.g., "30° Incline DB Press")
-   - [Sets] x [Reps] @ [Weight] kg (or time format like 1:00 for timed drills; for two-cable exercises, specify "per side")
-   - **Rest:** [Rest period from trainer, or intelligent default]
-   - **RPE:** [Target Rate of Perceived Exertion, 1-10 scale]
-   - **Form:** [Key form cues and technique focus]
-   - **Energy:** [Expected energy level: Fresh/Moderate/Fatigued]
-   - **Adjustments:** [Any modifications from standard form]
-   - **Notes:** [Additional coaching cues, tempo, technique notes, percentages]
+   ### A1. [Exercise Name]
+   - [Sets] x [Reps] @ [Weight] kg (single values only)
+   - **Rest:** [Rest period]
+   - **RPE:** [Target RPE]
+   - **Form:** [Key form cues]
+   - **Energy:** [Expected energy level]
+   - **Adjustments:** [Any modifications]
+   - **Notes:** [Coaching cues]
    ```
 
-   **EXERCISE NAMING RULES (CRITICAL):**
-   1. **Bench exercises**: ALWAYS specify angle
-      - ✅ Correct: "30° Incline DB Press", "Flat Bench Press", "15° Decline DB Fly"
-      - ❌ Wrong: "Incline Press" (missing degree), "DB Bench" (missing angle)
-
-   2. **Cable exercises with two cables**: Specify load per side
-      - ✅ Correct: "15 kg per side" for High-to-Low Cable Fly
-      - ✅ Single cable: Just specify total load (e.g., "20 kg")
-
-   3. **Machine exercises**: Specify grip/attachment
-      - ✅ Examples: "Lat Pulldown (Wide Grip)", "Cable Row (V-Handle)"
-
-   4. **Free weight carries**: Use kettlebells (not dumbbells)
-      - ✅ Correct: "Kettlebell Farmer Carry", "KB Suitcase Carry"
-      - ❌ Wrong: "DB Farmer Carry", "Dumbbell Carry"
-
-   **Example - Converting a PREP section:**
-   Original from user:
-   ```
-   PREP
-   1 Set
-   90/90 HIP SWITCH - 01:00.00 (Rotate side to side)
-   FIGURE 4 GLUTE ACTIVATION - 01:00.00 (30 seconds per side)
-   ```
-
-   Your formatted output:
-   ```
-   ### A1. 90/90 Hip Switch
-   - 1 x 1:00
-   - **Rest:** 0s (flow into next drill)
-   - **Notes:** Rotate side to side without hands (ninja level)
-
-   ### A2. Figure 4 Glute Activation
-   - 1 x 1:00
-   - **Rest:** 0s (flow into next drill)
-   - **Notes:** 30 seconds per side
-   ```
-
-   **Example - Converting CLUSTER SET SINGLES:**
-   Original from user:
-   ```
-   CLUSTER SET SINGLES - BACK SQUAT
-   5 Sets x 1 rep @ 96.5 kg (75%)
-   Un-rack for new rep every 45 seconds
-   ```
-
-   Your formatted output:
-   ```
-   ### C1. Back Squat (Cluster Singles)
-   - 5 x 1 @ 96.5 kg
-   - **Rest:** 45s between reps, 3min after set 5
-   - **Notes:** Un-rack for new rep every 45s; max bar speed and performance intent; 75% training max
-   ```
-
-   **Example - Converting MYO REP FINISHER:**
-   Original from user:
-   ```
-   MYO REP FINISHER
-   3 Sets
-   30° INCLINE DB BENCH PRESS - 8 reps
-   DB RDL (GLUTE OPTIMIZED) - 12 reps
-   ```
-
-   Your formatted output:
-   ```
-   ### E1. 30° Incline DB Bench Press
-   - 3 x 8 @ 24-26 kg
-   - **Rest:** 60s
-   - **Notes:** Upper chest focus; controlled eccentric; last set = myo-rep
-
-   ### E2. DB RDL (Glute Optimized)
-   - 3 x 12 @ 28-32 kg
-   - **Rest:** 60s
-   - **Notes:** Glute emphasis; last set = myo-rep (1 RIR, rest 10-15s, 3-4 more reps x 3 rounds)
-   ```
+   **EXERCISE NAMING RULES:**
+   1. Bench exercises: ALWAYS specify angle (e.g., "30° Incline DB Press")
+   2. Cable exercises with two cables: Specify load per side
+   3. Free weight carries: Use kettlebells (not dumbbells)
 
    **REST PERIOD RULES:**
    - **Fort Days (Mon/Wed/Fri)**: Follow trainer's prescribed rest periods. If not specified:
@@ -296,54 +422,16 @@ The workout history section may contain lines like "SWAP ...", "never do ...", "
      * Finishers/carries: 30-45 seconds
 
 2. **TUESDAY, THURSDAY, SATURDAY (Supplemental Days):**
-   Design workouts using the SAME EXACT format as Fort workouts above:
-   - Use the ### A1. [Exercise] format with bullet points
-   - Focus on AESTHETICS + accessory work
-   - Target the focus areas: arms, medial delts, upper chest, back detail
-   - MUST NOT compromise the next main day's performance
-   - Keep intensity moderate - these are supplemental, not primary training days
-   - Focus on progressive overload from prior week's log (if continuing same program)
-   - OR design fresh supplemental workouts (if new Fort program)
+   - Use ### A1. [Exercise] format with bullet points
+   - Focus on AESTHETICS: arms, medial delts, upper chest, back detail
+   - MUST NOT compromise next main day's performance
+   - **NO RANGES**: Single rep and load values only
 
-   **INCLINE WALKING (MANDATORY for all supplemental days):**
-   - **Warm-up**: 10 minutes incline walk before lifting (baseline: 3.4 mph @ 6% incline, but adjust for optimal aesthetics benefit and readiness)
-   - **Finisher**: 15 minutes incline walk after lifting (baseline: 3.5 mph @ 6% incline, but optimize for fat loss and recovery without compromising next day)
-   - Consider: Samuel's conditioning level, proximity to next Fort workout, and aerobic capacity
-   - Format incline walks as exercises in the plan using the ### format
+   **INCLINE WALKING (MANDATORY):**
+   - Warm-up: 10min @ 3.4 mph, 6% grade
+   - Finisher: 15min @ 3.5 mph, 6% grade
 
-   **Use the EXACT SAME format structure with ALL fields:**
-   ```
-   ### A1. Incline Walk (Warm-up)
-   - 1 x 10:00 @ 3.4 mph, 6% grade
-   - **Rest:** 2-3min before first exercise
-   - **RPE:** 3-4
-   - **Form:** Upright posture, glutes engaged
-   - **Energy:** Fresh
-   - **Adjustments:** Adjust speed/grade based on readiness
-   - **Notes:** Increase blood flow, activate glutes and hamstrings
-
-   ### A2. Cable Lateral Raise
-   - 3 x 12-15 @ 20 kg
-   - **Rest:** 90s
-   - **RPE:** 7-8
-   - **Form:** Constant tension through range; wrist height
-   - **Energy:** Fresh to moderate
-   - **Adjustments:** None
-   - **Notes:** Medial delt focus; avoid momentum
-
-   [... other exercises ...]
-
-   ### F1. Incline Walk (Finisher)
-   - 1 x 15:00 @ 3.5 mph, 6% grade
-   - **Rest:** N/A (end of session)
-   - **RPE:** 4-5
-   - **Form:** Maintain upright posture throughout
-   - **Energy:** Fatigued but controlled
-   - **Adjustments:** None
-   - **Notes:** Steady pace for fat oxidation; should not compromise next day's performance
-   ```
-
-   **CRITICAL: SUPPLEMENTAL DAY INTERFERENCE CHECKS**
+   **SUPPLEMENTAL DAY INTERFERENCE CHECKS:**
 
    Before finalizing supplemental exercises, verify against Fort schedule to prevent interference:
 
