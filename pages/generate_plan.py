@@ -339,6 +339,8 @@ def show():
         )
 
     if generate_button:
+        if st.session_state.plan_generation_in_progress is False:
+            st.session_state.plan_generation_in_progress = True
         with st.spinner("🤖 Generating your personalized workout plan..."):
             try:
                 # Import after user clicks to avoid loading on page load
@@ -482,6 +484,8 @@ USER PREFERENCES:
                     archived_sheet_name = f"{sheet_name} [archived {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
                     sheets_writer.archive_sheet_if_exists(archived_sheet_name)
                     sheets_writer.write_workout_plan(plan)
+
+                    _run_plan_existence_checks()
 
                     st.success("✅ Workout plan generated successfully!")
                     st.balloons()

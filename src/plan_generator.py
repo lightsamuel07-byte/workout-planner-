@@ -6,6 +6,7 @@ import anthropic
 import os
 import yaml
 import re
+import time
 from datetime import datetime
 
 
@@ -26,6 +27,24 @@ class PlanGenerator:
         self.model = model or config['claude']['model']
         self.max_tokens = max_tokens or config['claude']['max_tokens']
         self.config = config
+
+    def _create_message(self, *, model, max_tokens, messages, retries=3):
+        last_err = None
+        for attempt in range(1, retries + 1):
+            try:
+                return self.client.messages.create(
+                    model=model,
+                    max_tokens=max_tokens,
+                    messages=messages,
+                )
+            except Exception as e:
+                last_err = e
+                if attempt >= retries:
+                    raise
+                sleep_s = min(8.0, 0.75 * (2 ** (attempt - 1)))
+                print(f"Transient API error (attempt {attempt}/{retries}): {e}. Retrying in {sleep_s:.2f}s...")
+                time.sleep(sleep_s)
+        raise last_err
 
     def _load_exercise_swaps(self):
         """Load exercise swaps and preferences from YAML file."""
@@ -73,31 +92,48 @@ class PlanGenerator:
         fort_prompt = self._build_fort_prompt(workout_history, trainer_workouts, preferences, fort_week_constraints)
 
         try:
-            fort_message = self.client.messages.create(
+            fort_message = self._create_message(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                messages=[{"role": "user", "content": fort_prompt}]
+                messages=[{"role": "user", "content": fort_prompt}],
             )
             fort_plan = fort_message.content[0].text
             fort_plan = self._apply_exercise_swaps_to_text(fort_plan)
-            fort_plan = self._validate_no_ranges(fort_plan, attempt=1)[0]  # Force single values
+
+            fort_plan, fort_violations, _ = self._validate_no_ranges(fort_plan, attempt=1)
+            if fort_violations:
+                fort_plan_retry = self._retry_fix_ranges(fort_prompt, fort_plan, fort_violations)
+                if fort_plan_retry:
+                    fort_plan = self._apply_exercise_swaps_to_text(fort_plan_retry)
+                fort_plan, fort_violations2, was_collapsed = self._validate_no_ranges(fort_plan, attempt=2)
+                if was_collapsed:
+                    fort_plan = self._apply_exercise_swaps_to_text(fort_plan)
 
             # Verify Fort days are complete
             missing_fort = self._missing_fort_days(fort_plan)
             if missing_fort:
                 print(f"    ⚠️ Missing Fort days: {missing_fort}. Retrying...")
                 correction = f"Your previous output is missing these Fort days: {', '.join(missing_fort)}. Generate the COMPLETE weekly plan with all Fort days (Mon/Wed/Fri) in the specified format."
-                fort_message2 = self.client.messages.create(
+                fort_message2 = self._create_message(
                     model=self.model,
                     max_tokens=self.max_tokens,
                     messages=[
                         {"role": "user", "content": fort_prompt},
                         {"role": "assistant", "content": fort_plan},
-                        {"role": "user", "content": correction}
-                    ]
+                        {"role": "user", "content": correction},
+                    ],
                 )
                 fort_plan = fort_message2.content[0].text
                 fort_plan = self._apply_exercise_swaps_to_text(fort_plan)
+
+                fort_plan, fort_violations, _ = self._validate_no_ranges(fort_plan, attempt=1)
+                if fort_violations:
+                    fort_plan_retry = self._retry_fix_ranges(fort_prompt, fort_plan, fort_violations)
+                    if fort_plan_retry:
+                        fort_plan = self._apply_exercise_swaps_to_text(fort_plan_retry)
+                    fort_plan, fort_violations2, was_collapsed = self._validate_no_ranges(fort_plan, attempt=2)
+                    if was_collapsed:
+                        fort_plan = self._apply_exercise_swaps_to_text(fort_plan)
 
             print("  ✓ Fort days generated")
 
@@ -105,14 +141,22 @@ class PlanGenerator:
             print("  → Step 2: Generating supplemental days (Tue/Thu/Sat)...")
             supplemental_prompt = self._build_supplemental_prompt(fort_plan, workout_history, preferences, fort_week_constraints)
 
-            supp_message = self.client.messages.create(
+            supp_message = self._create_message(
                 model=self.model,
                 max_tokens=self.max_tokens,
-                messages=[{"role": "user", "content": supplemental_prompt}]
+                messages=[{"role": "user", "content": supplemental_prompt}],
             )
             supplemental_plan = supp_message.content[0].text
             supplemental_plan = self._apply_exercise_swaps_to_text(supplemental_plan)
-            supplemental_plan = self._validate_no_ranges(supplemental_plan, attempt=1)[0]
+
+            supplemental_plan, supp_violations, _ = self._validate_no_ranges(supplemental_plan, attempt=1)
+            if supp_violations:
+                supplemental_plan_retry = self._retry_fix_ranges(supplemental_prompt, supplemental_plan, supp_violations)
+                if supplemental_plan_retry:
+                    supplemental_plan = self._apply_exercise_swaps_to_text(supplemental_plan_retry)
+                supplemental_plan, supp_violations2, was_collapsed = self._validate_no_ranges(supplemental_plan, attempt=2)
+                if was_collapsed:
+                    supplemental_plan = self._apply_exercise_swaps_to_text(supplemental_plan)
 
             print("  ✓ Supplemental days generated")
 
@@ -121,6 +165,8 @@ class PlanGenerator:
 
             # Final validation for ranges
             full_plan, violations, was_collapsed = self._validate_no_ranges(full_plan, attempt=2)
+            if was_collapsed:
+                full_plan = self._apply_exercise_swaps_to_text(full_plan)
 
             # Generate explanation
             explanation = self._generate_explanation(full_plan, workout_history, violations if was_collapsed else None)
@@ -230,12 +276,10 @@ PREAMBLE:
         )
 
         try:
-            message = self.client.messages.create(
+            message = self._create_message(
                 model=summarizer_model,
                 max_tokens=300,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ]
+                messages=[{"role": "user", "content": prompt}],
             )
             text = message.content[0].text
             return text.strip() if text else None
@@ -287,9 +331,8 @@ PREAMBLE:
             if '@' not in stripped:
                 continue
 
-            matches = range_pattern.findall(stripped)
-            for match in matches:
-                violations.append((i + 1, stripped, match))
+            for m in range_pattern.finditer(stripped):
+                violations.append((i + 1, stripped, m.group(1), m.group(2), m.start()))
 
         if not violations:
             return text, [], False
@@ -301,7 +344,7 @@ PREAMBLE:
         # Auto-collapse: reps -> top value, load -> midpoint (only within prescription lines)
         collapsed_text = text
         collapsed_lines = collapsed_text.split('\n')
-        for line_num, line, (low, high) in violations:
+        for line_num, line, low, high, _match_start in violations:
             idx = line_num - 1
             if idx < 0 or idx >= len(collapsed_lines):
                 continue
@@ -312,16 +355,13 @@ PREAMBLE:
                 continue
 
             low_val, high_val = int(low), int(high)
-
-            # If the range occurs after '@', treat as load; otherwise treat as reps.
             at_pos = stripped.find('@')
-            range_pos = stripped.find(f"{low}")
-            if at_pos != -1 and range_pos != -1 and range_pos > at_pos:
+            m = re.search(rf"\b{re.escape(low)}\s*[-–]\s*{re.escape(high)}\b", stripped)
+            if m and at_pos != -1 and m.start() > at_pos:
                 replacement = str(int(round((low_val + high_val) / 2.0)))
             else:
                 replacement = str(high_val)
 
-            # Replace first occurrence of the specific range token in that line.
             current = re.sub(rf"\b{re.escape(low)}\s*[-–]\s*{re.escape(high)}\b", replacement, current, count=1)
             collapsed_lines[idx] = current
 
@@ -388,7 +428,7 @@ PREAMBLE:
         prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
 
 CRITICAL OUTPUT RULES:
-- **NO RANGES**: Use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
+- **NO RANGES IN PRESCRIPTION LINES ONLY**: In the sets/reps/load prescription line (e.g., "- 4 x 12 @ 24 kg"), reps and load must be single values (no "12-15" or "22-26")
 
 {athlete_config}
 
@@ -764,6 +804,38 @@ REQUIREMENTS:
 - McGill Big-3
 
 OUTPUT ONLY the three Fort days in the specified format. Do not include supplemental days."""
+
+    def _retry_fix_ranges(self, original_prompt, plan_text, violations):
+        if not plan_text or not violations:
+            return None
+
+        correction_lines = []
+        for line_num, line, low, high, _pos in violations[:20]:
+            correction_lines.append(f"Line {line_num}: {line}")
+
+        correction = (
+            "Your previous output contains ranges in exercise prescription lines. "
+            "Rewrite the plan to remove ranges ONLY in the prescription lines that look like '- [sets] x [reps] @ [load]'. "
+            "Reps and load in those lines must be single values. "
+            "Do NOT change narrative notes (ranges are allowed in notes), do NOT drop exercises, do NOT change exercise order, do NOT invent weights. "
+            "Here are example offending lines:\n" + "\n".join(correction_lines)
+        )
+
+        try:
+            message = self._create_message(
+                model=self.model,
+                max_tokens=self.max_tokens,
+                messages=[
+                    {"role": "user", "content": original_prompt},
+                    {"role": "assistant", "content": plan_text},
+                    {"role": "user", "content": correction},
+                ],
+            )
+            text = message.content[0].text
+            return text.strip() if text else None
+        except Exception as e:
+            print(f"Error retrying to remove ranges: {e}")
+            return None
 
     def _build_supplemental_prompt(self, fort_plan, workout_history, preferences, fort_week_constraints=None):
         """Build prompt for generating supplemental days (Tue/Thu/Sat) based on Fort output."""
