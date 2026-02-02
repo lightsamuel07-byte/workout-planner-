@@ -13,7 +13,7 @@ claude:
   api_key_env: "ANTHROPIC_API_KEY"  # Will read from environment variable
   model: "claude-sonnet-4-5-20250929"
   max_tokens: 8000
-  timeout: 120  # Client timeout in seconds (increased from default 60)
+  timeout: 300  # Client timeout in seconds (5 minutes for full weekly plan generation with Fort workouts)
 
 # Output Configuration
 output:
