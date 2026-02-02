@@ -99,21 +99,22 @@ class PlanGenerator:
             # Validate and enforce no ranges (hybrid: retry once, then collapse)
             plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
             if violations and not was_collapsed:
-                # Retry once with correction prompt
-                correction_prompt = f"""The previous plan had range values. Fix these to single values:
-{chr(10).join(f"Line {v[0]}: {v[2][0]}-{v[2][1]} -> pick single value" for v in violations[:10])}
+                # Lightweight retry: just send the plan + specific corrections (no full context)
+                correction_prompt = f"""Fix these {len(violations)} range violations in the workout plan below:
+
+{chr(10).join(f"• {v[1]}: {v[2][0]}-{v[2][1]} (use higher value for reps, midpoint for load)" for v in violations[:15])}
 
 Rules:
-- Reps: use the HIGHER value (e.g., 12-15 -> 15)
-- Load (kg): use the MIDPOINT (e.g., 22-26 -> 24)
+- Reps ranges (e.g., 12-15): use HIGHER value → 15
+- Load ranges (e.g., 22-26 kg): use MIDPOINT → 24 kg
 
-Return the COMPLETE corrected plan."""
+Return ONLY the corrected lines in the same format. Here's the full plan to fix:
+
+{plan}"""
                 message2 = self.client.messages.create(
                     model=self.model,
                     max_tokens=self.max_tokens,
                     messages=[
-                        {"role": "user", "content": prompt},
-                        {"role": "assistant", "content": plan},
                         {"role": "user", "content": correction_prompt}
                     ]
                 )
@@ -330,11 +331,8 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 
 ---
 
-EXERCISE SWAP RULES - APPLY AUTOMATICALLY:
-{self._load_exercise_swaps()}
-
 CORE PRINCIPLES:
-- Fort workouts (Mon/Wed/Fri) are priority #1 - reformat to ### A1. format but preserve ALL content
+- Fort workouts (Mon/Wed/Fri) are priority #1 - preserve ALL content
 - Supplemental days (Tue/Thu/Sat) support Fort work - focus: arms, medial delts, upper chest, back detail
 - Progressive overload: +2.5-5kg if user exceeded reps, maintain if struggled, +2.5kg if exact
 - SWAP directives from logs are HARD constraints - replace as requested, don't progress

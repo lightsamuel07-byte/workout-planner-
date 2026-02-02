@@ -109,7 +109,7 @@ def main():
 
     try:
         sheets_reader.authenticate()
-        workout_history = sheets_reader.read_workout_history(num_recent_workouts=20)
+        workout_history = sheets_reader.read_workout_history(num_recent_workouts=7)
         formatted_history = sheets_reader.format_history_for_ai(workout_history)
 
         # Read prior week's supplemental workouts for progressive overload
@@ -157,7 +157,7 @@ def main():
         program_context = "\n\nCONTINUING FORT PROGRAM: Maintain the same supplemental workout structure with progressive overload based on prior week's data.\n"
         program_context += f"\n{formatted_prior_supplemental}\n"
 
-    plan = plan_generator.generate_plan(
+    plan, explanation = plan_generator.generate_plan(
         workout_history=formatted_history,
         trainer_workouts=formatted_trainer_workouts + program_context,
         preferences=""  # Already included in formatted_trainer_workouts
@@ -172,6 +172,12 @@ def main():
     print("YOUR GENERATED WORKOUT PLAN")
     print("=" * 60)
     print("\n" + plan + "\n")
+
+    if explanation:
+        print("\n" + "=" * 60)
+        print("PLAN EXPLANATION")
+        print("=" * 60)
+        print("\n" + explanation + "\n")
 
     # Save the plan to file
     output_folder = config['output']['folder']
