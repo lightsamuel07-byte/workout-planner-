@@ -20,6 +20,9 @@ def get_all_plans():
     if os.path.exists(archive_dir):
         md_files.extend(glob.glob(os.path.join(archive_dir, "workout_plan_*.md")))
 
+    # Exclude explanation files (they end with _explanation.md)
+    md_files = [f for f in md_files if not f.endswith('_explanation.md')]
+
     md_files.sort(reverse=True)
     return md_files
 
@@ -245,6 +248,19 @@ def show():
         st.markdown(f"<br>**Total exercises:** {len(exercises)}", unsafe_allow_html=True)
 
     st.markdown("---")
+
+    # Check if explanation file exists for this plan
+    explanation_path = selected_plan_path.replace('.md', '_explanation.md')
+    if os.path.exists(explanation_path):
+        with st.expander("📖 View AI Explanation (Why this plan was designed this way)", expanded=False):
+            try:
+                with open(explanation_path, 'r') as f:
+                    explanation_content = f.read()
+                st.markdown(explanation_content)
+            except Exception as e:
+                st.error(f"Error reading explanation file: {e}")
+
+        st.markdown("---")
 
     # Action buttons
     col1, col2, col3 = st.columns(3)
