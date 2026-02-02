@@ -323,6 +323,14 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 
 ---
 
+FORT WORKOUT CONVERSION (CRITICAL):
+The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the standardized ### A1. Exercise format:
+  * Extract ALL exercises from these sections: PREP (mobility/warmup), CLUSTER WARM-UP (progressive warmup sets), primary cluster work (singles/doubles), MYO REP finishers (accessories), THAW (conditioning circuits)
+  * Convert each to the ### A1. [Exercise Name] format shown below with complete details (sets x reps @ load, rest period)
+  * Add coaching context: RPE (effort 1-10), Form (technique cues), Energy (intensity level), Adjustments (modifications), Notes (programming rationale)
+  * Keep original block labels intact (A1-A4=PREP, B1-B5=warmup, C1/D1=main clusters, E1-E3=accessories, F1=THAW)
+  * Calculate actual kg loads from percentages if specified (1RMs listed below)
+
 {trainer_workouts}
 
 ---
@@ -332,11 +340,6 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 ---
 
 CORE PRINCIPLES:
-- Fort workouts (Mon/Wed/Fri) from Train Heroic MUST be converted to the exercise format below
-  * Include ALL sections: PREP (mobility), CLUSTER WARM-UP (warmup sets), main work, MYO REP finishers, THAW (conditioning)
-  * Convert each exercise to ### A1. Exercise Name format with sets/reps/load/rest
-  * Add coaching details: RPE (effort level), Form (cues), Energy (intensity), Adjustments (mods), Notes (context)
-  * Preserve exercise block labels (A1-A4 for PREP, B1-B5 for warmup, C1/D1 for clusters, E1-E3 for accessories, F1 for THAW)
 - Supplemental days (Tue/Thu/Sat) support Fort work - focus: arms, medial delts, upper chest, back detail
 - Progressive overload: +2.5-5kg if user exceeded reps, maintain if struggled, +2.5kg if exact
 - SWAP directives from logs are HARD constraints - replace as requested, don't progress
