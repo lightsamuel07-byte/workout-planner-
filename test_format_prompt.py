@@ -104,7 +104,7 @@ print("\nGenerating plan with updated prompt that standardizes Fort workout form
 print("This will call the Anthropic API - checking for consistent ### A1. formatting\n")
 
 plan_gen = PlanGenerator(api_key=api_key, config=config)
-plan = plan_gen.generate_plan(workout_history, formatted_workouts, preferences)
+plan, _explanation = plan_gen.generate_plan(workout_history, formatted_workouts, preferences)
 
 if plan:
     # Save to output for inspection

@@ -94,6 +94,35 @@ class SheetsWriter:
 
         return True
 
+    def archive_sheet_if_exists(self, archived_sheet_name):
+        """Rename the current sheet to an archived name if it exists."""
+        if not self.service:
+            raise Exception("Not authenticated. Call authenticate() first.")
+
+        sheet_id = self._get_sheet_id_by_title(self.sheet_name)
+        if sheet_id is None:
+            return False
+
+        request_body = {
+            'requests': [
+                {
+                    'updateSheetProperties': {
+                        'properties': {
+                            'sheetId': sheet_id,
+                            'title': archived_sheet_name
+                        },
+                        'fields': 'title'
+                    }
+                }
+            ]
+        }
+        self.service.spreadsheets().batchUpdate(
+            spreadsheetId=self.spreadsheet_id,
+            body=request_body
+        ).execute()
+
+        return True
+
     def _parse_plan_to_rows(self, plan_text):
         """
         Parse the markdown plan into structured rows for Google Sheets.
@@ -262,6 +291,22 @@ class SheetsWriter:
 
         except Exception as e:
             print(f"Error ensuring sheet exists: {e}")
+            raise
+
+    def _get_sheet_id_by_title(self, title):
+        try:
+            sheet_metadata = self.service.spreadsheets().get(
+                spreadsheetId=self.spreadsheet_id
+            ).execute()
+
+            for sheet in sheet_metadata.get('sheets', []):
+                props = sheet.get('properties', {})
+                if props.get('title') == title:
+                    return props.get('sheetId')
+
+            return None
+        except Exception as e:
+            print(f"Error getting sheet id: {e}")
             raise
 
     def _clear_sheet(self):
