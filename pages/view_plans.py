@@ -16,6 +16,10 @@ def get_all_plans():
         return []
 
     md_files = glob.glob(os.path.join(output_dir, "workout_plan_*.md"))
+    archive_dir = os.path.join(output_dir, "archive")
+    if os.path.exists(archive_dir):
+        md_files.extend(glob.glob(os.path.join(archive_dir, "workout_plan_*.md")))
+
     md_files.sort(reverse=True)
     return md_files
 
@@ -33,7 +37,8 @@ def parse_plan_content(plan_path):
 
     # Split by days
     days = {}
-    day_pattern = r'## ([A-Z]+DAY[^#]*)'
+    # Capture just the day name (e.g., "MONDAY", "TUESDAY") without the extra text
+    day_pattern = r'## ([A-Z]+DAY)'
 
     matches = list(re.finditer(day_pattern, content))
     for i, match in enumerate(matches):
@@ -116,9 +121,23 @@ def show():
     plan_options = []
     for plan_path in plans:
         filename = os.path.basename(plan_path)
-        # Extract timestamp from filename
+        # Extract date/version from filename
+        archived_match = re.search(r'workout_plan_(\d{8})__archived_(\d{8})_(\d{6})', filename)
+        canonical_week_match = re.search(r'workout_plan_(\d{8})\.md$', filename)
         timestamp_match = re.search(r'workout_plan_(\d{8})_(\d{6})', filename)
-        if timestamp_match:
+
+        if archived_match:
+            week_str = archived_match.group(1)
+            arch_date = archived_match.group(2)
+            arch_time = archived_match.group(3)
+            formatted_week = f"{week_str[:4]}-{week_str[4:6]}-{week_str[6:8]}"
+            formatted_archived = f"{arch_date[:4]}-{arch_date[4:6]}-{arch_date[6:8]} {arch_time[:2]}:{arch_time[2:4]}"
+            plan_options.append((f"{formatted_week} (archived {formatted_archived})", plan_path))
+        elif canonical_week_match:
+            week_str = canonical_week_match.group(1)
+            formatted_week = f"{week_str[:4]}-{week_str[4:6]}-{week_str[6:8]}"
+            plan_options.append((f"{formatted_week} (current)", plan_path))
+        elif timestamp_match:
             date_str = timestamp_match.group(1)
             time_str = timestamp_match.group(2)
             formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]} {time_str[:2]}:{time_str[2:4]}"
