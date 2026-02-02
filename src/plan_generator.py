@@ -12,7 +12,7 @@ from datetime import datetime
 class PlanGenerator:
     """Generates intelligent workout plans using Claude AI."""
 
-    def __init__(self, api_key, config, model=None, max_tokens=None):
+    def __init__(self, api_key, config, model=None, max_tokens=None, timeout=None):
         """
         Initialize the plan generator.
 
@@ -21,8 +21,12 @@ class PlanGenerator:
             config: Full configuration dictionary with athlete profile and rules
             model: Claude model to use (defaults to config value)
             max_tokens: Maximum tokens for response (defaults to config value)
+            timeout: Client timeout in seconds (defaults to config value)
         """
-        self.client = anthropic.Anthropic(api_key=api_key)
+        self.client = anthropic.Anthropic(
+            api_key=api_key,
+            timeout=timeout or config['claude'].get('timeout', 120)
+        )
         self.model = model or config['claude']['model']
         self.max_tokens = max_tokens or config['claude']['max_tokens']
         self.config = config
