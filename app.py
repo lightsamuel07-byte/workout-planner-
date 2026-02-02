@@ -56,11 +56,13 @@ def check_password():
 
     def password_entered():
         """Checks whether a password entered by the user is correct."""
-        # Try to get password from secrets, fall back to default for local dev
+        # Get password from secrets - no hardcoded fallback for security
         try:
-            correct_password = st.secrets.get("APP_PASSWORD", "workout2026")
+            correct_password = st.secrets["APP_PASSWORD"]
         except (AttributeError, KeyError):
-            correct_password = "workout2026"
+            st.error("❌ APP_PASSWORD not configured in Streamlit secrets")
+            st.info("💡 Please add APP_PASSWORD to your .streamlit/secrets.toml file")
+            st.stop()
 
         # Use .get() to safely access the password - it may not exist yet in callback
         entered_password = st.session_state.get("password", "")

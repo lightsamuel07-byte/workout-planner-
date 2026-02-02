@@ -33,6 +33,8 @@ def show():
 
     st.markdown("### 🏋️ Main Lifts Progress (Last 8 Weeks)")
 
+    analytics = None  # Initialize to None to avoid NameError later
+
     try:
         import pandas as pd
         from src.analytics import WorkoutAnalytics
@@ -101,6 +103,9 @@ def show():
     st.markdown("### 💪 Weekly Volume Tracking")
 
     try:
+        if not analytics:
+            raise Exception("Analytics not initialized")
+
         volume_data = analytics.get_weekly_volume(weeks=8)
 
         if volume_data:
@@ -149,6 +154,9 @@ def show():
         st.markdown("**Volume Increases (Last 8 Weeks)**")
 
         try:
+            if not analytics:
+                raise Exception("Analytics not initialized")
+
             focus_groups = ['arms', 'shoulders', 'chest', 'back']
 
             for group in focus_groups:
@@ -175,6 +183,9 @@ def show():
         st.markdown("**Bicep Grip Rotation Tracking**")
 
         try:
+            if not analytics:
+                raise Exception("Analytics not initialized")
+
             bicep_compliance = analytics.get_bicep_grip_rotation_compliance(weeks=4)
 
             if bicep_compliance['compliant']:

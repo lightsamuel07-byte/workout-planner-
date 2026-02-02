@@ -47,11 +47,23 @@ def get_latest_plan():
     if not os.path.exists(output_dir):
         return None
 
+    # Prefer the current week's canonical file if present
+    today = datetime.now()
+    days_since_monday = today.weekday()
+    monday = today - timedelta(days=days_since_monday)
+    week_stamp = monday.strftime("%Y%m%d")
+    canonical = os.path.join(output_dir, f"workout_plan_{week_stamp}.md")
+    if os.path.exists(canonical):
+        return canonical
+
     md_files = glob.glob(os.path.join(output_dir, "workout_plan_*.md"))
+    archive_dir = os.path.join(output_dir, "archive")
+    if os.path.exists(archive_dir):
+        md_files.extend(glob.glob(os.path.join(archive_dir, "workout_plan_*.md")))
+
     if not md_files:
         return None
 
-    # Sort by filename (which includes timestamp)
     md_files.sort(reverse=True)
     return md_files[0]
 
@@ -308,7 +320,7 @@ def show():
 
         action_button("View Full Week Plan", "plans", "📋", use_container_width=True)
         
-        action_button("View Progress Charts", "progress", "�", use_container_width=True)
+        action_button("View Progress Charts", "progress", "📈", use_container_width=True)
 
         action_button("Generate New Week Plan", "generate", "🆕", use_container_width=True)
 

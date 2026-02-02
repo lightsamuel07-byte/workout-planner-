@@ -186,7 +186,7 @@ class SheetsReader:
                     print(f"[PARSE DEBUG] Row data: {row[:min(10, len(row))]}")
                     print(f"[PARSE DEBUG] Column H (row[7]): '{row[7] if len(row) > 7 else 'OUT OF RANGE'}'")
                 
-                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=Notes, H=Log
+                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Form, I=Energy, J=Adjustments, K=Notes, L=Log
                 exercise = {
                     'block': row[0] if len(row) > 0 else '',
                     'exercise': row[1] if len(row) > 1 else '',
@@ -194,12 +194,12 @@ class SheetsReader:
                     'reps': row[3] if len(row) > 3 else '',
                     'load': row[4] if len(row) > 4 else '',
                     'rest': row[5] if len(row) > 5 else '',
-                    'notes': row[6] if len(row) > 6 else '',
-                    'log': row[7] if len(row) > 7 else '',  # Column H is the LOG column
-                    'rpe': row[8] if len(row) > 8 else '',
-                    'energy': row[9] if len(row) > 9 else '',
-                    'adjustments': row[10] if len(row) > 10 else '',
-                    'form': row[11] if len(row) > 11 else ''
+                    'rpe': row[6] if len(row) > 6 else '',      # Column G
+                    'form': row[7] if len(row) > 7 else '',     # Column H
+                    'energy': row[8] if len(row) > 8 else '',   # Column I
+                    'adjustments': row[9] if len(row) > 9 else '',  # Column J
+                    'notes': row[10] if len(row) > 10 else '',  # Column K
+                    'log': row[11] if len(row) > 11 else ''     # Column L is the LOG column
                 }
 
                 # Only add if it's not a header or empty
