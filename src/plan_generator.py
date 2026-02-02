@@ -5,6 +5,7 @@ AI-powered workout plan generation using Claude API.
 import anthropic
 import os
 import yaml
+import re
 from datetime import datetime
 
 
@@ -58,7 +59,7 @@ class PlanGenerator:
 
         return formatted
 
-    def generate_plan(self, workout_history, trainer_workouts, preferences):
+    def generate_plan(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
         """
         Generate a weekly workout plan using Claude AI.
 
@@ -73,7 +74,7 @@ class PlanGenerator:
         print("\n🤖 Generating your personalized workout plan with Claude AI...")
 
         # Construct the prompt
-        prompt = self._build_prompt(workout_history, trainer_workouts, preferences)
+        prompt = self._build_prompt(workout_history, trainer_workouts, preferences, fort_week_constraints=fort_week_constraints)
 
         try:
             # Call Claude API
@@ -89,16 +90,204 @@ class PlanGenerator:
             )
 
             plan = message.content[0].text
+            plan = self._apply_exercise_swaps_to_text(plan)
+
+            # Validate and enforce no ranges (hybrid: retry once, then collapse)
+            plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
+            if violations and not was_collapsed:
+                # Retry once with correction prompt
+                correction_prompt = f"""The previous plan had range values. Fix these to single values:
+{chr(10).join(f"Line {v[0]}: {v[2][0]}-{v[2][1]} -> pick single value" for v in violations[:10])}
+
+Rules:
+- Reps: use the HIGHER value (e.g., 12-15 -> 15)
+- Load (kg): use the MIDPOINT (e.g., 22-26 -> 24)
+
+Return the COMPLETE corrected plan."""
+                message2 = self.client.messages.create(
+                    model=self.model,
+                    max_tokens=self.max_tokens,
+                    messages=[
+                        {"role": "user", "content": prompt},
+                        {"role": "assistant", "content": plan},
+                        {"role": "user", "content": correction_prompt}
+                    ]
+                )
+                plan = message2.content[0].text
+                plan = self._apply_exercise_swaps_to_text(plan)
+                plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=2)
+
+            # Generate explanation file
+            explanation = self._generate_explanation(plan, workout_history, violations if was_collapsed else None)
+
             print("✓ Workout plan generated successfully!\n")
-            return plan
+            return plan, explanation
 
         except Exception as e:
             print(f"Error generating plan: {e}")
+            return None, None
+
+    def summarize_fort_preamble(self, preamble_text):
+        if not preamble_text or not preamble_text.strip():
             return None
 
-    def _build_prompt(self, workout_history, trainer_workouts, preferences):
+        prompt = f"""Summarize the following Fort week/program preamble into concise constraints for programming.
+
+Output rules:
+- 6-12 bullet points max.
+- Only include actionable constraints (clusters, rest intervals, progression intent, rep scheme changes, load guidance, fatigue intent).
+- Preserve key numeric details.
+- No tables.
+
+PREAMBLE:
+{preamble_text}
+"""
+
+        summarizer_model = (
+            (self.config.get('claude', {}) or {}).get('summarizer_model')
+            or self.model
+        )
+
+        try:
+            message = self.client.messages.create(
+                model=summarizer_model,
+                max_tokens=300,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            text = message.content[0].text
+            return text.strip() if text else None
+        except Exception as e:
+            print(f"Error summarizing Fort preamble: {e}")
+            return None
+
+    def _apply_exercise_swaps_to_text(self, text):
+        swaps_file = 'exercise_swaps.yaml'
+        if not os.path.exists(swaps_file):
+            return text
+
+        with open(swaps_file, 'r') as f:
+            swaps_config = yaml.safe_load(f) or {}
+
+        swaps = swaps_config.get('exercise_swaps', {}) or {}
+        for original, replacement in swaps.items():
+            if not original or not replacement:
+                continue
+            pattern = re.compile(re.escape(str(original)), re.IGNORECASE)
+            text = pattern.sub(str(replacement), text)
+
+        return text
+
+    def _validate_no_ranges(self, text, attempt=1):
         """
-        Build the AI prompt for plan generation.
+        Validate that the plan contains no rep or load ranges in the
+        exercise prescription line only (the line that looks like:
+        "- 4 x 12 @ 24 kg").
+
+        This intentionally allows Fort narrative ranges like "rest 25–30s"
+        or "rep schemes 8/12/15" in notes.
+        Hybrid policy: retry once, then auto-collapse if still failing.
+        Returns: (validated_text, violations_found, was_collapsed)
+        """
+        # Pattern to match numeric ranges like "12-15" or "25–30"
+        range_pattern = re.compile(r'(\d+)\s*[-–]\s*(\d+)')
+        violations = []
+
+        lines = text.split('\n')
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            # Only enforce on the exercise prescription line.
+            # Example: "- 4 x 12 @ 24 kg" (also works for timed lines "- 1 x 10:00 @ 3.4 mph")
+            if not stripped.startswith('-'):
+                continue
+            if ' x ' not in stripped:
+                continue
+            if '@' not in stripped:
+                continue
+
+            matches = range_pattern.findall(stripped)
+            for match in matches:
+                violations.append((i + 1, stripped, match))
+
+        if not violations:
+            return text, [], False
+
+        # If this is first attempt, return violations for retry
+        if attempt == 1:
+            return text, violations, False
+
+        # Auto-collapse: reps -> top value, load -> midpoint (only within prescription lines)
+        collapsed_text = text
+        collapsed_lines = collapsed_text.split('\n')
+        for line_num, line, (low, high) in violations:
+            idx = line_num - 1
+            if idx < 0 or idx >= len(collapsed_lines):
+                continue
+
+            current = collapsed_lines[idx]
+            stripped = current.strip()
+            if not stripped.startswith('-') or ' x ' not in stripped or '@' not in stripped:
+                continue
+
+            low_val, high_val = int(low), int(high)
+
+            # If the range occurs after '@', treat as load; otherwise treat as reps.
+            at_pos = stripped.find('@')
+            range_pos = stripped.find(f"{low}")
+            if at_pos != -1 and range_pos != -1 and range_pos > at_pos:
+                replacement = str(int(round((low_val + high_val) / 2.0)))
+            else:
+                replacement = str(high_val)
+
+            # Replace first occurrence of the specific range token in that line.
+            current = re.sub(rf"\b{re.escape(low)}\s*[-–]\s*{re.escape(high)}\b", replacement, current, count=1)
+            collapsed_lines[idx] = current
+
+        collapsed_text = "\n".join(collapsed_lines)
+
+        return collapsed_text, violations, True
+
+    def _generate_explanation(self, plan, workout_history, violations_collapsed=None):
+        """Generate short explanation file (5-15 bullets)."""
+        bullets = []
+
+        # Basic stats
+        lines = plan.split('\n')
+        exercise_count = sum(1 for l in lines if l.strip().startswith('###'))
+        bullets.append(f"Total exercises: {exercise_count}")
+
+        # Progressive overload summary
+        if workout_history and 'supplemental' in workout_history.lower():
+            bullets.append("Progressive overload applied based on prior week performance")
+
+        # Any swaps applied
+        swaps_file = 'exercise_swaps.yaml'
+        if os.path.exists(swaps_file):
+            with open(swaps_file, 'r') as f:
+                swaps_config = yaml.safe_load(f) or {}
+            swaps = swaps_config.get('exercise_swaps', {})
+            if swaps:
+                bullets.append(f"Exercise swaps enforced: {len(swaps)} rules active")
+
+        # Hard preferences
+        bullets.append("Standing calf raises only (no seated)")
+        bullets.append("No belt on pulls/deadlifts")
+        bullets.append("Biceps grip rotation: supinated → neutral → pronated")
+
+        # Range violations handled
+        if violations_collapsed:
+            bullets.append(f"Auto-corrected {len(violations_collapsed)} range violations to single values")
+
+        # Focus areas
+        bullets.append("Focus: arms, medial delts, upper chest, back detail")
+        bullets.append("Incline walking included on all supplemental days")
+
+        return "\n".join(f"• {b}" for b in bullets[:15])  # Cap at 15 bullets
+
+    def _build_prompt(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
+        """
+        Build the AI prompt for plan generation using compressed format.
 
         Args:
             workout_history: Formatted workout history
@@ -109,11 +298,19 @@ class PlanGenerator:
             Complete prompt string
         """
         # Extract athlete profile and rules from config
-        athlete_config = self._format_athlete_config()
+        athlete_config = self._format_athlete_config_compressed()
+
+        fort_constraints_block = ""
+        if fort_week_constraints:
+            fort_constraints_block = f"\nFORT WEEK CONSTRAINTS:\n{fort_week_constraints}\n"
 
         prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
 
+CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
+
 {athlete_config}
+
+{fort_constraints_block}
 
 ---
 
@@ -129,457 +326,78 @@ class PlanGenerator:
 
 ---
 
-EXERCISE SWAP RULES - APPLY THESE AUTOMATICALLY:
+EXERCISE SWAP RULES - APPLY AUTOMATICALLY:
 {self._load_exercise_swaps()}
 
-CRITICAL INSTRUCTIONS FOR PLAN CREATION:
+CORE PRINCIPLES:
+- Fort workouts (Mon/Wed/Fri) are priority #1 - reformat to ### A1. format but preserve ALL content
+- Supplemental days (Tue/Thu/Sat) support Fort work - focus: arms, medial delts, upper chest, back detail
+- Progressive overload: +2.5-5kg if user exceeded reps, maintain if struggled, +2.5kg if exact
+- SWAP directives from logs are HARD constraints - replace as requested, don't progress
 
-**READING FORT INSTRUCTIONS FOR SUPPLEMENTAL ADJUSTMENTS:**
+FOR SUPPLEMENTAL DAYS - INTERFERENCE PREVENTION:
+Tue (post-squat/pre-press): Arms, shoulders, upper chest, back detail only. NO heavy legs/pressing
+Thu (post-press/pre-deadlift): Light legs, chest, delts only. NO heavy biceps/grip work  
+Sat (post-deadlift): Upper body only. NO heavy lower back/leg compounds
 
-Carefully analyze Fort workouts for intensity indicators that should inform supplemental programming:
+MANDATORY HARD RULES:
+• Equipment: No belt on pulls, standing calves only, no split squats
+• Biceps: Rotate grips (sup→neutral→pron), never same grip consecutive days, ≤12 sets/4days
+• Triceps: Vary attachments Tue/Fri/Sat, no single-arm D-handle Sat
+• Carries: Tuesday only, RPE 6-7 (preserve Friday grip)
+• Daily: McGill Big-3 warm-up, incline walking (10min@3.4mph/6%, 15min@3.5mph/6%)
 
-- **Percentage targets** (e.g., "85% 1RM"): If Fort is heavy (>80% 1RM), reduce supplemental intensity to RPE 6-7
-- **RPE cues** (e.g., "RPE 8-9", "work to near failure"): If Fort prescribes high RPE, keep supplemental moderate (RPE 6-7)
-- **Volume spikes**: If Fort has unusually high set counts, reduce supplemental volume by 1-2 sets per exercise
-- **Rep ranges**: If Fort moves to lower reps (1-5 strength phase), keep supplemental higher reps (8-15 hypertrophy)
-- **Coach notes about fatigue**: If notes mention "tough week", "grinder sets", or "deload", reduce supplemental intensity
-- **Exercise selection signals**: If Fort adds more accessories than usual, reduce supplemental exercise count
-
-**Progressive Overload from Prior Week Logs:**
-
-The workout history section contains prior week's logged performance. Use this data intelligently:
-
-- **User logged MORE reps than prescribed**: Increase load by 2.5-5kg for next week
-- **User logged exact reps with good form**: Maintain load or increase by 2.5kg (conservative progression)
-- **User logged FEWER reps or noted "struggled"**: Maintain same load or reduce by 2.5kg if needed
-- **Pay attention to RPE, Form, Energy notes**: If user noted "RPE 9" or "form breakdown", don't increase load
-- **Look for patterns**: If user consistently hits top of rep range, they're ready for load progression
-- **Recovery signals**: If Energy was "Fatigued" or notes mention poor sleep, be conservative with progression
-
-**Integration Principle:** Fort workouts are priority #1. Supplemental work must support, not interfere with, Fort performance.
-
-1. **MONDAY, WEDNESDAY, FRIDAY (Main Days - Fort Workouts):**
-   - Use the trainer workouts provided above but REFORMAT them for consistent parsing
-   - **IMPORTANT**: Apply all exercise swaps listed above BEFORE formatting
-   - Convert each exercise/drill into the standardized format shown below
-   - Preserve ALL training content: sets, reps, weights, rest periods, coaching notes
-   - For sections with multiple exercises (like PREP or MYO REP FINISHER), list each exercise individually
-   - Label exercises sequentially: A1, A2, A3, B1, B2, etc.
-   - For T.H.A.W./CIRCUIT conditioning work, if there are team/partner/solo options, ALWAYS use the solo variant
-
-   **Required format for EVERY Fort exercise:**
-   ```
-   ### A1. [Exercise Name] (specify bench angle if applicable, e.g., "30° Incline DB Press")
-   - [Sets] x [Reps] @ [Weight] kg (or time format like 1:00 for timed drills; for two-cable exercises, specify "per side")
-   - **Rest:** [Rest period from trainer, or intelligent default]
-   - **RPE:** [Target Rate of Perceived Exertion, 1-10 scale]
-   - **Form:** [Key form cues and technique focus]
-   - **Energy:** [Expected energy level: Fresh/Moderate/Fatigued]
-   - **Adjustments:** [Any modifications from standard form]
-   - **Notes:** [Additional coaching cues, tempo, technique notes, percentages]
-   ```
-
-   **EXERCISE NAMING RULES (CRITICAL):**
-   1. **Bench exercises**: ALWAYS specify angle
-      - ✅ Correct: "30° Incline DB Press", "Flat Bench Press", "15° Decline DB Fly"
-      - ❌ Wrong: "Incline Press" (missing degree), "DB Bench" (missing angle)
-
-   2. **Cable exercises with two cables**: Specify load per side
-      - ✅ Correct: "15 kg per side" for High-to-Low Cable Fly
-      - ✅ Single cable: Just specify total load (e.g., "20 kg")
-
-   3. **Machine exercises**: Specify grip/attachment
-      - ✅ Examples: "Lat Pulldown (Wide Grip)", "Cable Row (V-Handle)"
-
-   4. **Free weight carries**: Use kettlebells (not dumbbells)
-      - ✅ Correct: "Kettlebell Farmer Carry", "KB Suitcase Carry"
-      - ❌ Wrong: "DB Farmer Carry", "Dumbbell Carry"
-
-   **Example - Converting a PREP section:**
-   Original from user:
-   ```
-   PREP
-   1 Set
-   90/90 HIP SWITCH - 01:00.00 (Rotate side to side)
-   FIGURE 4 GLUTE ACTIVATION - 01:00.00 (30 seconds per side)
-   ```
-
-   Your formatted output:
-   ```
-   ### A1. 90/90 Hip Switch
-   - 1 x 1:00
-   - **Rest:** 0s (flow into next drill)
-   - **Notes:** Rotate side to side without hands (ninja level)
-
-   ### A2. Figure 4 Glute Activation
-   - 1 x 1:00
-   - **Rest:** 0s (flow into next drill)
-   - **Notes:** 30 seconds per side
-   ```
-
-   **Example - Converting CLUSTER SET SINGLES:**
-   Original from user:
-   ```
-   CLUSTER SET SINGLES - BACK SQUAT
-   5 Sets x 1 rep @ 96.5 kg (75%)
-   Un-rack for new rep every 45 seconds
-   ```
-
-   Your formatted output:
-   ```
-   ### C1. Back Squat (Cluster Singles)
-   - 5 x 1 @ 96.5 kg
-   - **Rest:** 45s between reps, 3min after set 5
-   - **Notes:** Un-rack for new rep every 45s; max bar speed and performance intent; 75% training max
-   ```
-
-   **Example - Converting MYO REP FINISHER:**
-   Original from user:
-   ```
-   MYO REP FINISHER
-   3 Sets
-   30° INCLINE DB BENCH PRESS - 8 reps
-   DB RDL (GLUTE OPTIMIZED) - 12 reps
-   ```
-
-   Your formatted output:
-   ```
-   ### E1. 30° Incline DB Bench Press
-   - 3 x 8 @ 24-26 kg
-   - **Rest:** 60s
-   - **Notes:** Upper chest focus; controlled eccentric; last set = myo-rep
-
-   ### E2. DB RDL (Glute Optimized)
-   - 3 x 12 @ 28-32 kg
-   - **Rest:** 60s
-   - **Notes:** Glute emphasis; last set = myo-rep (1 RIR, rest 10-15s, 3-4 more reps x 3 rounds)
-   ```
-
-   **REST PERIOD RULES:**
-   - **Fort Days (Mon/Wed/Fri)**: Follow trainer's prescribed rest periods. If not specified:
-     * Main lifts (squats, deadlifts, presses): 3-5 minutes
-     * Accessory compounds: 2-3 minutes
-     * Isolation work: 60-90 seconds
-   - **Supplemental Days (Tue/Thu/Sat)**:
-     * Main movements (A, B blocks): 90-120 seconds
-     * Isolation (C, D, E blocks): 60-90 seconds
-     * Finishers/carries: 30-45 seconds
-
-2. **TUESDAY, THURSDAY, SATURDAY (Supplemental Days):**
-   Design workouts using the SAME EXACT format as Fort workouts above:
-   - Use the ### A1. [Exercise] format with bullet points
-   - Focus on AESTHETICS + accessory work
-   - Target the focus areas: arms, medial delts, upper chest, back detail
-   - MUST NOT compromise the next main day's performance
-   - Keep intensity moderate - these are supplemental, not primary training days
-   - Focus on progressive overload from prior week's log (if continuing same program)
-   - OR design fresh supplemental workouts (if new Fort program)
-
-   **INCLINE WALKING (MANDATORY for all supplemental days):**
-   - **Warm-up**: 10 minutes incline walk before lifting (baseline: 3.4 mph @ 6% incline, but adjust for optimal aesthetics benefit and readiness)
-   - **Finisher**: 15 minutes incline walk after lifting (baseline: 3.5 mph @ 6% incline, but optimize for fat loss and recovery without compromising next day)
-   - Consider: Samuel's conditioning level, proximity to next Fort workout, and aerobic capacity
-   - Format incline walks as exercises in the plan using the ### format
-
-   **Use the EXACT SAME format structure with ALL fields:**
-   ```
-   ### A1. Incline Walk (Warm-up)
-   - 1 x 10:00 @ 3.4 mph, 6% grade
-   - **Rest:** 2-3min before first exercise
-   - **RPE:** 3-4
-   - **Form:** Upright posture, glutes engaged
-   - **Energy:** Fresh
-   - **Adjustments:** Adjust speed/grade based on readiness
-   - **Notes:** Increase blood flow, activate glutes and hamstrings
-
-   ### A2. Cable Lateral Raise
-   - 3 x 12-15 @ 20 kg
-   - **Rest:** 90s
-   - **RPE:** 7-8
-   - **Form:** Constant tension through range; wrist height
-   - **Energy:** Fresh to moderate
-   - **Adjustments:** None
-   - **Notes:** Medial delt focus; avoid momentum
-
-   [... other exercises ...]
-
-   ### F1. Incline Walk (Finisher)
-   - 1 x 15:00 @ 3.5 mph, 6% grade
-   - **Rest:** N/A (end of session)
-   - **RPE:** 4-5
-   - **Form:** Maintain upright posture throughout
-   - **Energy:** Fatigued but controlled
-   - **Adjustments:** None
-   - **Notes:** Steady pace for fat oxidation; should not compromise next day's performance
-   ```
-
-   **CRITICAL: SUPPLEMENTAL DAY INTERFERENCE CHECKS**
-
-   Before finalizing supplemental exercises, verify against Fort schedule to prevent interference:
-
-   **Tuesday (post-Monday squat, pre-Wednesday press):**
-   - ❌ Avoid: Heavy leg work (squats, lunges, heavy leg compounds), heavy pressing movements
-   - ✅ Safe: Arms (biceps, triceps), shoulders (lateral/rear delts), upper chest, back detail work
-   - ⚠️ Recovery concern: Don't fatigue grip or core heavily before Wednesday's pressing work
-
-   **Thursday (post-Wednesday press, pre-Friday deadlift):**
-   - ❌ Avoid: Heavy bicep/forearm work, heavy back pulling, exercises that tax grip strength
-   - ✅ Safe: Legs (accessories, light work - not heavy squats), chest accessories, delts (all heads)
-   - ⚠️ Recovery concern: Preserve grip strength for Friday deadlifts - no heavy curls or farmer walks
-
-   **Saturday (post-Friday deadlift):**
-   - ❌ Avoid: Heavy lower back loading, heavy leg compounds, heavy deadlift variations
-   - ✅ Safe: Upper body focus - arms, chest, delts, light back accessories (no heavy rows)
-   - ⚠️ Recovery concern: Allow CNS recovery from Friday's deadlift session
-
-   **Additional Recovery Rules:**
-   - If Fort day heavily loads shoulders, avoid heavy overhead work day before/after
-   - Never train same muscle group heavy two days in a row
-   - Cap total weekly bicep hard sets at 10-12 across rolling 4-day window
-   - Monitor cumulative fatigue - if Fort week is brutal, dial back supplemental intensity
-
-3. **SUNDAY:**
-   - Active recovery or rest day
-   - Light movement, stretching, or optional easy cardio
-   - Sauna when appropriate
-
-4. **DAILY STRUCTURE:**
-   Every session must start with:
-   - McGill Big-3 warm-up (bird-dog, side plank, curl-up)
-
-5. **MANDATORY HARD RULES - YOU MUST FOLLOW THESE:**
-
-   **Equipment & Exercise Selection:**
-   - NO belt on pulls/deadlifts
-   - Standing calf raises ONLY (NEVER seated calves)
-   - NO split squats (any variant) - use alternatives from swap library
-
-   **Biceps Programming (CRITICAL):**
-   - NEVER same grip two days in a row
-   - Rotate grips: supinated → neutral → pronated
-   - Keep ~48 hours before another long-length stimulus (e.g., incline curls)
-   - Cap biceps hard sets at 10-12 per rolling 4 days
-   - Track grip rotation across the week
-
-   **Triceps Programming:**
-   - Vary attachments across Tue/Fri/Sat
-   - NO single-arm D-handle on Saturday
-
-   **Carries & Grip Work:**
-   - Place carries on Tuesday only
-   - Keep at RPE 6-7, shorter distances (to preserve Friday deadlift grip)
-
-   **Lateral Raises:**
-   - If Monday has lateral raises and Tuesday would conflict, use alternatives:
-     * Reverse pec deck, cable Y-raise (low→high), or rear-delt face pulls
-
-6. **PROGRESSION GUIDANCE:**
-   - Barbell main lifts: If last top set ≤ RPE 9 (≥1 RIR), add 2.5-5 kg or 1-2 reps
-   - Dumbbells: Move up one step after hitting top of rep range on ≥2 clean sets with RPE ≤8
-   - Cable/Machine: When top of range is clean (RPE 7-8), add one plate next session
-   - Round: barbell to 0.5 kg, DBs to nearest available step
-   - **Use RPE tracking**: Target RPE 7-8 for supplemental work; if user logged RPE 9-10, reduce load
-   - **Use Form tracking**: Only progress if prior week showed good form; form breakdown = maintain load
-   - **Use Energy tracking**: If prior week showed "Fatigued", be conservative with progression
-
-7. **1RM REFERENCES (for calculating percentages if needed):**
-   - Back Squat: 129 kg
-   - Bench Press: 94 kg
-   - Deadlift: 168 kg
-
-8. **FINISHERS:**
-   - Include incline walking on supplemental days
-   - THAW intensity must preserve next day performance (don't trash recovery)
-   - Sauna after main days when appropriate
-
-9. **SANITY CHECK BEFORE FINALIZING:**
-   Before you output the plan, verify:
-   - ✓ No same-grip biceps on consecutive days
-   - ✓ Biceps hard sets ≤ 10-12 per rolling 4 days
-   - ✓ Standing calf raises only (no seated)
-   - ✓ Triceps attachments varied across Tue/Fri/Sat
-   - ✓ No split squats anywhere
-   - ✓ Carries on Tuesday at moderate load
-   - ✓ THAW/finisher intensity won't compromise next day
-   - ✓ Sauna included after main days
-
-10. **OUTPUT FORMAT:**
-
-Use American spelling throughout. Format as markdown with ## for day headers and ### for exercises:
-
-```
-# WEEKLY WORKOUT PLAN FOR SAMUEL
-Generated: [current date]
-Focus: Strength + Aesthetics (arms, medial delts, upper chest, back detail)
-
----
-
-## MONDAY - FORT WORKOUT (Main Day)
-
-**Warm-up:**
-- McGill Big-3
-
-### A1. [First PREP Exercise]
-- [Sets] x [Reps/Time] @ [Load]
-- **Rest:** [Rest period]
-- **RPE:** [Target RPE]
-- **Form:** [Key form cues]
-- **Energy:** [Expected energy level]
-- **Adjustments:** [Any modifications]
-- **Notes:** [Coaching cues]
-
-### A2. [Second PREP Exercise]
-- [Sets] x [Reps/Time] @ [Load]
-- **Rest:** [Rest period]
-- **RPE:** [Target RPE]
-- **Form:** [Key form cues]
-- **Energy:** [Expected energy level]
-- **Adjustments:** [Any modifications]
-- **Notes:** [Coaching cues]
-
-[Continue with all Fort exercises in ### A1., ### B1., etc. format]
-
----
-
-## TUESDAY - AESTHETICS + ARMS
-
-**Warm-up:**
-- McGill Big-3
-
+EXERCISE FORMAT (ALL EXERCISES):
 ### A1. [Exercise Name]
 - [Sets] x [Reps] @ [Load] kg
-- **Rest:** [Rest period]
-- **RPE:** [Target RPE]
-- **Form:** [Key form cues, grip type for biceps]
-- **Energy:** [Expected energy level]
-- **Adjustments:** [Any modifications]
-- **Notes:** [Additional coaching cues]
+- **Rest:** [period]
+- **RPE:** [target]
+- **Form:** [cues]
+- **Energy:** [level]
+- **Adjustments:** [mods]
+- **Notes:** [coaching]
 
-### A2. [Exercise Name]
-- [Sets] x [Reps] @ [Load] kg
-- **Rest:** [Rest period]
-- **RPE:** [Target RPE]
-- **Form:** [Key form cues]
-- **Energy:** [Expected energy level]
-- **Adjustments:** [Any modifications]
-- **Notes:** [Coaching cues]
+NAMING RULES:
+• Bench: specify angle (e.g., "30° Incline DB Press")
+• Cable dual: load per side
+• Carries: use kettlebells
 
-[Continue with all supplemental exercises in ### format]
+REST PERIODS:
+• Fort main lifts: 3-5min, compounds: 2-3min, isolation: 60-90s
+• Supplemental main: 90-120s, isolation: 60-90s, finishers: 30-45s
 
-**Finisher:**
-- Incline walk: [duration/intensity]
+1RMs: Squat 129kg, Bench 94kg, Deadlift 168kg
 
-**Post-workout:**
-- Sauna optional
+OUTPUT: Use ## day headers, ### exercise format, American spelling. Include sanity check confirmation.
 
----
-
-## WEDNESDAY - FORT WORKOUT (Main Day)
-
-[Same standardized ### format as Monday]
-
----
-
-## THURSDAY - AESTHETICS + BACK DETAIL
-
-[Same standardized ### format as Tuesday]
-
----
-
-## FRIDAY - FORT WORKOUT (Main Day)
-
-[Same standardized ### format as Monday]
-
----
-
-## SATURDAY - AESTHETICS + ARMS
-
-[Same standardized ### format as Tuesday]
-
----
-
-## SUNDAY - ACTIVE RECOVERY / REST
-
-**Optional activities:**
-- Light movement, stretching, or easy cardio
-- Sauna
-
----
-
-## WEEKLY PROGRAMMING NOTES:
-- [Bicep grip rotation summary across the week]
-- [Progressive overload guidance for supplemental exercises]
-- [Recovery and readiness notes]
-- [Any specific form cues or technique reminders]
-- [Sanity check confirmation]
-
-```
-
-**CRITICAL**: Every single exercise (Fort and supplemental) MUST use the ### A1. format with bullet points for sets/reps/load/rest/notes. This ensures consistent parsing to Google Sheets.
-
-Generate the complete weekly workout plan now, following ALL rules above:
-"""
+Generate complete weekly plan following ALL rules above."""
 
         return prompt
 
-    def _format_athlete_config(self):
-        """Format the athlete configuration section for the prompt."""
-        config_text = f"""
-ATHLETE PROFILE:
-• Name: {self.config['athlete']['name']}
-• Units: {self.config['athlete']['units']}
-• Spelling: {self.config['athlete']['spelling']}
+    def _format_athlete_config_compressed(self):
+        """Format the athlete configuration section for the prompt in compressed format."""
+        return f"""
+ATHLETE: {self.config['athlete']['name']} | {self.config['athlete']['units']} | {self.config['athlete']['spelling']} spelling
+GOAL: {self.config['goals']['primary']} | Focus: {', '.join(self.config['goals']['focus_areas'])}
+SCHEDULE: Fort {', '.join(self.config['weekly_structure']['main_days'])} | Supplemental {', '.join(self.config['weekly_structure']['supplemental_days'])}
+HARD RULES: {' | '.join(self.config['hard_rules']['equipment'])} | Biceps: {' | '.join(self.config['hard_rules']['biceps'])}"""
 
-PRIMARY GOALS:
-• {self.config['goals']['primary']}
-
-FOCUS AREAS:
-• {', '.join(self.config['goals']['focus_areas'])}
-
-WEEKLY STRUCTURE:
-• Main Days: {', '.join(self.config['weekly_structure']['main_days'])}
-  ({self.config['weekly_structure']['main_days_note']})
-• Supplemental Days: {', '.join(self.config['weekly_structure']['supplemental_days'])}
-  ({self.config['weekly_structure']['supplemental_days_note']})
-• Daily Warm-up: {self.config['weekly_structure']['daily_warmup']}
-
-HARD RULES (NON-NEGOTIABLE):
-"""
-        for rule in self.config['hard_rules']['equipment']:
-            config_text += f"• {rule}\n"
-
-        config_text += "\nBICEPS RULES:\n"
-        for rule in self.config['hard_rules']['biceps']:
-            config_text += f"• {rule}\n"
-
-        config_text += f"\nSPELLING: {self.config['hard_rules']['spelling']}\n"
-
-        config_text += """
-SWAP LIBRARY (if needed):
-"""
-        for exercise, alternatives in self.config['swap_library'].items():
-            if isinstance(alternatives, list):
-                config_text += f"• {exercise.replace('_', ' ').title()}: {', '.join(alternatives)}\n"
-            else:
-                config_text += f"• {exercise.replace('_', ' ').title()}: {alternatives.get('note', '')}\n"
-
-        return config_text
-
-    def save_plan(self, plan, output_folder="output", format="markdown"):
+    def save_plan(self, plan, explanation=None, output_folder="output", format="markdown"):
         """
-        Save the generated plan to a file.
+        Save the generated plan and optional explanation to files.
 
         Args:
             plan: The generated plan text
+            explanation: The explanation text (optional)
             output_folder: Folder to save the plan
             format: File format (markdown, text, json)
 
         Returns:
-            Path to saved file
+            Tuple of (plan_path, explanation_path or None)
         """
         if not plan:
             print("No plan to save.")
-            return None
+            return None, None
 
         # Create output folder if it doesn't exist
         os.makedirs(output_folder, exist_ok=True)
@@ -587,12 +405,21 @@ SWAP LIBRARY (if needed):
         # Generate filename with timestamp
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         extension = "md" if format == "markdown" else "txt"
+
+        # Save main plan
         filename = f"workout_plan_{timestamp}.{extension}"
         filepath = os.path.join(output_folder, filename)
-
-        # Save the plan
         with open(filepath, 'w') as f:
             f.write(plan)
-
         print(f"✓ Plan saved to: {filepath}")
-        return filepath
+
+        # Save explanation if provided
+        expl_path = None
+        if explanation:
+            expl_filename = f"workout_plan_{timestamp}_explanation.{extension}"
+            expl_path = os.path.join(output_folder, expl_filename)
+            with open(expl_path, 'w') as f:
+                f.write(explanation)
+            print(f"✓ Explanation saved to: {expl_path}")
+
+        return filepath, expl_path
