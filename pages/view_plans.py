@@ -158,8 +158,21 @@ def show():
     # Parse and display the selected plan
     days = parse_plan_content(selected_plan_path)
 
+    # Check if any days were parsed
+    if not days:
+        st.error("⚠️ Unable to parse workout days from this plan file.")
+        st.info("The plan file may be in an unexpected format. Try generating a new plan.")
+        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        return
+
     # Day navigation tabs
     day_names = list(days.keys())
+
+    if not day_names:
+        st.error("⚠️ No workout days found in this plan.")
+        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        return
+
     selected_day = st.radio(
         "Select Day",
         options=day_names,
@@ -172,7 +185,11 @@ def show():
     # Display selected day
     st.markdown(f"## {selected_day}")
 
-    day_content = days[selected_day]
+    day_content = days.get(selected_day, '')
+
+    if not day_content:
+        st.warning(f"No content found for {selected_day}")
+        return
     exercises = parse_exercises(day_content)
 
     colors = get_colors()
