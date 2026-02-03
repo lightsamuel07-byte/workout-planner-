@@ -196,15 +196,75 @@ def show():
 
     st.markdown("---")
 
+    # Step 2.5: Select Prior Week Sheet
+    prior_week_sheet = None
+    if not is_new_program:
+        st.markdown("### 📋 STEP 2.5: Select Prior Week's Sheet")
+
+        try:
+            from src.sheets_reader import SheetsReader
+            import yaml
+
+            # Load config to get spreadsheet ID
+            config_path = os.path.join(os.path.dirname(__file__), '..', 'config.yaml')
+            with open(config_path, 'r') as f:
+                config = yaml.safe_load(f)
+
+            # Initialize reader to get list of sheets
+            reader = SheetsReader(
+                spreadsheet_id=config['google_sheets']['spreadsheet_id'],
+                sheet_name=config['google_sheets']['sheet_name'],  # temp, will change
+                credentials_file=config['google_sheets']['credentials_file']
+            )
+            reader.authenticate()
+
+            # Get all sheets from the spreadsheet
+            sheet_metadata = reader.service.spreadsheets().get(
+                spreadsheetId=config['google_sheets']['spreadsheet_id']
+            ).execute()
+
+            all_sheets = [sheet['properties']['title'] for sheet in sheet_metadata.get('sheets', [])]
+
+            # Filter to only weekly plan sheets (exclude individual day sheets and logs)
+            weekly_sheets = [s for s in all_sheets if s.startswith('(Weekly Plan)')]
+            weekly_sheets.sort(reverse=True)  # Most recent first
+
+            if weekly_sheets:
+                prior_week_sheet = st.selectbox(
+                    "Select which week's data to use for progressive overload:",
+                    options=weekly_sheets,
+                    index=0,  # Default to most recent
+                    help="Choose the sheet containing last week's logged performance. The AI will use Column H (Log) data for progressive overload."
+                )
+
+                st.success(f"✅ Will read workout history from: **{prior_week_sheet}**")
+            else:
+                st.warning("⚠️ No weekly plan sheets found. The AI will generate workouts without prior history.")
+
+        except Exception as e:
+            st.warning(f"⚠️ Could not load sheet list: {str(e)}")
+            st.info("💡 The AI will use the default sheet from config.yaml")
+
+    st.markdown("---")
+
     # Step 3: Review Last Week (Optional)
     st.markdown("### 📊 STEP 3: Last Week's Performance (Optional)")
 
     with st.expander("View Last Week's Log"):
-        st.markdown("""
-        📊 **Auto-loaded from Google Sheets**
+        if prior_week_sheet:
+            st.markdown(f"""
+            📊 **Auto-loaded from Google Sheets**
 
-        *Last week's data will be automatically loaded and used for progressive overload recommendations.*
-        """)
+            *Reading workout history from: **{prior_week_sheet}***
+
+            The AI will analyze Column H (Log) data for progressive overload recommendations.
+            """)
+        else:
+            st.markdown("""
+            📊 **Auto-loaded from Google Sheets**
+
+            *Last week's data will be automatically loaded and used for progressive overload recommendations.*
+            """)
 
     st.markdown("---")
 
@@ -313,14 +373,19 @@ USER PREFERENCES:
                 workout_history = "No prior workout history available (new program)."
                 if not is_new_program:
                     try:
+                        # Use user-selected sheet if available, otherwise fall back to config
+                        sheet_to_read = prior_week_sheet if prior_week_sheet else config['google_sheets']['sheet_name']
+
                         sheets_reader = SheetsReader(
                             credentials_file=config['google_sheets']['credentials_file'],
                             spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-                            sheet_name=config['google_sheets']['sheet_name']
+                            sheet_name=sheet_to_read
                         )
                         sheets_reader.authenticate()
                         prior_supplemental = sheets_reader.read_prior_week_supplemental()
                         workout_history = sheets_reader.format_supplemental_for_ai(prior_supplemental)
+
+                        st.info(f"✅ Loaded workout history from: **{sheet_to_read}**")
                     except Exception as e:
                         st.warning(f"Could not load prior week data: {e}")
 
