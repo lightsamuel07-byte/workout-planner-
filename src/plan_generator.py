@@ -324,10 +324,10 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 ---
 
 FORT WORKOUT CONVERSION (CRITICAL):
-The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the standardized ### A1. Exercise format:
+The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the FORT WORKOUT FORMAT with FULL DETAIL:
   * Extract ALL exercises from these sections: PREP (mobility/warmup), CLUSTER WARM-UP (progressive warmup sets), primary cluster work (singles/doubles), MYO REP finishers (accessories), THAW (conditioning circuits)
-  * Convert each to the ### A1. [Exercise Name] format shown below with complete details (sets x reps @ load, rest period)
-  * Add coaching context: RPE (effort 1-10), Form (technique cues), Energy (intensity level), Adjustments (modifications), Notes (programming rationale)
+  * Convert each to the ### A1. [Exercise Name] format with COMPLETE coaching details
+  * Include ALL fields: Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes
   * Keep original block labels intact (A1-A4=PREP, B1-B5=warmup, C1/D1=main clusters, E1-E3=accessories, F1=THAW)
   * Calculate actual kg loads from percentages if specified (1RMs listed below)
 
@@ -346,8 +346,14 @@ CORE PRINCIPLES:
 
 FOR SUPPLEMENTAL DAYS - INTERFERENCE PREVENTION:
 Tue (post-squat/pre-press): Arms, shoulders, upper chest, back detail only. NO heavy legs/pressing
-Thu (post-press/pre-deadlift): Light legs, chest, delts only. NO heavy biceps/grip work  
+Thu (post-press/pre-deadlift): Light legs, chest, delts only. NO heavy biceps/grip work
 Sat (post-deadlift): Upper body only. NO heavy lower back/leg compounds
+
+SUPPLEMENTAL DAY GENERATION (Tue/Thu/Sat):
+Generate supplemental exercises using ESSENTIAL FORMAT only:
+  * Include: Sets, Reps, Load, Rest, Notes (brief 1-2 sentences with key coaching points and load progression)
+  * OMIT: RPE, Form, Energy, Adjustments (to reduce token usage)
+  * Follow interference prevention rules above
 
 MANDATORY HARD RULES:
 • Equipment: No belt on pulls, standing calves only, no split squats
@@ -356,7 +362,9 @@ MANDATORY HARD RULES:
 • Carries: Tuesday only, RPE 6-7 (preserve Friday grip)
 • Daily: McGill Big-3 warm-up, incline walking (10min@3.4mph/6%, 15min@3.5mph/6%)
 
-EXERCISE FORMAT (ALL EXERCISES):
+EXERCISE FORMAT:
+
+FORT WORKOUTS (Mon/Wed/Fri) - FULL DETAIL:
 ### A1. [Exercise Name]
 - [Sets] x [Reps] @ [Load] kg
 - **Rest:** [period]
@@ -365,6 +373,12 @@ EXERCISE FORMAT (ALL EXERCISES):
 - **Energy:** [level]
 - **Adjustments:** [mods]
 - **Notes:** [coaching]
+
+SUPPLEMENTAL WORKOUTS (Tue/Thu/Sat) - ESSENTIAL ONLY:
+### A1. [Exercise Name]
+- [Sets] x [Reps] @ [Load] kg
+- **Rest:** [period]
+- **Notes:** [brief coaching notes]
 
 NAMING RULES:
 • Bench: specify angle (e.g., "30° Incline DB Press")
