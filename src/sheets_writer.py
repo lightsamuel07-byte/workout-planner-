@@ -151,7 +151,7 @@ class SheetsWriter:
                 current_day = line.replace('## ', '').strip()
                 rows.append([current_day])
                 rows.append([])
-                rows.append(['Block', 'Exercise', 'Sets', 'Reps', 'Load (kg)', 'Rest', 'RPE', 'Form', 'Energy', 'Adjustments', 'Notes', 'Log'])
+                rows.append(['Block', 'Exercise', 'Sets', 'Reps', 'Load (kg)', 'Rest', 'Notes', 'Log'])
                 i += 1
                 continue
 
@@ -167,9 +167,9 @@ class SheetsWriter:
 
                     # Validate block label (A1, B2, C3, etc.)
                     if re.match(r'^[A-Z]\d+$', block_label):
-                        # Extract exercise details from following bullet points
-                        sets, reps, load, rest, rpe, form, energy, adjustments, notes = self._extract_exercise_details(lines, i + 1)
-                        rows.append([block_label, exercise_name, sets, reps, load, rest, rpe, form, energy, adjustments, notes, ''])
+                        # Extract exercise details from following bullet points (8-column format)
+                        sets, reps, load, rest, notes = self._extract_exercise_details(lines, i + 1)
+                        rows.append([block_label, exercise_name, sets, reps, load, rest, notes, ''])
 
             i += 1
 
@@ -177,24 +177,16 @@ class SheetsWriter:
 
     def _extract_exercise_details(self, lines, start_idx):
         """
-        Extract sets, reps, load, rest, RPE, form, energy, adjustments, and notes from bullet points after an exercise header.
-        Expects unified format:
-        - 3 x 12-15 @ 20 kg
+        Extract sets, reps, load, rest, and notes from bullet points after an exercise header.
+        Simplified 8-column format:
+        - 3 x 12 @ 20 kg
         - **Rest:** 60s
-        - **RPE:** 7-8
-        - **Form:** Focus on key cues
-        - **Energy:** Fresh/Moderate/Fatigued
-        - **Adjustments:** Modifications from standard form
-        - **Notes:** Coaching cues here
+        - **Notes:** Coaching cues, technique points, intensity targets all in one field
         """
         sets = ""
         reps = ""
         load = ""
         rest = ""
-        rpe = ""
-        form = ""
-        energy = ""
-        adjustments = ""
         notes = ""
 
         i = start_idx
@@ -221,13 +213,13 @@ class SheetsWriter:
                     if sets_match:
                         sets = sets_match.group(1)
 
-                    # Extract reps (can be range like "12-15" or single number or time like "1:00")
-                    reps_match = re.search(r'x\s*([\d\-:]+)', content)
+                    # Extract reps (can be single number or time like "1:00")
+                    reps_match = re.search(r'x\s*([\d:]+)', content)
                     if reps_match:
                         reps = reps_match.group(1)
 
                     # Extract load
-                    load_match = re.search(r'@\s*([\d\.\-]+)', content)
+                    load_match = re.search(r'@\s*([\d\.]+)', content)
                     if load_match:
                         load = load_match.group(1)
 
@@ -235,23 +227,7 @@ class SheetsWriter:
                 elif content.startswith('**Rest:**'):
                     rest = content.replace('**Rest:**', '').strip()
 
-                # Parse RPE
-                elif content.startswith('**RPE:**'):
-                    rpe = content.replace('**RPE:**', '').strip()
-
-                # Parse Form
-                elif content.startswith('**Form:**'):
-                    form = content.replace('**Form:**', '').strip()
-
-                # Parse Energy
-                elif content.startswith('**Energy:**'):
-                    energy = content.replace('**Energy:**', '').strip()
-
-                # Parse Adjustments
-                elif content.startswith('**Adjustments:**'):
-                    adjustments = content.replace('**Adjustments:**', '').strip()
-
-                # Parse notes
+                # Parse notes (all coaching info goes here now)
                 elif content.startswith('**Notes:**'):
                     notes = content.replace('**Notes:**', '').strip()
 
@@ -261,7 +237,7 @@ class SheetsWriter:
 
             i += 1
 
-        return sets, reps, load, rest, rpe, form, energy, adjustments, notes
+        return sets, reps, load, rest, notes
 
     def _ensure_sheet_exists(self):
         """Check if the sheet exists, create it if not."""

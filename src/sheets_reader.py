@@ -104,8 +104,8 @@ class SheetsReader:
 
         try:
             # Read all data from the sheet
-            # Extended range to include all columns: Block, Exercise, Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes, Log (A:L = 12 columns)
-            range_name = f"{self.sheet_name}!A:L"
+            # 8-column schema: Block, Exercise, Sets, Reps, Load, Rest, Notes, Log (A:H = 8 columns)
+            range_name = f"{self.sheet_name}!A:H"
             print(f"[READ DEBUG] Reading from sheet: '{self.sheet_name}'")
             print(f"[READ DEBUG] Range: {range_name}")
             
@@ -183,10 +183,10 @@ class SheetsReader:
                 # Debug first exercise of first workout
                 if len(current_workout['exercises']) == 0 and current_workout.get('date', '').startswith('MONDAY'):
                     print(f"[PARSE DEBUG] First Monday exercise row length: {len(row)}")
-                    print(f"[PARSE DEBUG] Row data: {row[:min(10, len(row))]}")
+                    print(f"[PARSE DEBUG] Row data: {row[:min(8, len(row))]}")
                     print(f"[PARSE DEBUG] Column H (row[7]): '{row[7] if len(row) > 7 else 'OUT OF RANGE'}'")
-                
-                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Form, I=Energy, J=Adjustments, K=Notes, L=Log
+
+                # 8-column schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=Notes, H=Log
                 exercise = {
                     'block': row[0] if len(row) > 0 else '',
                     'exercise': row[1] if len(row) > 1 else '',
@@ -194,12 +194,8 @@ class SheetsReader:
                     'reps': row[3] if len(row) > 3 else '',
                     'load': row[4] if len(row) > 4 else '',
                     'rest': row[5] if len(row) > 5 else '',
-                    'rpe': row[6] if len(row) > 6 else '',      # Column G
-                    'form': row[7] if len(row) > 7 else '',     # Column H
-                    'energy': row[8] if len(row) > 8 else '',   # Column I
-                    'adjustments': row[9] if len(row) > 9 else '',  # Column J
-                    'notes': row[10] if len(row) > 10 else '',  # Column K
-                    'log': row[11] if len(row) > 11 else ''     # Column L is the LOG column
+                    'notes': row[6] if len(row) > 6 else '',    # Column G
+                    'log': row[7] if len(row) > 7 else ''       # Column H is the LOG column
                 }
 
                 # Only add if it's not a header or empty
@@ -327,8 +323,8 @@ class SheetsReader:
 
         try:
             # Read all data from the weekly plan sheet
-            # Extended range to include all columns: Block, Exercise, Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes, Log (A:L = 12 columns)
-            range_name = f"'{sheet_name}'!A:L"
+            # 8-column schema: Block, Exercise, Sets, Reps, Load, Rest, Notes, Log (A:H = 8 columns)
+            range_name = f"'{sheet_name}'!A:H"
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
                 range=range_name
@@ -395,7 +391,7 @@ class SheetsReader:
 
             # Parse exercise rows
             if in_exercise_section and current_day and len(row) >= 2:
-                # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Form, I=Energy, J=Adjustments, K=Notes, L=Log
+                # 8-column schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=Notes, H=Log
                 exercise_data = {
                     'block': row[0] if len(row) > 0 else '',
                     'exercise': row[1] if len(row) > 1 else '',
@@ -403,12 +399,8 @@ class SheetsReader:
                     'reps': row[3] if len(row) > 3 else '',
                     'load': row[4] if len(row) > 4 else '',
                     'rest': row[5] if len(row) > 5 else '',
-                    'rpe': row[6] if len(row) > 6 else '',
-                    'form': row[7] if len(row) > 7 else '',
-                    'energy': row[8] if len(row) > 8 else '',
-                    'adjustments': row[9] if len(row) > 9 else '',
-                    'notes': row[10] if len(row) > 10 else '',
-                    'log': row[11] if len(row) > 11 else ''
+                    'notes': row[6] if len(row) > 6 else '',
+                    'log': row[7] if len(row) > 7 else ''
                 }
 
                 # Only add if it has an exercise name
@@ -518,8 +510,8 @@ class SheetsReader:
 
         try:
             # Read current sheet data to find the correct rows
-            # Extended range to include all columns: Block, Exercise, Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes, Log (A:L = 12 columns)
-            range_name = f"'{self.sheet_name}'!A:L"
+            # 8-column schema: Block, Exercise, Sets, Reps, Load, Rest, Notes, Log (A:H = 8 columns)
+            range_name = f"'{self.sheet_name}'!A:H"
             result = self.service.spreadsheets().values().get(
                 spreadsheetId=self.spreadsheet_id,
                 range=range_name
@@ -566,8 +558,8 @@ class SheetsReader:
 
                         # Check if exercise names match (allow partial match)
                         if log_entry['exercise'].lower() in exercise_name.lower() or exercise_name.lower() in log_entry['exercise'].lower():
-                            # Column H is the LOG column (user's actual sheet structure)
-                            # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=RPE, H=Log
+                            # Column H is the LOG column (8-column schema)
+                            # Schema: A=Block, B=Exercise, C=Sets, D=Reps, E=Load, F=Rest, G=Notes, H=Log
                             if log_entry['log']:  # Only update if there's actual log data
                                 cell_range = f"'{self.sheet_name}'!H{current_row + 1}"
                                 updates.append({

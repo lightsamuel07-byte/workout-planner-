@@ -324,12 +324,12 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 ---
 
 FORT WORKOUT CONVERSION (CRITICAL):
-The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the FORT WORKOUT FORMAT with FULL DETAIL:
+The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the exercise format:
   * Extract ALL exercises from these sections: PREP (mobility/warmup), CLUSTER WARM-UP (progressive warmup sets), primary cluster work (singles/doubles), MYO REP finishers (accessories), THAW (conditioning circuits)
-  * Convert each to the ### A1. [Exercise Name] format with COMPLETE coaching details
-  * Include ALL fields: Sets, Reps, Load, Rest, RPE, Form, Energy, Adjustments, Notes
+  * Convert each to the ### A1. [Exercise Name] format with Sets, Reps, Load, Rest, Notes (coaching details in Notes field only)
   * Keep original block labels intact (A1-A4=PREP, B1-B5=warmup, C1/D1=main clusters, E1-E3=accessories, F1=THAW)
   * Calculate actual kg loads from percentages if specified (1RMs listed below)
+  * Put technique cues, intensity targets, and adjustments in the Notes field (NOT separate RPE/Form/Energy/Adjustments fields)
 
 {trainer_workouts}
 
@@ -374,36 +374,20 @@ Tue (post-squat/pre-press): Arms, shoulders, upper chest, back detail only. NO h
 Thu (post-press/pre-deadlift): Light legs, chest, delts only. NO heavy biceps/grip work
 Sat (post-deadlift): Upper body only. NO heavy lower back/leg compounds
 
-SUPPLEMENTAL DAY GENERATION (Tue/Thu/Sat):
-Generate supplemental exercises using ESSENTIAL FORMAT only:
-  * Include: Sets, Reps, Load, Rest, Notes (brief 1-2 sentences with key coaching points and load progression)
-  * OMIT: RPE, Form, Energy, Adjustments (to reduce token usage)
-  * Follow interference prevention rules above
-
 MANDATORY HARD RULES:
 • Equipment: No belt on pulls, standing calves only, no split squats
 • Biceps: Rotate grips (sup→neutral→pron), never same grip consecutive days, ≤12 sets/4days
 • Triceps: Vary attachments Tue/Fri/Sat, no single-arm D-handle Sat
-• Carries: Tuesday only, RPE 6-7 (preserve Friday grip)
+• Carries: Tuesday only, moderate load (preserve Friday grip)
 • Daily: McGill Big-3 warm-up, incline walking (10min@3.4mph/6%, 15min@3.5mph/6%)
 
-EXERCISE FORMAT:
-
-FORT WORKOUTS (Mon/Wed/Fri) - FULL DETAIL:
+EXERCISE FORMAT (ALL DAYS - SIMPLIFIED):
 ### A1. [Exercise Name]
 - [Sets] x [Reps] @ [Load] kg
 - **Rest:** [period]
-- **RPE:** [target]
-- **Form:** [cues]
-- **Energy:** [level]
-- **Adjustments:** [mods]
-- **Notes:** [coaching]
+- **Notes:** [Brief coaching cues, technique points, and progression context. 1-2 sentences max.]
 
-SUPPLEMENTAL WORKOUTS (Tue/Thu/Sat) - ESSENTIAL ONLY:
-### A1. [Exercise Name]
-- [Sets] x [Reps] @ [Load] kg
-- **Rest:** [period]
-- **Notes:** [brief coaching notes]
+IMPORTANT: Do NOT include RPE, Form, Energy, or Adjustments fields - all essential coaching info goes in Notes field only.
 
 NAMING RULES:
 • Bench: specify angle (e.g., "30° Incline DB Press")
