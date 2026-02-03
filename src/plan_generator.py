@@ -341,8 +341,33 @@ The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You M
 
 CORE PRINCIPLES:
 - Supplemental days (Tue/Thu/Sat) support Fort work - focus: arms, medial delts, upper chest, back detail
-- Progressive overload: +2.5-5kg if user exceeded reps, maintain if struggled, +2.5kg if exact
 - SWAP directives from logs are HARD constraints - replace as requested, don't progress
+
+PROGRESSIVE OVERLOAD RULES (CRITICAL):
+When the prior week's LOGGED field contains performance notes, those notes are ABSOLUTE TRUTH and override everything else.
+
+**HOW TO READ LOGGED NOTES:**
+- "felt heavy", "quite heavy", "struggled", "tough", "challenging", "failed" = USER STRUGGLED
+- "easy", "too light", "could do more", "had reps left" = USER EXCEEDED
+- No logged note OR neutral note (e.g., "4x12 @ 6.25kg") = HIT EXACTLY
+
+**PROGRESSION LOGIC:**
+1. **If user STRUGGLED** (logged "felt heavy", "tough", etc.):
+   - DO NOT increase load
+   - DO NOT increase reps
+   - MAINTAIN same load and reps OR reduce if user failed
+   - Example: If logged "8.25kg felt quite heavy for 12 reps" → keep 6.25kg for 12 reps (stay at working weight)
+
+2. **If user EXCEEDED** (logged "easy", "could do more", etc.):
+   - Increase reps by 1-2 within range OR increase load by one step (NOT both)
+   - Example: If logged "6.25kg felt easy for 12 reps" → try 13 reps @ 6.25kg OR 12 reps @ 8kg
+
+3. **If user HIT EXACTLY** (no struggle/easy notes):
+   - Increase load by one small step (DBs: next increment, cables: +1 plate)
+   - Keep reps same OR increase by 1 if at bottom of range
+   - Example: If logged "4x12 @ 6.25kg" (neutral) → try 12 reps @ 8kg
+
+**NEVER INCREASE BOTH REPS AND LOAD IN THE SAME WEEK** - this violates progressive overload principles
 
 FOR SUPPLEMENTAL DAYS - INTERFERENCE PREVENTION:
 Tue (post-squat/pre-press): Arms, shoulders, upper chest, back detail only. NO heavy legs/pressing
