@@ -291,13 +291,13 @@ def show():
 TRAINER WORKOUTS FROM TRAIN HEROIC:
 
 === {monday_header} ===
-{monday_workout}
+{monday_workout_clean}
 
 === {wednesday_header} ===
-{wednesday_workout}
+{wednesday_workout_clean}
 
 === {friday_header} ===
-{friday_workout}
+{friday_workout_clean}
 """
 
                 # Fixed preferences

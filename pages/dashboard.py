@@ -6,6 +6,7 @@ import streamlit as st
 from datetime import datetime, timedelta
 import os
 import glob
+import re
 from src.ui_utils import (
     render_page_header, 
     nav_button, 
@@ -116,8 +117,8 @@ def parse_plan_summary(plan_path):
         'sunday': 'Rest Day'
     }
 
-    # Count exercises
-    exercise_count = content.count('### A1.') + content.count('### B1.') + content.count('### C1.')
+    # Count all exercise headings like "### A1. Exercise Name"
+    exercise_count = len(re.findall(r'^###\s+[A-Z]\d+\.', content, flags=re.MULTILINE))
     summary['total_exercises'] = exercise_count
 
     return summary

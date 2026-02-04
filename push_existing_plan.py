@@ -7,7 +7,7 @@ Usage: python3 push_existing_plan.py <markdown_file>
 import sys
 import os
 import yaml
-from datetime import datetime
+from datetime import datetime, timedelta
 from src.sheets_writer import SheetsWriter
 
 def main():
@@ -25,7 +25,7 @@ def main():
 
     # Get current date for sheet name
     today = datetime.now()
-    monday = today - datetime.timedelta(days=today.weekday())
+    monday = today - timedelta(days=today.weekday())
     sheet_name = f"(Weekly Plan) {monday.strftime('%-m/%-d/%Y')}"
 
     print(f"\nPushing plan to sheet: {sheet_name}")
@@ -33,13 +33,14 @@ def main():
     # Initialize sheets writer
     writer = SheetsWriter(
         credentials_file=config['google_sheets']['credentials_file'],
-        spreadsheet_id=config['google_sheets']['spreadsheet_id']
+        spreadsheet_id=config['google_sheets']['spreadsheet_id'],
+        sheet_name=sheet_name
     )
 
     writer.authenticate()
 
     # Write to sheets
-    writer.write_plan_to_sheet(plan_content, sheet_name)
+    writer.write_workout_plan(plan_content)
 
     print(f"\n✅ Successfully wrote plan to Google Sheets!")
     print(f"Sheet: {sheet_name}")
