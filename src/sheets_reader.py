@@ -5,6 +5,7 @@ Google Sheets integration for reading workout history.
 import os
 import pickle
 import json
+import re
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -19,6 +20,7 @@ except ImportError:
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+RPE_VALUE_RE = re.compile(r"\brpe\s*[:=]?\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE)
 
 
 class SheetsReader:
@@ -581,6 +583,9 @@ class SheetsReader:
                     formatted += f" @ {ex['load']} kg"
                 if ex['log']:
                     formatted += f" | LOGGED: {ex['log']}"
+                    parsed_rpe = self._extract_rpe_from_text(ex['log'])
+                    if parsed_rpe is not None:
+                        formatted += f" | RPE_PARSED: {parsed_rpe:.1f}"
                 elif ex['notes']:
                     formatted += f" | {ex['notes']}"
                 formatted += "\n"
@@ -588,6 +593,20 @@ class SheetsReader:
             formatted += "\n"
 
         return formatted
+
+    def _extract_rpe_from_text(self, text):
+        """Parse explicit numeric RPE value from freeform log text."""
+        if not text:
+            return None
+
+        match = RPE_VALUE_RE.search(text)
+        if not match:
+            return None
+
+        value = float(match.group(1))
+        if 1.0 <= value <= 10.0:
+            return value
+        return None
 
     def write_workout_logs(self, workout_date, logs):
         """

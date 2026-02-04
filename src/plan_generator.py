@@ -376,6 +376,10 @@ When the prior week's LOGGED field contains performance notes, those notes are A
 - "felt heavy", "quite heavy", "struggled", "tough", "challenging", "failed" = USER STRUGGLED
 - "easy", "too light", "could do more", "had reps left" = USER EXCEEDED
 - No logged note OR neutral note (e.g., "4x12 @ 6.25kg") = HIT EXACTLY
+- If present, use explicit `RPE x` (or `RPE_PARSED`) as quantitative signal:
+  - RPE >= 9.0 = at/near failure, hold or reduce next week
+  - RPE 7.5-8.5 = challenging but productive, progress conservatively
+  - RPE <= 7.0 = comfortable, can progress
 
 **PROGRESSION LOGIC:**
 1. **If user STRUGGLED** (logged "felt heavy", "tough", etc.):
@@ -394,6 +398,8 @@ When the prior week's LOGGED field contains performance notes, those notes are A
    - Example: If logged "4x12 @ 6.25kg" (neutral) → try 12 reps @ 8kg
 
 **NEVER INCREASE BOTH REPS AND LOAD IN THE SAME WEEK** - this violates progressive overload principles
+**When text cue and numeric RPE conflict, prioritize text cue first, then use RPE to size the adjustment.**
+Assume the canonical logging format is: `performance | RPE x | Notes: ...`.
 
 FOR SUPPLEMENTAL DAYS - INTERFERENCE PREVENTION:
 Tue (post-squat/pre-press): Arms, shoulders, upper chest, back detail only. NO heavy legs/pressing

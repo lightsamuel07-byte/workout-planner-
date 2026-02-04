@@ -468,6 +468,8 @@ def show():
         else:
             st.info("💡 Enter your workout data above, then click Save to store it in Google Sheets")
 
+        st.caption("Saved in Google Sheet Log column as: `performance | RPE x | Notes: ...`")
+
         # Add pulsing animation CSS for save button when unsaved changes
         if logs_count > 0 and not st.session_state.get('last_save_time'):
             st.markdown("""
