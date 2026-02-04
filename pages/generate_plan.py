@@ -336,23 +336,22 @@ def show():
                 friday_header = f"Friday ({friday_title})" if friday_title else "Friday"
 
 
-                trainer_workouts = {
-                    'monday': monday_workout,
-                    'wednesday': wednesday_workout,
-                    'friday': friday_workout
-                }
+                # Use cleaned Fort text for prompt efficiency while preserving key training sections.
+                monday_for_prompt = monday_workout_clean or monday_workout
+                wednesday_for_prompt = wednesday_workout_clean or wednesday_workout
+                friday_for_prompt = friday_workout_clean or friday_workout
 
                 formatted_workouts = f"""
 TRAINER WORKOUTS FROM TRAIN HEROIC:
 
 === {monday_header} ===
-{monday_workout}
+{monday_for_prompt}
 
 === {wednesday_header} ===
-{wednesday_workout}
+{wednesday_for_prompt}
 
 === {friday_header} ===
-{friday_workout}
+{friday_for_prompt}
 """
 
                 # Fixed preferences
