@@ -10,6 +10,24 @@ from src.analytics import WorkoutAnalytics
 from src.design_system import get_colors
 
 
+RPE_PATTERN = re.compile(r"\brpe\s*[:=]?\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE)
+
+
+def extract_rpe_value(*fields):
+    """Parse first valid RPE value from provided text fields."""
+    for field in fields:
+        text = (field or "").strip()
+        if not text:
+            continue
+        match = RPE_PATTERN.search(text)
+        if not match:
+            continue
+        value = float(match.group(1))
+        if 1.0 <= value <= 10.0:
+            return value
+    return None
+
+
 def show():
     """Render the exercise history page"""
 
@@ -123,6 +141,7 @@ def show():
             exercise_history = []
             for workout in filtered_data:
                 for exercise in workout.get('exercises', []):
+                    rpe_value = extract_rpe_value(exercise.get('log', ''), exercise.get('notes', ''))
                     if exercise.get('exercise', '').strip() == selected_exercise:
                         exercise_history.append({
                             'date': workout.get('date', ''),
@@ -130,7 +149,7 @@ def show():
                             'reps': exercise.get('reps', ''),
                             'load': exercise.get('load', ''),
                             'rest': exercise.get('rest', ''),
-                            'rpe': exercise.get('rpe', ''),
+                            'rpe': rpe_value,
                             'notes': exercise.get('notes', ''),
                             'log': exercise.get('log', '')
                         })
@@ -172,17 +191,10 @@ def show():
 
             with col3:
                 # Average RPE (if tracked)
-                rpe_values = [session['rpe'] for session in exercise_history if session.get('rpe')]
+                rpe_values = [session['rpe'] for session in exercise_history if session.get('rpe') is not None]
                 if rpe_values:
-                    try:
-                        rpe_nums = [float(re.search(r'(\d+)', rpe).group(1)) for rpe in rpe_values if re.search(r'(\d+)', rpe)]
-                        if rpe_nums:
-                            avg_rpe = sum(rpe_nums) / len(rpe_nums)
-                            st.metric("Avg RPE", f"{avg_rpe:.1f}/10")
-                        else:
-                            st.metric("Avg RPE", "N/A")
-                    except Exception:
-                        st.metric("Avg RPE", "N/A")
+                    avg_rpe = sum(rpe_values) / len(rpe_values)
+                    st.metric("Avg RPE", f"{avg_rpe:.1f}/10")
                 else:
                     st.metric("Avg RPE", "Not tracked")
 
@@ -233,8 +245,8 @@ def show():
                         st.write(f"Reps: {session['reps'] or 'N/A'}")
                         st.write(f"Load: {session['load'] or 'N/A'}")
                         st.write(f"Rest: {session['rest'] or 'N/A'}")
-                        if session['rpe']:
-                            st.write(f"RPE: {session['rpe']}")
+                        if session['rpe'] is not None:
+                            st.write(f"RPE: {session['rpe']:.1f}")
 
                     with col2:
                         st.markdown("**Logged Performance:**")

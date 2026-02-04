@@ -373,7 +373,15 @@ with st.sidebar:
     # Google Sheets link
     st.markdown("---")
     st.markdown("### 📊 Google Sheets")
-    sheets_url = "https://docs.google.com/spreadsheets/d/1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+    try:
+        import yaml
+        with open('config.yaml', 'r') as f:
+            config = yaml.safe_load(f)
+        spreadsheet_id = config.get('google_sheets', {}).get('spreadsheet_id', '')
+    except Exception:
+        spreadsheet_id = ""
+
+    sheets_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}" if spreadsheet_id else "https://docs.google.com/spreadsheets"
     st.markdown(f"[Open Workout Log]({sheets_url})")
 
 # Main content area - route to different pages

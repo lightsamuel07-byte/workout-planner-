@@ -38,8 +38,7 @@ def get_sheet_plans():
     try:
         reader = get_sheets_reader()
         sheets = reader.get_all_weekly_plan_sheets()
-        sheets.sort(reverse=True)
-        return sheets
+        return list(reversed(sheets))
     except Exception:
         return []
 
@@ -321,14 +320,19 @@ def show():
                 except Exception as e:
                     st.error(f"Error reading explanation file: {e}")
 
-            st.markdown("---")
+    st.markdown("---")
 
     # Action buttons
     col1, col2, col3 = st.columns(3)
 
+    try:
+        spreadsheet_id = get_sheets_reader().spreadsheet_id
+    except Exception:
+        spreadsheet_id = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+
     with col1:
         if st.button("📊 Open in Google Sheets", use_container_width=True):
-            sheets_url = "https://docs.google.com/spreadsheets/d/1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+            sheets_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
             st.markdown(f"[Open Google Sheets]({sheets_url})")
 
     with col2:

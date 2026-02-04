@@ -398,6 +398,21 @@ class SheetsReader:
             print("No prior weekly plan found.")
             return None
 
+        return self.read_supplemental_from_sheet(sheet_name)
+
+    def read_supplemental_from_sheet(self, sheet_name):
+        """
+        Read supplemental workouts (Tue/Thu/Sat) from a specific sheet.
+
+        Args:
+            sheet_name: Exact Google Sheet tab name
+
+        Returns:
+            Dictionary with Tuesday, Thursday, Saturday workout data
+        """
+        if not sheet_name:
+            return None
+
         if not self.service:
             raise RuntimeError("Not authenticated. Call authenticate() first.")
 
@@ -419,11 +434,11 @@ class SheetsReader:
             # Parse supplemental days (Tuesday, Thursday, Saturday)
             supplemental_data = self._parse_supplemental_workouts(values)
 
-            print(f"✓ Read prior week's supplemental workouts from {sheet_name}")
+            print(f"✓ Read supplemental workouts from {sheet_name}")
             return supplemental_data
 
         except HttpError as err:
-            print(f"Error reading prior week's plan: {err}")
+            print(f"Error reading supplemental workouts from {sheet_name}: {err}")
             return None
 
     def _parse_supplemental_workouts(self, values):

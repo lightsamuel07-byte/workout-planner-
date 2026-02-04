@@ -61,6 +61,9 @@ def get_latest_plan():
     if os.path.exists(archive_dir):
         md_files.extend(glob.glob(os.path.join(archive_dir, "workout_plan_*.md")))
 
+    # Exclude explanation companion files.
+    md_files = [f for f in md_files if not f.endswith("_explanation.md")]
+
     if not md_files:
         return None
 

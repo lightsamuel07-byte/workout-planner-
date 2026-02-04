@@ -219,16 +219,10 @@ def show():
             )
             reader.authenticate()
 
-            # Get all sheets from the spreadsheet
-            sheet_metadata = reader.service.spreadsheets().get(
-                spreadsheetId=config['google_sheets']['spreadsheet_id']
-            ).execute()
-
-            all_sheets = [sheet['properties']['title'] for sheet in sheet_metadata.get('sheets', [])]
-
-            # Filter to only weekly plan sheets (exclude individual day sheets and logs)
-            weekly_sheets = [s for s in all_sheets if s.startswith('(Weekly Plan)')]
-            weekly_sheets.sort(reverse=True)  # Most recent first
+            # Use normalized reader logic so both naming formats are supported:
+            # - "(Weekly Plan) M/D/YYYY"
+            # - "Weekly Plan (M/D/YYYY)"
+            weekly_sheets = list(reversed(reader.get_all_weekly_plan_sheets()))
 
             if weekly_sheets:
                 prior_week_sheet = st.selectbox(
@@ -384,7 +378,7 @@ USER PREFERENCES:
                             service_account_file=config.get('google_sheets', {}).get('service_account_file')
                         )
                         sheets_reader.authenticate()
-                        prior_supplemental = sheets_reader.read_prior_week_supplemental()
+                        prior_supplemental = sheets_reader.read_supplemental_from_sheet(sheet_to_read)
                         workout_history = sheets_reader.format_supplemental_for_ai(prior_supplemental)
 
                         st.info(f"✅ Loaded workout history from: **{sheet_to_read}**")
