@@ -10,6 +10,9 @@ import streamlit as st
 import yaml
 
 from src.ui_utils import action_button, empty_state, render_page_header
+from src.sheets_reader import SheetsReader
+from src.workout_db import WorkoutDB
+from scripts.import_google_sheets_history import import_one_sheet
 
 
 def get_db_path():
@@ -32,6 +35,65 @@ def _fetch_all(conn, query, params=()):
     return conn.execute(query, params).fetchall()
 
 
+def bootstrap_database_from_sheets(db_path):
+    """
+    Build local SQLite database by importing all weekly plan sheets.
+    Useful for fresh Streamlit Cloud instances.
+    """
+    with open("config.yaml", "r", encoding="utf-8") as f:
+        config = yaml.safe_load(f) or {}
+
+    google_cfg = config.get("google_sheets", {}) or {}
+    spreadsheet_id = google_cfg.get("spreadsheet_id")
+    credentials_file = google_cfg.get("credentials_file")
+    service_account_file = google_cfg.get("service_account_file") or None
+
+    if not spreadsheet_id:
+        raise ValueError("Missing google_sheets.spreadsheet_id in config.yaml")
+    if not credentials_file:
+        raise ValueError("Missing google_sheets.credentials_file in config.yaml")
+
+    reader = SheetsReader(
+        credentials_file=credentials_file,
+        spreadsheet_id=spreadsheet_id,
+        sheet_name=google_cfg.get("sheet_name", "Sheet1"),
+        service_account_file=service_account_file,
+    )
+    reader.authenticate()
+    sheet_names = reader.get_all_weekly_plan_sheets()
+    if not sheet_names:
+        raise RuntimeError("No weekly plan sheets found to import.")
+
+    db = WorkoutDB(db_path)
+    db.init_schema()
+    try:
+        total_sessions = 0
+        total_rows = 0
+        total_rpe_rows = 0
+        for sheet_name in sheet_names:
+            stats = import_one_sheet(
+                reader=reader,
+                db=db,
+                spreadsheet_id=spreadsheet_id,
+                sheet_name=sheet_name,
+                dry_run=False,
+            )
+            total_sessions += stats["sessions"]
+            total_rows += stats["rows"]
+            total_rpe_rows += stats["rows_with_rpe"]
+
+        summary = db.count_summary()
+        return {
+            "sheet_count": len(sheet_names),
+            "imported_sessions": total_sessions,
+            "imported_rows": total_rows,
+            "imported_rpe_rows": total_rpe_rows,
+            "db_summary": summary,
+        }
+    finally:
+        db.close()
+
+
 def show():
     """Render the database status page."""
     render_page_header("Database Status", "SQLite health and history coverage", "🗄️")
@@ -42,9 +104,26 @@ def show():
         empty_state(
             "🧱",
             "No Local Database Found",
-            "Run the importer to create the local workout database from Google Sheets."
+            "This cloud session has no local SQLite file yet."
+        )
+        st.info(
+            "Your online app runs in a separate environment from your laptop, "
+            "so local DB files are not automatically shared."
         )
         st.code(f"python3 scripts/import_google_sheets_history.py --db-path {db_path}")
+        if st.button("⚡ Build DB from Google Sheets now", type="primary", use_container_width=True):
+            with st.spinner("Importing weekly plan history from Google Sheets..."):
+                try:
+                    result = bootstrap_database_from_sheets(db_path)
+                    st.success(
+                        "DB created successfully from "
+                        f"{result['sheet_count']} sheet(s): "
+                        f"{result['db_summary']['sessions']} sessions, "
+                        f"{result['db_summary']['exercise_logs']} exercise logs."
+                    )
+                    st.rerun()
+                except Exception as exc:
+                    st.error(f"Could not build DB automatically: {exc}")
         action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
         return
 
