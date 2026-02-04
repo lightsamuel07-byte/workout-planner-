@@ -296,6 +296,7 @@ def show():
                 from src.plan_generator import PlanGenerator
                 from src.sheets_reader import SheetsReader
                 from src.sheets_writer import SheetsWriter
+                from src.generation_context import build_db_generation_context
                 import yaml
                 from dotenv import load_dotenv
 
@@ -365,6 +366,8 @@ USER PREFERENCES:
 
                 # Get workout history (optional)
                 workout_history = "No prior workout history available (new program)."
+                prior_supplemental = None
+                db_context = None
                 if not is_new_program:
                     try:
                         # Use user-selected sheet if available, otherwise fall back to config
@@ -380,7 +383,17 @@ USER PREFERENCES:
                         prior_supplemental = sheets_reader.read_supplemental_from_sheet(sheet_to_read)
                         workout_history = sheets_reader.format_supplemental_for_ai(prior_supplemental)
 
+                        db_path = (config.get('database', {}) or {}).get('path', 'data/workout_history.db')
+                        db_context = build_db_generation_context(
+                            db_path=db_path,
+                            prior_supplemental=prior_supplemental,
+                            max_exercises=10,
+                            logs_per_exercise=2,
+                        )
+
                         st.info(f"✅ Loaded workout history from: **{sheet_to_read}**")
+                        if db_context:
+                            st.caption("🗄️ Added compact long-term context from local DB.")
                     except Exception as e:
                         st.warning(f"Could not load prior week data: {e}")
 
@@ -404,6 +417,7 @@ USER PREFERENCES:
                     formatted_workouts,
                     preferences,
                     fort_week_constraints=fort_week_constraints,
+                    db_context=db_context,
                 )
 
                 if plan:

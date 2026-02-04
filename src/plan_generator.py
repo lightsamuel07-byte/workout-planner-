@@ -63,7 +63,14 @@ class PlanGenerator:
 
         return formatted
 
-    def generate_plan(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
+    def generate_plan(
+        self,
+        workout_history,
+        trainer_workouts,
+        preferences,
+        fort_week_constraints=None,
+        db_context=None
+    ):
         """
         Generate a weekly workout plan using Claude AI.
 
@@ -78,7 +85,13 @@ class PlanGenerator:
         print("\n🤖 Generating your personalized workout plan with Claude AI...")
 
         # Construct the prompt
-        prompt = self._build_prompt(workout_history, trainer_workouts, preferences, fort_week_constraints=fort_week_constraints)
+        prompt = self._build_prompt(
+            workout_history,
+            trainer_workouts,
+            preferences,
+            fort_week_constraints=fort_week_constraints,
+            db_context=db_context
+        )
 
         try:
             # Call Claude API
@@ -290,7 +303,14 @@ PREAMBLE:
 
         return "\n".join(f"• {b}" for b in bullets[:15])  # Cap at 15 bullets
 
-    def _build_prompt(self, workout_history, trainer_workouts, preferences, fort_week_constraints=None):
+    def _build_prompt(
+        self,
+        workout_history,
+        trainer_workouts,
+        preferences,
+        fort_week_constraints=None,
+        db_context=None
+    ):
         """
         Build the AI prompt for plan generation using compressed format.
 
@@ -309,6 +329,10 @@ PREAMBLE:
         if fort_week_constraints:
             fort_constraints_block = f"\nFORT WEEK CONSTRAINTS:\n{fort_week_constraints}\n"
 
+        db_context_block = ""
+        if db_context:
+            db_context_block = f"\n{db_context}\n\n---\n"
+
         prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
 
 CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
@@ -322,6 +346,8 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 {workout_history}
 
 ---
+
+{db_context_block}
 
 FORT WORKOUT CONVERSION (CRITICAL):
 The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the exercise format:
