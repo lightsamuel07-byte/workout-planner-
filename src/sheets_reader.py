@@ -4,6 +4,7 @@ Google Sheets integration for reading workout history.
 
 import os
 import pickle
+import json
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -23,7 +24,13 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 class SheetsReader:
     """Handles reading workout history from Google Sheets."""
 
-    def __init__(self, credentials_file, spreadsheet_id, sheet_name="Sheet1"):
+    def __init__(
+        self,
+        credentials_file,
+        spreadsheet_id,
+        sheet_name="Sheet1",
+        service_account_file=None
+    ):
         """
         Initialize the Sheets reader.
 
@@ -31,10 +38,12 @@ class SheetsReader:
             credentials_file: Path to the Google API credentials JSON file
             spreadsheet_id: The ID of the Google Sheets spreadsheet
             sheet_name: Name of the sheet tab to read from
+            service_account_file: Optional path to service account JSON for headless auth
         """
         self.credentials_file = credentials_file
         self.spreadsheet_id = spreadsheet_id
         self.sheet_name = sheet_name
+        self.service_account_file = service_account_file
         self.service = None
 
     def authenticate(self):
@@ -50,6 +59,8 @@ class SheetsReader:
             except (AttributeError, KeyError):
                 pass  # Secrets not available, use local credentials
 
+        service_account_file = self._service_account_file_to_use()
+
         if use_service_account:
             # Use service account (Streamlit Cloud)
             from google.oauth2 import service_account
@@ -60,6 +71,14 @@ class SheetsReader:
                 scopes=SCOPES
             )
             print("✓ Authenticated with service account")
+        elif service_account_file:
+            # Use service account file (local/headless)
+            creds = self._load_service_account_file(service_account_file)
+            print("✓ Authenticated with service account file")
+        elif os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'):
+            # Use service account JSON from environment variable
+            creds = self._load_service_account_env_json(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'))
+            print("✓ Authenticated with service account JSON from environment")
         else:
             # Use local credentials.json file
             # The file token.json stores the user's access and refresh tokens
@@ -87,6 +106,67 @@ class SheetsReader:
 
         self.service = build('sheets', 'v4', credentials=creds)
         print("✓ Successfully authenticated with Google Sheets")
+
+    def _service_account_file_to_use(self):
+        """
+        Resolve which service account file (if any) should be used.
+        Priority:
+        1) Explicit constructor arg
+        2) GOOGLE_SERVICE_ACCOUNT_FILE env var
+        3) credentials_file, if it is a service account JSON
+        """
+        if self.service_account_file:
+            return self.service_account_file
+
+        env_service_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE')
+        if env_service_file:
+            return env_service_file
+
+        if self._is_service_account_json_file(self.credentials_file):
+            return self.credentials_file
+
+        return None
+
+    def _is_service_account_json_file(self, path):
+        """Check if path is a service account credentials file."""
+        if not path or not os.path.exists(path):
+            return False
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                payload = json.load(f)
+            return payload.get('type') == 'service_account'
+        except (OSError, json.JSONDecodeError):
+            return False
+
+    def _load_service_account_file(self, path):
+        """Load service account credentials from a JSON file."""
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Service account file not found: {path}")
+
+        from google.oauth2 import service_account
+
+        return service_account.Credentials.from_service_account_file(
+            path,
+            scopes=SCOPES
+        )
+
+    def _load_service_account_env_json(self, json_str):
+        """Load service account credentials from an env JSON string."""
+        try:
+            payload = json.loads(json_str)
+        except json.JSONDecodeError as exc:
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON") from exc
+
+        if payload.get('type') != 'service_account':
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON must be a service account payload")
+
+        from google.oauth2 import service_account
+
+        return service_account.Credentials.from_service_account_info(
+            payload,
+            scopes=SCOPES
+        )
 
     def read_workout_history(self, num_recent_workouts=7, use_cache=True):
         """

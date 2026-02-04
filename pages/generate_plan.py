@@ -214,7 +214,8 @@ def show():
             reader = SheetsReader(
                 spreadsheet_id=config['google_sheets']['spreadsheet_id'],
                 sheet_name=config['google_sheets']['sheet_name'],  # temp, will change
-                credentials_file=config['google_sheets']['credentials_file']
+                credentials_file=config['google_sheets']['credentials_file'],
+                service_account_file=config.get('google_sheets', {}).get('service_account_file')
             )
             reader.authenticate()
 
@@ -379,7 +380,8 @@ USER PREFERENCES:
                         sheets_reader = SheetsReader(
                             credentials_file=config['google_sheets']['credentials_file'],
                             spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-                            sheet_name=sheet_to_read
+                            sheet_name=sheet_to_read,
+                            service_account_file=config.get('google_sheets', {}).get('service_account_file')
                         )
                         sheets_reader.authenticate()
                         prior_supplemental = sheets_reader.read_prior_week_supplemental()
@@ -443,7 +445,8 @@ USER PREFERENCES:
                     sheets_writer = SheetsWriter(
                         credentials_file=config['google_sheets']['credentials_file'],
                         spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-                        sheet_name=sheet_name
+                        sheet_name=sheet_name,
+                        service_account_file=config.get('google_sheets', {}).get('service_account_file')
                     )
                     sheets_writer.authenticate()
 

@@ -32,7 +32,8 @@ def test_sheets_connection():
         reader = SheetsReader(
             credentials_file=config['google_sheets']['credentials_file'],
             spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-            sheet_name=config['google_sheets']['sheet_name']
+            sheet_name=config['google_sheets']['sheet_name'],
+            service_account_file=config.get('google_sheets', {}).get('service_account_file')
         )
         print(f"\n✓ SheetsReader initialized")
     except Exception as e:

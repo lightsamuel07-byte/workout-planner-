@@ -66,6 +66,30 @@ python test_setup.py
 
 Should show: "✓ ALL CHECKS PASSED!"
 
+### Import Google Sheets History to SQLite (New)
+
+If you want a true local workout database (for future RPE-aware progression), run:
+
+```bash
+python scripts/import_google_sheets_history.py --db-path data/workout_history.db
+```
+
+Default DB location is controlled by:
+
+```yaml
+database:
+  path: "data/workout_history.db"
+```
+
+For headless/server imports, add a service account JSON path in `config.yaml`:
+
+```yaml
+google_sheets:
+  service_account_file: "service_account.json"
+```
+
+Then share your Google Sheet with that service account email.
+
 ### Generate Your First Plan
 
 ```bash

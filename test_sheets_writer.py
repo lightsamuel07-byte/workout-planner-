@@ -48,7 +48,8 @@ print(f"Will write to sheet: {sheet_name}")
 sheets_writer = SheetsWriter(
     credentials_file=config['google_sheets']['credentials_file'],
     spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-    sheet_name=sheet_name
+    sheet_name=sheet_name,
+    service_account_file=config.get('google_sheets', {}).get('service_account_file')
 )
 
 # Authenticate and write

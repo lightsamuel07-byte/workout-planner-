@@ -53,7 +53,8 @@ def get_authenticated_reader():
 
     reader = SheetsReader(
         credentials_file=config['google_sheets']['credentials_file'],
-        spreadsheet_id=config['google_sheets']['spreadsheet_id']
+        spreadsheet_id=config['google_sheets']['spreadsheet_id'],
+        service_account_file=config.get('google_sheets', {}).get('service_account_file')
     )
     reader.authenticate()
     return reader

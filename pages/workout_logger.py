@@ -5,6 +5,8 @@ Workout Logger page - Log today's workout in real-time
 import streamlit as st
 from datetime import datetime
 import html
+import re
+import yaml
 from src.ui_utils import (
     render_page_header, 
     get_authenticated_reader, 
@@ -13,6 +15,80 @@ from src.ui_utils import (
     progress_bar
 )
 from src.design_system import get_colors
+from src.workout_sync import sync_workout_logs_to_db
+
+
+RPE_VALUE_RE = re.compile(r"\brpe\s*[:=]?\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE)
+RPE_OPTIONS = [""] + [f"{step / 2:.1f}".rstrip("0").rstrip(".") for step in range(2, 21)]  # 1 -> 10
+
+
+def _format_rpe_value(value):
+    return f"{float(value):.1f}".rstrip("0").rstrip(".")
+
+
+def parse_existing_log_fields(log_text):
+    """Split existing freeform log text into performance, RPE, and notes fields."""
+    text = (log_text or "").strip()
+    if not text:
+        return "", "", ""
+
+    parts = [p.strip() for p in text.split("|") if p.strip()]
+    if not parts:
+        return text, "", ""
+
+    performance_parts = []
+    notes_parts = []
+    rpe_value = ""
+
+    for part in parts:
+        lower_part = part.lower()
+
+        rpe_match = RPE_VALUE_RE.search(part)
+        if rpe_match:
+            numeric = float(rpe_match.group(1))
+            if 1.0 <= numeric <= 10.0:
+                rpe_value = _format_rpe_value(numeric)
+                continue
+
+        if lower_part.startswith("note:") or lower_part.startswith("notes:"):
+            notes_parts.append(part.split(":", 1)[1].strip())
+        else:
+            performance_parts.append(part)
+
+    performance = " | ".join(performance_parts).strip()
+    notes = " | ".join([n for n in notes_parts if n]).strip()
+
+    if not performance and not notes and not rpe_value:
+        performance = text
+
+    return performance, rpe_value, notes
+
+
+def build_log_entry(performance, rpe, notes):
+    """Compose consistent log output for Google Sheets."""
+    segments = []
+    performance = (performance or "").strip()
+    rpe = (rpe or "").strip()
+    notes = (notes or "").strip()
+
+    if performance:
+        segments.append(performance)
+    if rpe:
+        segments.append(f"RPE {_format_rpe_value(rpe)}")
+    if notes:
+        segments.append(f"Notes: {notes}")
+
+    return " | ".join(segments)
+
+
+def get_database_path():
+    """Read DB path from config, with sane default."""
+    try:
+        with open("config.yaml", "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f) or {}
+        return (config.get("database", {}) or {}).get("path") or "data/workout_history.db"
+    except (OSError, yaml.YAMLError):
+        return "data/workout_history.db"
 
 
 def show():
@@ -106,7 +182,13 @@ def show():
         # Progress display with bar
         logged_count = sum(1 for ex in exercises if ex.get('log', '').strip())
         if logged_count > 0 or 'workout_logs' in st.session_state:
-            session_logged = sum(1 for idx in range(len(exercises)) if st.session_state.get('workout_logs', {}).get(f"log_{idx}", ""))
+            session_logged = 0
+            for idx in range(len(exercises)):
+                performance = st.session_state.get('workout_logs', {}).get(f"log_{idx}", "").strip()
+                rpe_value = st.session_state.get('workout_rpe', {}).get(f"rpe_{idx}", "").strip()
+                note_value = st.session_state.get('workout_notes', {}).get(f"note_{idx}", "").strip()
+                if performance or rpe_value or note_value:
+                    session_logged += 1
             total_logged = max(logged_count, session_logged)
             completion_percentage = (total_logged / len(exercises) * 100) if len(exercises) > 0 else 0
             colors = get_colors()
@@ -150,6 +232,10 @@ def show():
         # Initialize session state for logging
         if 'workout_logs' not in st.session_state:
             st.session_state.workout_logs = {}
+        if 'workout_rpe' not in st.session_state:
+            st.session_state.workout_rpe = {}
+        if 'workout_notes' not in st.session_state:
+            st.session_state.workout_notes = {}
         if 'last_save_time' not in st.session_state:
             st.session_state.last_save_time = None
 
@@ -213,15 +299,31 @@ def show():
                     with col2:
                         # Logging input
                         log_key = f"log_{idx}"
+                        rpe_key = f"rpe_{idx}"
+                        note_key = f"note_{idx}"
+                        edit_key = f"edit_mode_{idx}"
 
-                        # Show existing log if present
-                        if existing_log:
+                        # Show existing log if present (unless manually editing)
+                        if existing_log and not st.session_state.get(edit_key):
                             st.markdown(f"<div style='background-color: #d4edda; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;'><span style='color: #155724; font-size: 0.9rem;'>✅ Logged: {html.escape(existing_log)}</span></div>", unsafe_allow_html=True)
-                            
-                            # Quick action to clear this log
+
+                            parsed_perf, parsed_rpe, parsed_note = parse_existing_log_fields(existing_log)
+                            parsed_parts = []
+                            if parsed_rpe:
+                                parsed_parts.append(f"RPE {parsed_rpe}")
+                            if parsed_note:
+                                parsed_parts.append("Has notes")
+                            if parsed_parts:
+                                st.caption(" • ".join(parsed_parts))
+
+                            # Enter edit mode
                             if st.button("✏️ Edit", key=f"edit_{idx}", use_container_width=True):
-                                if log_key in st.session_state.workout_logs:
-                                    del st.session_state.workout_logs[log_key]
+                                st.session_state.workout_logs[log_key] = parsed_perf
+                                if parsed_rpe:
+                                    st.session_state.workout_rpe[rpe_key] = parsed_rpe
+                                if parsed_note:
+                                    st.session_state.workout_notes[note_key] = parsed_note
+                                st.session_state[edit_key] = True
                                 st.rerun()
                         else:
                             # Detect exercise type for smart placeholder
@@ -240,20 +342,32 @@ def show():
                             with qcol1:
                                 if st.button("✓ Done", key=f"done_{idx}", use_container_width=True, help="Mark as completed as prescribed"):
                                     st.session_state.workout_logs[log_key] = "Done"
+                                    st.session_state[f"input_{log_key}"] = "Done"
                                     st.rerun()
                             with qcol2:
                                 if st.button("⊗ Skip", key=f"skip_{idx}", use_container_width=True, help="Mark as skipped"):
                                     st.session_state.workout_logs[log_key] = "Skipped"
+                                    st.session_state[f"input_{log_key}"] = "Skipped"
                                     st.rerun()
-                            
-                            # Show previous log if available from saved data
-                            if existing_log and not st.session_state.workout_logs.get(log_key):
-                                st.caption(f"💭 Last time: {existing_log[:50]}")
-                            
-                            # Input for new log
+
+                            # Hydrate defaults once when editing existing logs
+                            if existing_log and st.session_state.get(edit_key):
+                                has_local_values = (
+                                    log_key in st.session_state.workout_logs
+                                    or rpe_key in st.session_state.workout_rpe
+                                    or note_key in st.session_state.workout_notes
+                                )
+                                if not has_local_values:
+                                    parsed_perf, parsed_rpe, parsed_note = parse_existing_log_fields(existing_log)
+                                    st.session_state.workout_logs[log_key] = parsed_perf
+                                    if parsed_rpe:
+                                        st.session_state.workout_rpe[rpe_key] = parsed_rpe
+                                    if parsed_note:
+                                        st.session_state.workout_notes[note_key] = parsed_note
+
                             default_value = st.session_state.workout_logs.get(log_key, "")
                             log_input = st.text_input(
-                                "Log performance",
+                                "Performance",
                                 value=default_value,
                                 placeholder=placeholder,
                                 key=f"input_{log_key}",
@@ -261,9 +375,41 @@ def show():
                                 label_visibility="collapsed"
                             )
 
-                            # Store in session state
-                            if log_input:
-                                st.session_state.workout_logs[log_key] = log_input
+                            current_rpe = st.session_state.workout_rpe.get(rpe_key, "")
+                            if current_rpe not in RPE_OPTIONS:
+                                current_rpe = ""
+                            rpe_input = st.selectbox(
+                                "RPE (Optional)",
+                                options=RPE_OPTIONS,
+                                index=RPE_OPTIONS.index(current_rpe),
+                                key=f"input_{rpe_key}",
+                                help="RPE scale 1-10 (0.5 increments)",
+                                label_visibility="collapsed"
+                            )
+
+                            note_default = st.session_state.workout_notes.get(note_key, "")
+                            note_input = st.text_input(
+                                "Notes (Optional)",
+                                value=note_default,
+                                placeholder="Optional notes (pain, form, fatigue, etc.)",
+                                key=f"input_{note_key}",
+                                label_visibility="collapsed"
+                            )
+
+                            if log_input.strip():
+                                st.session_state.workout_logs[log_key] = log_input.strip()
+                            else:
+                                st.session_state.workout_logs.pop(log_key, None)
+
+                            if rpe_input:
+                                st.session_state.workout_rpe[rpe_key] = rpe_input
+                            else:
+                                st.session_state.workout_rpe.pop(rpe_key, None)
+
+                            if note_input.strip():
+                                st.session_state.workout_notes[note_key] = note_input.strip()
+                            else:
+                                st.session_state.workout_notes.pop(note_key, None)
 
                 st.markdown("<br>", unsafe_allow_html=True)
 
@@ -295,7 +441,13 @@ def show():
         """, unsafe_allow_html=True)
 
         # Count how many exercises have logs
-        logs_count = sum(1 for idx in range(len(exercises)) if st.session_state.workout_logs.get(f"log_{idx}", ""))
+        logs_count = 0
+        for idx in range(len(exercises)):
+            performance = st.session_state.workout_logs.get(f"log_{idx}", "").strip()
+            rpe_value = st.session_state.workout_rpe.get(f"rpe_{idx}", "").strip()
+            note_value = st.session_state.workout_notes.get(f"note_{idx}", "").strip()
+            if performance or rpe_value or note_value:
+                logs_count += 1
         
         colors = get_colors()
 
@@ -339,19 +491,39 @@ def show():
 
         with col2:
             save_button_key = "save_workout_main"
-            save_button_label = "💾 Save to Google Sheets" if logs_count == 0 else f"💾 Save {logs_count} Exercise{'s' if logs_count != 1 else ''}"
+            save_button_label = "💾 Save (Sheets + DB)" if logs_count == 0 else f"💾 Save {logs_count} Exercise{'s' if logs_count != 1 else ''} (Sheets + DB)"
             if st.button(save_button_label, type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet", key=save_button_key):
                 # Prepare log data to write back to sheets
                 logs_to_save = []
+                db_entries = []
 
                 for idx, ex in enumerate(exercises):
                     log_key = f"log_{idx}"
-                    log_value = st.session_state.workout_logs.get(log_key, "")
+                    rpe_key = f"rpe_{idx}"
+                    note_key = f"note_{idx}"
+                    performance_value = st.session_state.workout_logs.get(log_key, "")
+                    rpe_value = st.session_state.workout_rpe.get(rpe_key, "")
+                    note_value = st.session_state.workout_notes.get(note_key, "")
+                    log_value = build_log_entry(performance_value, rpe_value, note_value)
 
                     logs_to_save.append({
                         'exercise': ex.get('exercise', ''),
                         'log': log_value
                     })
+                    if log_value.strip():
+                        db_entries.append({
+                            "source_row": idx + 1,
+                            "exercise_name": ex.get('exercise', ''),
+                            "block": ex.get('block', ''),
+                            "prescribed_sets": ex.get('sets', ''),
+                            "prescribed_reps": ex.get('reps', ''),
+                            "prescribed_load": ex.get('load', ''),
+                            "prescribed_rest": ex.get('rest', ''),
+                            "prescribed_notes": ex.get('notes', ''),
+                            "log_text": log_value,
+                            "explicit_rpe": rpe_value,
+                            "parsed_notes": note_value,
+                        })
 
                 # Write logs to Google Sheets
                 try:
@@ -359,10 +531,28 @@ def show():
                         success = reader.write_workout_logs(todays_workout.get('date', ''), logs_to_save)
 
                     if success:
+                        db_error = None
+                        db_path = get_database_path()
+                        try:
+                            sync_workout_logs_to_db(
+                                db_path=db_path,
+                                sheet_name=current_sheet,
+                                day_label=todays_workout.get('date', ''),
+                                fallback_day_name=day_name,
+                                fallback_date_iso=today.date().isoformat(),
+                                entries=db_entries,
+                            )
+                        except Exception as sync_err:
+                            db_error = sync_err
+
                         # Store save time
                         st.session_state.last_save_time = datetime.now().strftime("%I:%M %p")
 
                         st.success(f"✅ Saved {logs_count} exercise log{'s' if logs_count != 1 else ''} to Google Sheets!")
+                        if db_error:
+                            st.warning(f"⚠️ Saved to Sheets, but DB sync failed: {db_error}")
+                        else:
+                            st.caption(f"🗄️ Synced to local DB: `{db_path}`")
                         st.balloons()
 
                         # Don't clear session state or redirect - let user stay on page
@@ -410,6 +600,8 @@ def show():
                 with ccol1:
                     if st.button("Yes, Clear", type="primary", use_container_width=True, key="confirm_clear_yes"):
                         st.session_state.workout_logs = {}
+                        st.session_state.workout_rpe = {}
+                        st.session_state.workout_notes = {}
                         if 'last_save_time' in st.session_state:
                             del st.session_state.last_save_time
                         st.session_state.confirm_clear = False

@@ -7,6 +7,7 @@ google_sheets:
   spreadsheet_id: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
   sheet_name: "(Weekly Plan) 1/18/2026"  # Most recent sheet for reading history
   credentials_file: "credentials.json"
+  service_account_file: ""  # Optional: path to service-account JSON for headless/server imports
 
 # Claude API Configuration
 claude:
@@ -19,6 +20,9 @@ claude:
 output:
   folder: "output"
   format: "markdown"  # Options: markdown, text, json
+
+database:
+  path: "data/workout_history.db"
 
 # ============================================================================
 # ATHLETE PROFILE

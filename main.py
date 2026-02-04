@@ -74,7 +74,8 @@ def main():
     sheets_reader = SheetsReader(
         credentials_file=config['google_sheets']['credentials_file'],
         spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-        sheet_name=config['google_sheets']['sheet_name']
+        sheet_name=config['google_sheets']['sheet_name'],
+        service_account_file=config.get('google_sheets', {}).get('service_account_file')
     )
 
     # Calculate next Monday for the sheet name (the upcoming week)
@@ -90,7 +91,8 @@ def main():
     sheets_writer = SheetsWriter(
         credentials_file=config['google_sheets']['credentials_file'],
         spreadsheet_id=config['google_sheets']['spreadsheet_id'],
-        sheet_name=sheet_name
+        sheet_name=sheet_name,
+        service_account_file=config.get('google_sheets', {}).get('service_account_file')
     )
 
     input_handler = InputHandler()

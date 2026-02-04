@@ -6,6 +6,7 @@ from googleapiclient.discovery import build
 from google.oauth2.credentials import Credentials
 import os
 import re
+import json
 from datetime import datetime
 
 try:
@@ -20,7 +21,13 @@ SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 class SheetsWriter:
     """Handles writing workout plans to Google Sheets."""
 
-    def __init__(self, credentials_file, spreadsheet_id, sheet_name='Weekly Plan'):
+    def __init__(
+        self,
+        credentials_file,
+        spreadsheet_id,
+        sheet_name='Weekly Plan',
+        service_account_file=None
+    ):
         """
         Initialize the SheetsWriter.
 
@@ -28,10 +35,12 @@ class SheetsWriter:
             credentials_file: Path to Google credentials JSON
             spreadsheet_id: ID of the Google Sheets spreadsheet
             sheet_name: Name of the sheet to write to (default: 'Weekly Plan')
+            service_account_file: Optional path to service account JSON for headless auth
         """
         self.credentials_file = credentials_file
         self.spreadsheet_id = spreadsheet_id
         self.sheet_name = sheet_name
+        self.service_account_file = service_account_file
         self.service = None
 
     def authenticate(self):
@@ -50,6 +59,8 @@ class SheetsWriter:
             except (AttributeError, KeyError):
                 pass
 
+        service_account_file = self._service_account_file_to_use()
+
         if use_service_account:
             # Use service account (Streamlit Cloud)
             from google.oauth2 import service_account
@@ -59,6 +70,10 @@ class SheetsWriter:
                 credentials_dict,
                 scopes=SCOPES
             )
+        elif service_account_file:
+            creds = self._load_service_account_file(service_account_file)
+        elif os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'):
+            creds = self._load_service_account_env_json(os.getenv('GOOGLE_SERVICE_ACCOUNT_JSON'))
         else:
             # Use local token.json
             if not os.path.exists('token.json'):
@@ -66,6 +81,67 @@ class SheetsWriter:
             creds = Credentials.from_authorized_user_file('token.json', SCOPES)
 
         self.service = build('sheets', 'v4', credentials=creds)
+
+    def _service_account_file_to_use(self):
+        """
+        Resolve which service account file (if any) should be used.
+        Priority:
+        1) Explicit constructor arg
+        2) GOOGLE_SERVICE_ACCOUNT_FILE env var
+        3) credentials_file, if it is a service account JSON
+        """
+        if self.service_account_file:
+            return self.service_account_file
+
+        env_service_file = os.getenv('GOOGLE_SERVICE_ACCOUNT_FILE')
+        if env_service_file:
+            return env_service_file
+
+        if self._is_service_account_json_file(self.credentials_file):
+            return self.credentials_file
+
+        return None
+
+    def _is_service_account_json_file(self, path):
+        """Check if path is a service account credentials file."""
+        if not path or not os.path.exists(path):
+            return False
+
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                payload = json.load(f)
+            return payload.get('type') == 'service_account'
+        except (OSError, json.JSONDecodeError):
+            return False
+
+    def _load_service_account_file(self, path):
+        """Load service account credentials from a JSON file."""
+        if not os.path.exists(path):
+            raise FileNotFoundError(f"Service account file not found: {path}")
+
+        from google.oauth2 import service_account
+
+        return service_account.Credentials.from_service_account_file(
+            path,
+            scopes=SCOPES
+        )
+
+    def _load_service_account_env_json(self, json_str):
+        """Load service account credentials from an env JSON string."""
+        try:
+            payload = json.loads(json_str)
+        except json.JSONDecodeError as exc:
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON") from exc
+
+        if payload.get('type') != 'service_account':
+            raise ValueError("GOOGLE_SERVICE_ACCOUNT_JSON must be a service account payload")
+
+        from google.oauth2 import service_account
+
+        return service_account.Credentials.from_service_account_info(
+            payload,
+            scopes=SCOPES
+        )
 
     def write_workout_plan(self, plan_text):
         """

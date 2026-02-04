@@ -4,6 +4,7 @@
 # Google credentials
 credentials.json
 token.json
+service_account*.json
 
 # Streamlit secrets (local only)
 .streamlit/secrets.toml
@@ -21,6 +22,11 @@ ENV/
 # Output files
 output/*.md
 output/archive/
+
+# Local database
+data/*.db
+data/*.db-shm
+data/*.db-wal
 
 # IDE
 .vscode/

@@ -26,6 +26,7 @@ try:
     weekly_review = importlib.import_module('pages.weekly_review')
     exercise_history = importlib.import_module('pages.exercise_history')
     workout_logger = importlib.import_module('pages.workout_logger')
+    database_status = importlib.import_module('pages.database_status')
 
     # Reload modules to pick up code changes (fixes Streamlit Cloud caching)
     importlib.reload(dashboard)
@@ -35,6 +36,7 @@ try:
     importlib.reload(weekly_review)
     importlib.reload(exercise_history)
     importlib.reload(workout_logger)
+    importlib.reload(database_status)
 except ImportError as e:
     st.error(f"Critical error loading pages: {e}")
     st.code(f"Python path: {sys.path}")
@@ -270,6 +272,11 @@ with st.sidebar:
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
+    if st.button("🗄️ DB Status", use_container_width=True, key="nav_database_status",
+                 type="primary" if st.session_state.current_page == 'database_status' else "secondary"):
+        st.session_state.current_page = 'database_status'
+        st.rerun()
+
     st.markdown("---")
     
     # SETTINGS section
@@ -384,3 +391,5 @@ elif st.session_state.current_page == 'exercise_history':
     exercise_history.show()
 elif st.session_state.current_page == 'log_workout':
     workout_logger.show()
+elif st.session_state.current_page == 'database_status':
+    database_status.show()
