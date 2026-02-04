@@ -6,7 +6,7 @@ import streamlit as st
 import os
 import glob
 import re
-from src.ui_utils import render_page_header, action_button, empty_state
+from src.ui_utils import render_page_header, action_button, empty_state, get_authenticated_reader
 from src.design_system import get_colors
 
 def get_all_plans():
@@ -25,6 +25,30 @@ def get_all_plans():
 
     md_files.sort(reverse=True)
     return md_files
+
+
+@st.cache_resource
+def get_sheets_reader():
+    """Get cached authenticated SheetsReader for plan fallback."""
+    return get_authenticated_reader()
+
+
+def get_sheet_plans():
+    """Return weekly plan sheet names (newest first)."""
+    try:
+        reader = get_sheets_reader()
+        sheets = reader.get_all_weekly_plan_sheets()
+        sheets.sort(reverse=True)
+        return sheets
+    except Exception:
+        return []
+
+
+def read_sheet_plan(sheet_name):
+    """Read one weekly plan from Google Sheets."""
+    reader = get_sheets_reader()
+    reader.sheet_name = sheet_name
+    return reader.read_workout_history(num_recent_workouts=20)
 
 def parse_plan_content(plan_path):
     """Parse plan file into structured sections"""
@@ -106,94 +130,130 @@ def show():
 
     render_page_header("Workout Plans", "View your generated workout plans", "📋")
 
-    # Get all plans
     plans = get_all_plans()
+    selected_plan_path = None
+    selected_sheet_name = None
+    selected_day = None
+    day_content = ""
+    exercises = []
+    data_source = "local"
 
-    if not plans:
-        empty_state(
-            "📋",
-            "No Plans Yet",
-            "Create your first workout plan to start tracking!"
+    if plans:
+        # Local markdown plan selector
+        st.markdown("### 📁 Select a Plan")
+        plan_options = []
+        for plan_path in plans:
+            filename = os.path.basename(plan_path)
+            archived_match = re.search(r'workout_plan_(\d{8})__archived_(\d{8})_(\d{6})', filename)
+            canonical_week_match = re.search(r'workout_plan_(\d{8})\.md$', filename)
+            timestamp_match = re.search(r'workout_plan_(\d{8})_(\d{6})', filename)
+
+            if archived_match:
+                week_str = archived_match.group(1)
+                arch_date = archived_match.group(2)
+                arch_time = archived_match.group(3)
+                formatted_week = f"{week_str[:4]}-{week_str[4:6]}-{week_str[6:8]}"
+                formatted_archived = f"{arch_date[:4]}-{arch_date[4:6]}-{arch_date[6:8]} {arch_time[:2]}:{arch_time[2:4]}"
+                plan_options.append((f"{formatted_week} (archived {formatted_archived})", plan_path))
+            elif canonical_week_match:
+                week_str = canonical_week_match.group(1)
+                formatted_week = f"{week_str[:4]}-{week_str[4:6]}-{week_str[6:8]}"
+                plan_options.append((f"{formatted_week} (current)", plan_path))
+            elif timestamp_match:
+                date_str = timestamp_match.group(1)
+                time_str = timestamp_match.group(2)
+                formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]} {time_str[:2]}:{time_str[2:4]}"
+                plan_options.append((formatted_date, plan_path))
+            else:
+                plan_options.append((filename, plan_path))
+
+        selected_plan_display = st.selectbox(
+            "Choose a plan to view",
+            options=range(len(plan_options)),
+            format_func=lambda i: plan_options[i][0],
+            key="local_plan_selector"
         )
-        action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
-        return
+        selected_plan_path = plan_options[selected_plan_display][1]
 
-    # Plan selector
-    st.markdown("### 📁 Select a Plan")
+        st.markdown("---")
+        days = parse_plan_content(selected_plan_path)
+        if not days:
+            st.error("⚠️ Unable to parse workout days from this plan file.")
+            st.info("The plan file may be in an unexpected format. Try generating a new plan.")
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            return
 
-    plan_options = []
-    for plan_path in plans:
-        filename = os.path.basename(plan_path)
-        # Extract date/version from filename
-        archived_match = re.search(r'workout_plan_(\d{8})__archived_(\d{8})_(\d{6})', filename)
-        canonical_week_match = re.search(r'workout_plan_(\d{8})\.md$', filename)
-        timestamp_match = re.search(r'workout_plan_(\d{8})_(\d{6})', filename)
+        day_names = list(days.keys())
+        if not day_names:
+            st.error("⚠️ No workout days found in this plan.")
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            return
 
-        if archived_match:
-            week_str = archived_match.group(1)
-            arch_date = archived_match.group(2)
-            arch_time = archived_match.group(3)
-            formatted_week = f"{week_str[:4]}-{week_str[4:6]}-{week_str[6:8]}"
-            formatted_archived = f"{arch_date[:4]}-{arch_date[4:6]}-{arch_date[6:8]} {arch_time[:2]}:{arch_time[2:4]}"
-            plan_options.append((f"{formatted_week} (archived {formatted_archived})", plan_path))
-        elif canonical_week_match:
-            week_str = canonical_week_match.group(1)
-            formatted_week = f"{week_str[:4]}-{week_str[4:6]}-{week_str[6:8]}"
-            plan_options.append((f"{formatted_week} (current)", plan_path))
-        elif timestamp_match:
-            date_str = timestamp_match.group(1)
-            time_str = timestamp_match.group(2)
-            formatted_date = f"{date_str[:4]}-{date_str[4:6]}-{date_str[6:8]} {time_str[:2]}:{time_str[2:4]}"
-            plan_options.append((formatted_date, plan_path))
-        else:
-            plan_options.append((filename, plan_path))
+        selected_day = st.radio(
+            "Select Day",
+            options=day_names,
+            horizontal=True,
+            key="day_selector_local"
+        )
+        day_content = days.get(selected_day, '')
+        if not day_content:
+            st.warning(f"No content found for {selected_day}")
+            return
+        exercises = parse_exercises(day_content)
+    else:
+        # Fallback to Google Sheets when local files are absent (common on Streamlit Cloud).
+        data_source = "sheets"
+        sheet_plans = get_sheet_plans()
+        if not sheet_plans:
+            empty_state(
+                "📋",
+                "No Plans Yet",
+                "No local plan files or weekly plan sheets were found."
+            )
+            action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
+            return
 
-    selected_plan_display = st.selectbox(
-        "Choose a plan to view",
-        options=range(len(plan_options)),
-        format_func=lambda i: plan_options[i][0]
-    )
+        st.info("Showing plans from Google Sheets (no local markdown files found).")
+        selected_sheet_name = st.selectbox(
+            "Choose Google Sheet to view",
+            options=sheet_plans,
+            key="sheet_plan_selector"
+        )
 
-    selected_plan_path = plan_options[selected_plan_display][1]
+        workouts = read_sheet_plan(selected_sheet_name)
+        if not workouts:
+            st.warning(f"No workout data found in sheet `{selected_sheet_name}`.")
+            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            return
+
+        day_labels = [w.get('date', 'Unknown Day') for w in workouts]
+        selected_day = st.radio(
+            "Select Day",
+            options=day_labels,
+            horizontal=True,
+            key="day_selector_sheets"
+        )
+
+        selected_workout = next((w for w in workouts if w.get('date') == selected_day), None)
+        if not selected_workout:
+            st.warning(f"No content found for {selected_day}")
+            return
+
+        # Normalize sheet rows to the same keys used by the renderer below.
+        exercises = []
+        for ex in selected_workout.get('exercises', []):
+            exercises.append({
+                'block': ex.get('block', ''),
+                'name': ex.get('exercise', ''),
+                'sets': ex.get('sets', ''),
+                'reps': ex.get('reps', ''),
+                'load': ex.get('load', ''),
+                'rest': ex.get('rest', ''),
+                'notes': ex.get('notes', ''),
+            })
 
     st.markdown("---")
-
-    # Parse and display the selected plan
-    days = parse_plan_content(selected_plan_path)
-
-    # Check if any days were parsed
-    if not days:
-        st.error("⚠️ Unable to parse workout days from this plan file.")
-        st.info("The plan file may be in an unexpected format. Try generating a new plan.")
-        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
-        return
-
-    # Day navigation tabs
-    day_names = list(days.keys())
-
-    if not day_names:
-        st.error("⚠️ No workout days found in this plan.")
-        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
-        return
-
-    selected_day = st.radio(
-        "Select Day",
-        options=day_names,
-        horizontal=True,
-        key="day_selector"
-    )
-
-    st.markdown("---")
-
-    # Display selected day
     st.markdown(f"## {selected_day}")
-
-    day_content = days.get(selected_day, '')
-
-    if not day_content:
-        st.warning(f"No content found for {selected_day}")
-        return
-    exercises = parse_exercises(day_content)
 
     colors = get_colors()
     
@@ -203,8 +263,8 @@ def show():
             "Rest Day",
             "No exercises scheduled - time to recover!"
         )
-        # Show raw content for rest days
-        st.markdown(day_content)
+        if day_content:
+            st.markdown(day_content)
     else:
         # Display exercises in clean format
         for idx, ex in enumerate(exercises):
@@ -249,18 +309,19 @@ def show():
 
     st.markdown("---")
 
-    # Check if explanation file exists for this plan
-    explanation_path = selected_plan_path.replace('.md', '_explanation.md')
-    if os.path.exists(explanation_path):
-        with st.expander("📖 View AI Explanation (Why this plan was designed this way)", expanded=False):
-            try:
-                with open(explanation_path, 'r') as f:
-                    explanation_content = f.read()
-                st.markdown(explanation_content)
-            except Exception as e:
-                st.error(f"Error reading explanation file: {e}")
+    # Check if explanation file exists for local markdown plans
+    if data_source == "local" and selected_plan_path:
+        explanation_path = selected_plan_path.replace('.md', '_explanation.md')
+        if os.path.exists(explanation_path):
+            with st.expander("📖 View AI Explanation (Why this plan was designed this way)", expanded=False):
+                try:
+                    with open(explanation_path, 'r') as f:
+                        explanation_content = f.read()
+                    st.markdown(explanation_content)
+                except Exception as e:
+                    st.error(f"Error reading explanation file: {e}")
 
-        st.markdown("---")
+            st.markdown("---")
 
     # Action buttons
     col1, col2, col3 = st.columns(3)
@@ -271,7 +332,7 @@ def show():
             st.markdown(f"[Open Google Sheets]({sheets_url})")
 
     with col2:
-        if st.button("📄 View Markdown File", use_container_width=True):
+        if data_source == "local" and st.button("📄 View Markdown File", use_container_width=True):
             try:
                 with open(selected_plan_path, 'r') as f:
                     markdown_content = f.read()
@@ -281,6 +342,8 @@ def show():
                 st.error("Plan file not found. It may have been deleted.")
             except Exception as e:
                 st.error(f"Error reading file: {e}")
+        elif data_source == "sheets":
+            st.button("📄 View Markdown File", use_container_width=True, disabled=True, help="Markdown view is only available for local file plans.")
 
     with col3:
         action_button("🏠 Back to Dashboard", "dashboard", use_container_width=True)
