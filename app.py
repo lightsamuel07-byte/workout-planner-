@@ -8,7 +8,7 @@ import streamlit as st
 import os
 import sys
 import importlib
-from datetime import datetime, timedelta
+from src.design_system import get_colors
 
 # Ensure pages directory is in Python path
 sys.path.insert(0, os.path.dirname(__file__))
@@ -49,7 +49,7 @@ st.set_page_config(
     page_title="💪 Samuel's Workout Planner",
     page_icon="💪",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="collapsed"
 )
 
 # Password Protection
@@ -142,11 +142,6 @@ if st.session_state.get('dark_mode', False):
 # Additional page-specific styles with mobile responsiveness
 st.markdown("""
     <style>
-    /* Fix text area overlapping labels */
-    .stTextArea label[data-testid="stWidgetLabel"] {
-        display: none;
-    }
-    
     /* Page header styles */
     .main-header {
         font-size: 2.5rem;
@@ -171,11 +166,6 @@ st.markdown("""
             font-size: 1rem;
         }
         
-        /* Stack columns on mobile */
-        .row-widget.stHorizontalBlock {
-            flex-direction: column;
-        }
-        
         /* Full width buttons on mobile */
         .stButton button {
             width: 100% !important;
@@ -190,8 +180,10 @@ st.markdown("""
     /* Improve scrolling on mobile */
     @media (max-width: 768px) {
         .main .block-container {
+            padding-top: calc(1rem + env(safe-area-inset-top));
             padding-left: 1rem;
             padding-right: 1rem;
+            padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
         }
     }
     
@@ -224,24 +216,24 @@ with st.sidebar:
     st.markdown("""
     <style>
     div[data-testid="stSidebar"] button[kind="primary"] {
-        background: linear-gradient(135deg, #00D4AA 0%, #00B894 100%) !important;
+        background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%) !important;
         font-weight: 700 !important;
-        box-shadow: 0 2px 8px rgba(0, 212, 170, 0.3) !important;
+        box-shadow: 0 2px 8px rgba(0, 212, 170, 0.25) !important;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    if st.button("📊 Dashboard", use_container_width=True, key="nav_dashboard", 
+    if st.button("📊 Dashboard", width="stretch", key="nav_dashboard", 
                  type="primary" if st.session_state.current_page == 'dashboard' else "secondary"):
         st.session_state.current_page = 'dashboard'
         st.rerun()
 
-    if st.button("📝 Log Workout", use_container_width=True, key="nav_log_workout",
+    if st.button("📝 Log Workout", width="stretch", key="nav_log_workout",
                  type="primary" if st.session_state.current_page == 'log_workout' else "secondary"):
         st.session_state.current_page = 'log_workout'
         st.rerun()
 
-    if st.button("📋 View Plan", use_container_width=True, key="nav_plans",
+    if st.button("📋 View Plan", width="stretch", key="nav_plans",
                  type="primary" if st.session_state.current_page == 'plans' else "secondary"):
         st.session_state.current_page = 'plans'
         st.rerun()
@@ -249,7 +241,7 @@ with st.sidebar:
     # PLANNING section
     st.markdown('<div class="nav-section-header">PLANNING</div>', unsafe_allow_html=True)
     
-    if st.button("🆕 Generate Plan", use_container_width=True, key="nav_generate",
+    if st.button("🆕 Generate Plan", width="stretch", key="nav_generate",
                  type="primary" if st.session_state.current_page == 'generate' else "secondary"):
         st.session_state.current_page = 'generate'
         st.rerun()
@@ -257,22 +249,22 @@ with st.sidebar:
     # ANALYTICS section
     st.markdown('<div class="nav-section-header">ANALYTICS</div>', unsafe_allow_html=True)
 
-    if st.button("📈 Progress", use_container_width=True, key="nav_progress",
+    if st.button("📈 Progress", width="stretch", key="nav_progress",
                  type="primary" if st.session_state.current_page == 'progress' else "secondary"):
         st.session_state.current_page = 'progress'
         st.rerun()
 
-    if st.button("📅 Weekly Review", use_container_width=True, key="nav_weekly_review",
+    if st.button("📅 Weekly Review", width="stretch", key="nav_weekly_review",
                  type="primary" if st.session_state.current_page == 'weekly_review' else "secondary"):
         st.session_state.current_page = 'weekly_review'
         st.rerun()
 
-    if st.button("📋 Exercise History", use_container_width=True, key="nav_exercise_history",
+    if st.button("📋 Exercise History", width="stretch", key="nav_exercise_history",
                  type="primary" if st.session_state.current_page == 'exercise_history' else "secondary"):
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
-    if st.button("🗄️ DB Status", use_container_width=True, key="nav_database_status",
+    if st.button("🗄️ DB Status", width="stretch", key="nav_database_status",
                  type="primary" if st.session_state.current_page == 'database_status' else "secondary"):
         st.session_state.current_page = 'database_status'
         st.rerun()
@@ -283,37 +275,37 @@ with st.sidebar:
     st.markdown('<div class="nav-section-header">SETTINGS</div>', unsafe_allow_html=True)
     
     # Connection status indicator
+    colors = get_colors()
     try:
         import yaml
-        from src.sheets_reader import SheetsReader
         with open('config.yaml', 'r') as f:
             config = yaml.safe_load(f)
         
         st.markdown("""
         <div style="
             padding: 0.75rem;
-            background: rgba(0, 200, 83, 0.1);
-            border-left: 3px solid #00C853;
+            background: rgba(0, 212, 170, 0.12);
+            border-left: 3px solid {success};
             border-radius: 4px;
             font-size: 0.85rem;
         ">
             <div style="font-weight: 600; margin-bottom: 0.25rem;">🟢 Connected</div>
-            <div style="color: #666; font-size: 0.8rem;">Google Sheets synced</div>
+            <div style="color: {text_secondary}; font-size: 0.8rem;">Google Sheets synced</div>
         </div>
-        """, unsafe_allow_html=True)
+        """.format(success=colors['success'], text_secondary=colors['text_secondary']), unsafe_allow_html=True)
     except Exception as e:
         st.markdown("""
         <div style="
             padding: 0.75rem;
             background: rgba(244, 67, 54, 0.1);
-            border-left: 3px solid #F44336;
+            border-left: 3px solid {error};
             border-radius: 4px;
             font-size: 0.85rem;
         ">
             <div style="font-weight: 600; margin-bottom: 0.25rem;">🔴 Disconnected</div>
-            <div style="color: #666; font-size: 0.8rem;">Check your connection</div>
+            <div style="color: {text_secondary}; font-size: 0.8rem;">Check your connection</div>
         </div>
-        """, unsafe_allow_html=True)
+        """.format(error=colors['error'], text_secondary=colors['text_secondary']), unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown(f"**User:** Samuel")

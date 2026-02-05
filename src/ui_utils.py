@@ -95,7 +95,8 @@ def nav_button(label, page_name, icon="", **kwargs):
         bool: True if button was clicked
     """
     button_text = f"{icon} {label}".strip() if icon else label
-    if st.button(button_text, **kwargs):
+    normalized_kwargs = _normalize_button_kwargs(kwargs)
+    if st.button(button_text, **normalized_kwargs):
         st.session_state.current_page = page_name
         st.rerun()
         return True
@@ -200,9 +201,19 @@ def action_button(label, page_name, icon="", accent=False, **kwargs):
     
     if accent and 'type' not in kwargs:
         kwargs['type'] = 'primary'
-    
-    if st.button(button_text, **kwargs):
+
+    normalized_kwargs = _normalize_button_kwargs(kwargs)
+
+    if st.button(button_text, **normalized_kwargs):
         st.session_state.current_page = page_name
         st.rerun()
         return True
     return False
+
+
+def _normalize_button_kwargs(kwargs):
+    """Normalize legacy button kwargs while preserving caller intent."""
+    normalized = dict(kwargs)
+    if normalized.pop("use_container_width", False):
+        normalized.setdefault("width", "stretch")
+    return normalized

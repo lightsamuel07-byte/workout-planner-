@@ -19,6 +19,8 @@
     --color-border-strong: #000000;
     --color-border-medium: #D1D5DB;
     --color-border-light: #E5E7EB;
+    --border-width-subtle: 1px;
+    --border-width-strong: 2px;
     
     /* Spacing */
     --spacing-xs: 0.25rem;
@@ -82,7 +84,7 @@ h1, h2, h3, h4, h5, h6 {
     font-family: var(--font-family);
     font-weight: 600;
     border-radius: 8px !important;
-    border: 2px solid var(--color-border-strong) !important;
+    border: var(--border-width-subtle) solid var(--color-border-medium) !important;
     transition: all var(--transition-fast) !important;
     min-height: 44px !important;
     padding: 0.75rem 1.5rem !important;
@@ -136,7 +138,7 @@ button[kind="primary"]:hover {
 /* Metric Cards */
 .metric-card {
     background: var(--color-surface);
-    border: 2px solid var(--color-border-light);
+    border: var(--border-width-subtle) solid var(--color-border-light);
     border-radius: 8px;
     padding: var(--spacing-md);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast);
@@ -150,7 +152,7 @@ button[kind="primary"]:hover {
 /* Exercise Cards */
 .exercise-card {
     background: var(--color-surface);
-    border: 2px solid var(--color-border-strong);
+    border: var(--border-width-subtle) solid var(--color-border-medium);
     border-radius: 8px;
     padding: var(--spacing-md);
     margin-bottom: var(--spacing-md);
@@ -165,7 +167,7 @@ button[kind="primary"]:hover {
 /* Day Cards */
 .day-card {
     background: var(--color-surface);
-    border: 2px solid var(--color-border-strong);
+    border: var(--border-width-subtle) solid var(--color-border-medium);
     border-radius: 8px;
     padding: var(--spacing-md);
     text-align: center;
@@ -180,8 +182,8 @@ button[kind="primary"]:hover {
 
 .day-card.today {
     border-color: var(--color-accent);
-    border-width: 3px;
-    box-shadow: 0 0 0 2px var(--color-accent);
+    border-width: var(--border-width-strong);
+    box-shadow: 0 0 0 1px var(--color-accent);
 }
 
 /* Loading Skeleton */
@@ -209,7 +211,7 @@ button[kind="primary"]:hover {
 .stNumberInput > div > div > input {
     font-family: var(--font-family);
     border-radius: 8px !important;
-    border: 2px solid var(--color-border-medium) !important;
+    border: var(--border-width-subtle) solid var(--color-border-medium) !important;
     min-height: 44px !important;
     transition: all var(--transition-fast) !important;
     background-color: var(--color-surface) !important;
@@ -264,7 +266,7 @@ button[kind="primary"]:hover {
     font-weight: 600 !important;
     border-radius: 8px !important;
     background-color: var(--color-surface) !important;
-    border: 2px solid var(--color-border-light) !important;
+    border: var(--border-width-subtle) solid var(--color-border-light) !important;
     transition: all var(--transition-fast) !important;
     cursor: pointer !important;
 }
@@ -287,7 +289,7 @@ button[kind="primary"]:hover {
 /* Metrics */
 [data-testid="stMetric"] {
     background: var(--color-surface);
-    border: 2px solid var(--color-border-light);
+    border: var(--border-width-subtle) solid var(--color-border-light);
     border-radius: 8px;
     padding: var(--spacing-md);
     transition: all var(--transition-fast);
@@ -337,7 +339,7 @@ button[kind="primary"]:hover {
 /* Sidebar */
 [data-testid="stSidebar"] {
     background-color: var(--color-surface) !important;
-    border-right: 2px solid var(--color-border-light) !important;
+    border-right: var(--border-width-subtle) solid var(--color-border-light) !important;
 }
 
 /* Navigation Section Headers */
@@ -367,16 +369,12 @@ button[kind="primary"]:hover {
         margin-bottom: var(--spacing-md);
     }
     
-    /* Stack columns */
-    [data-testid="column"] {
-        min-width: 100% !important;
-        margin-bottom: var(--spacing-sm);
-    }
-    
     /* Reduce padding */
     .main .block-container {
+        padding-top: calc(var(--spacing-sm) + env(safe-area-inset-top));
         padding-left: var(--spacing-md) !important;
         padding-right: var(--spacing-md) !important;
+        padding-bottom: calc(6.5rem + env(safe-area-inset-bottom));
     }
     
     /* Day cards grid */
@@ -411,7 +409,7 @@ button[kind="primary"]:hover {
     bottom: 0;
     background: var(--color-surface);
     padding: var(--spacing-md);
-    border-top: 2px solid var(--color-border-strong);
+    border-top: var(--border-width-subtle) solid var(--color-border-medium);
     z-index: 999;
     margin: 0 calc(-1 * var(--spacing-md));
     box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
@@ -462,7 +460,7 @@ button[kind="primary"]:hover {
 
 .stTabs [data-baseweb="tab"] {
     border-radius: 8px;
-    border: 2px solid var(--color-border-medium);
+    border: var(--border-width-subtle) solid var(--color-border-medium);
     background: var(--color-surface);
     transition: all var(--transition-fast);
 }

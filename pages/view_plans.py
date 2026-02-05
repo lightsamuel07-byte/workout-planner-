@@ -6,6 +6,7 @@ import streamlit as st
 import os
 import glob
 import re
+import html
 from src.ui_utils import render_page_header, action_button, empty_state, get_authenticated_reader
 from src.design_system import get_colors
 
@@ -179,13 +180,13 @@ def show():
         if not days:
             st.error("⚠️ Unable to parse workout days from this plan file.")
             st.info("The plan file may be in an unexpected format. Try generating a new plan.")
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         day_names = list(days.keys())
         if not day_names:
             st.error("⚠️ No workout days found in this plan.")
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         selected_day = st.radio(
@@ -209,7 +210,7 @@ def show():
                 "No Plans Yet",
                 "No local plan files or weekly plan sheets were found."
             )
-            action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
+            action_button("Generate Plan Now", "generate", "🚀", accent=True, width="stretch")
             return
 
         st.info("Showing plans from Google Sheets (no local markdown files found).")
@@ -222,7 +223,7 @@ def show():
         workouts = read_sheet_plan(selected_sheet_name)
         if not workouts:
             st.warning(f"No workout data found in sheet `{selected_sheet_name}`.")
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         day_labels = [w.get('date', 'Unknown Day') for w in workouts]
@@ -266,45 +267,58 @@ def show():
             st.markdown(day_content)
     else:
         # Display exercises in clean format
-        for idx, ex in enumerate(exercises):
+        for ex in exercises:
+            safe_block = html.escape(str(ex.get('block', '')))
+            safe_name = html.escape(str(ex.get('name', '')))
+            safe_sets = html.escape(str(ex.get('sets', ''))) if ex.get('sets') else '-'
+            safe_reps = html.escape(str(ex.get('reps', ''))) if ex.get('reps') else '-'
+            safe_load = html.escape(str(ex.get('load', ''))) if ex.get('load') else '-'
+            safe_rest = html.escape(str(ex.get('rest', ''))) if ex.get('rest') else '-'
+            safe_notes = html.escape(str(ex.get('notes', '')))
+            notes_html = (
+                f'<div style="margin-top: 0.75rem; padding: 0.75rem; background-color: rgba(0, 212, 170, 0.08); color: {colors["text_primary"]}; border-left: 3px solid {colors["accent"]}; border-radius: 6px; font-size: 0.9rem; font-weight: 600;">📝 {safe_notes}</div>'
+                if safe_notes
+                else ""
+            )
+
             with st.container():
                 st.markdown(f"""
                 <div class="exercise-card" style="
                     background-color: {colors['surface']};
-                    border: 2px solid {colors['border_strong']};
-                    border-radius: 8px;
+                    border: 1px solid {colors['border_medium']};
+                    border-radius: 10px;
                     padding: 1rem;
                     margin-bottom: 1rem;
                 ">
-                    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 3px solid {colors['accent']}; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid {colors['accent']}; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
                         <div style="flex: 1;">
-                            <div style="font-size: 1.5rem; color: {colors['text_primary']}; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">{ex['block']}</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: {colors['text_primary']}; text-transform: uppercase;">{ex['name']}</div>
+                            <div style="font-size: 1.5rem; color: {colors['text_primary']}; font-weight: 700; font-family: 'Space Grotesk', sans-serif;">{safe_block}</div>
+                            <div style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: {colors['text_primary']}; text-transform: uppercase;">{safe_name}</div>
                         </div>
                     </div>
                     <div style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">
-                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                        <div style="border: 1px solid {colors['border_medium']}; border-radius: 6px; padding: 0.5rem; background-color: {colors['surface']};">
                             <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">SETS</div>
-                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['sets'] if ex['sets'] else '-'}</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{safe_sets}</div>
                         </div>
-                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                        <div style="border: 1px solid {colors['border_medium']}; border-radius: 6px; padding: 0.5rem; background-color: {colors['surface']};">
                             <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">REPS</div>
-                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['reps'] if ex['reps'] else '-'}</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{safe_reps}</div>
                         </div>
-                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                        <div style="border: 1px solid {colors['border_medium']}; border-radius: 6px; padding: 0.5rem; background-color: {colors['surface']};">
                             <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">LOAD</div>
-                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['load'] if ex['load'] else '-'}</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{safe_load}</div>
                         </div>
-                        <div style="border: 2px solid {colors['border_strong']}; padding: 0.5rem; background-color: {colors['surface']};">
+                        <div style="border: 1px solid {colors['border_medium']}; border-radius: 6px; padding: 0.5rem; background-color: {colors['surface']};">
                             <div style="font-size: 0.7rem; color: {colors['text_secondary']}; font-weight: 700; text-transform: uppercase;">REST</div>
-                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{ex['rest'] if ex['rest'] else '-'}</div>
+                            <div style="font-weight: 700; color: {colors['text_primary']}; font-size: 1.2rem;">{safe_rest}</div>
                         </div>
                     </div>
-                    {f'<div style="margin-top: 0.75rem; padding: 0.75rem; background-color: ' + colors['accent'] + '; color: ' + colors['primary'] + '; border: 2px solid ' + colors['accent'] + '; border-radius: 4px; font-size: 0.9rem; font-weight: 700;">📝 ' + ex['notes'] + '</div>' if ex['notes'] else ''}
+                    {notes_html}
                 </div>
                 """, unsafe_allow_html=True)
 
-        st.markdown(f"<br>**Total exercises:** {len(exercises)}", unsafe_allow_html=True)
+        st.caption(f"Total exercises: {len(exercises)}")
 
     st.markdown("---")
 
@@ -331,12 +345,12 @@ def show():
         spreadsheet_id = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
 
     with col1:
-        if st.button("📊 Open in Google Sheets", use_container_width=True):
+        if st.button("📊 Open in Google Sheets", width="stretch"):
             sheets_url = f"https://docs.google.com/spreadsheets/d/{spreadsheet_id}"
             st.markdown(f"[Open Google Sheets]({sheets_url})")
 
     with col2:
-        if data_source == "local" and st.button("📄 View Markdown File", use_container_width=True):
+        if data_source == "local" and st.button("📄 View Markdown File", width="stretch"):
             try:
                 with open(selected_plan_path, 'r') as f:
                     markdown_content = f.read()
@@ -347,7 +361,7 @@ def show():
             except Exception as e:
                 st.error(f"Error reading file: {e}")
         elif data_source == "sheets":
-            st.button("📄 View Markdown File", use_container_width=True, disabled=True, help="Markdown view is only available for local file plans.")
+            st.button("📄 View Markdown File", width="stretch", disabled=True, help="Markdown view is only available for local file plans.")
 
     with col3:
-        action_button("🏠 Back to Dashboard", "dashboard", use_container_width=True)
+        action_button("🏠 Back to Dashboard", "dashboard", width="stretch")

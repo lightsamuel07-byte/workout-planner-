@@ -65,7 +65,7 @@ def get_metric_card_html(label, value, delta=None, icon="", color_scheme=None):
     return f"""
     <div style="
         background: {color_scheme['surface']};
-        border: 2px solid {color_scheme['border_light']};
+        border: 1px solid {color_scheme['border_light']};
         padding: 1rem;
         border-radius: 8px;
         transition: transform 150ms cubic-bezier(0.4, 0, 0.2, 1), box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -90,7 +90,7 @@ def get_empty_state_html(icon, title, description, color_scheme=None):
         text-align: center;
         padding: 3rem 2rem;
         background: {color_scheme['surface']};
-        border: 2px solid {color_scheme['border_light']};
+        border: 1px solid {color_scheme['border_light']};
         border-radius: 12px;
         margin: 2rem 0;
     ">
@@ -166,7 +166,7 @@ def get_stat_grid_html(stats, columns=4, color_scheme=None):
         value = stat.get('value', '')
         stats_html += f"""
         <div style="
-            border: 2px solid {color_scheme['border_strong']};
+            border: 1px solid {color_scheme['border_medium']};
             padding: 0.75rem;
             background: {color_scheme['surface']};
         ">
@@ -206,6 +206,6 @@ def get_accent_button_style(color_scheme=None):
     return f"""
     background-color: {color_scheme['accent']} !important;
     color: {color_scheme['primary']} !important;
-    border: 2px solid {color_scheme['accent']} !important;
+    border: 1px solid {color_scheme['accent']} !important;
     font-weight: 600 !important;
     """

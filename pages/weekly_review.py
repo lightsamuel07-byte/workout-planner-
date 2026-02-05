@@ -5,14 +5,15 @@ Weekly Review page - Browse and review past workout weeks
 import streamlit as st
 from src.ui_utils import render_page_header, get_authenticated_reader, action_button, empty_state
 from src.design_system import get_colors
-from datetime import datetime
 import re
+import html
 
 
 def show():
     """Render the weekly review page"""
 
     render_page_header("Weekly Review", "Browse your workout history week by week", "📅")
+    colors = get_colors()
 
     try:
         # Get authenticated reader
@@ -27,7 +28,7 @@ def show():
                 "No History Yet",
                 "Complete your first week of workouts to see reviews here!"
             )
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         # Reverse order so most recent is first
@@ -47,11 +48,11 @@ def show():
             week_data = reader.read_workout_history()
 
             if not week_data:
-                st.markdown("""
-                <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+                st.markdown(f"""
+                <div style="text-align:center;padding:2rem;background:{colors['background']};border-radius:8px;border:1px solid {colors['border_light']};">
                     <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
-                    <div style="font-weight:600;margin-bottom:0.5rem;">No Data for This Week</div>
-                    <div style="color:#666;">This week exists but has no workout entries yet.</div>
+                    <div style="font-weight:600;margin-bottom:0.5rem;color:{colors['text_primary']};">No Data for This Week</div>
+                    <div style="color:{colors['text_secondary']};">This week exists but has no workout entries yet.</div>
                 </div>
                 """, unsafe_allow_html=True)
                 return
@@ -94,8 +95,8 @@ def show():
             <a href="{sheet_url}" target="_blank" style="
                 display: inline-block;
                 padding: 0.5rem 1rem;
-                background: #4285F4;
-                color: white;
+                background: {colors['info']};
+                color: {colors['surface']};
                 text-decoration: none;
                 border-radius: 4px;
                 font-weight: 500;
@@ -212,7 +213,7 @@ def show():
                 # Check if workout was completed
                 has_logs = any(ex.get('log', '').strip() for ex in exercises)
                 completion_status = "✅ COMPLETED" if has_logs else "⏸️ PLANNED"
-                status_color = "#00C853" if has_logs else "#FFA726"
+                status_color = colors['success'] if has_logs else colors['warning']
                 
                 # Create expandable section with enhanced styling
                 expander_label = f"{emoji} **{workout_date}**"
@@ -233,10 +234,10 @@ def show():
                     </div>
                     """, unsafe_allow_html=True)
                     if not exercises:
-                        st.markdown("""
-                        <div style="text-align:center;padding:1.5rem;background:#f8f9fa;border-radius:8px;">
+                        st.markdown(f"""
+                        <div style="text-align:center;padding:1.5rem;background:{colors['background']};border-radius:8px;border:1px solid {colors['border_light']};">
                             <div style="font-size:2rem;margin-bottom:0.5rem;">😴</div>
-                            <div style="color:#666;">Rest day - no exercises planned</div>
+                            <div style="color:{colors['text_secondary']};">Rest day - no exercises planned</div>
                         </div>
                         """, unsafe_allow_html=True)
                         continue
@@ -275,26 +276,30 @@ def show():
                                 info_parts.append(f"• Rest: {rest}")
 
                             info_str = " × ".join(info_parts) if info_parts else ""
+                            safe_exercise_name = html.escape(exercise_name)
+                            safe_info_str = html.escape(info_str)
+                            safe_log = html.escape(log)
+                            safe_notes = html.escape(notes)
 
                             # Display exercise with styling
                             if log:
                                 # Completed exercise - show with checkmark
                                 st.markdown(f"""
-                                <div style="background-color: #d4edda; padding: 0.75rem; border-left: 4px solid #28a745; margin-bottom: 0.5rem; border-radius: 4px;">
-                                    <div style="font-weight: 600; color: #155724;">✓ {exercise_name}</div>
-                                    <div style="font-size: 0.9rem; color: #155724;">{info_str}</div>
-                                    <div style="font-size: 0.85rem; color: #155724; margin-top: 0.25rem;">
-                                        <strong>Logged:</strong> {log}
+                                <div style="background-color: rgba(0, 212, 170, 0.08); padding: 0.75rem; border-left: 3px solid {colors['success']}; margin-bottom: 0.5rem; border-radius: 4px;">
+                                    <div style="font-weight: 600; color: {colors['text_primary']};">✓ {safe_exercise_name}</div>
+                                    <div style="font-size: 0.9rem; color: {colors['text_secondary']};">{safe_info_str}</div>
+                                    <div style="font-size: 0.85rem; color: {colors['text_secondary']}; margin-top: 0.25rem;">
+                                        <strong>Logged:</strong> {safe_log}
                                     </div>
                                 </div>
                                 """, unsafe_allow_html=True)
                             else:
                                 # Planned but not completed
                                 st.markdown(f"""
-                                <div style="background-color: #f8f9fa; padding: 0.75rem; border-left: 4px solid #6c757d; margin-bottom: 0.5rem; border-radius: 4px;">
-                                    <div style="font-weight: 600; color: #495057;">{exercise_name}</div>
-                                    <div style="font-size: 0.9rem; color: #6c757d;">{info_str}</div>
-                                    {f'<div style="font-size: 0.85rem; color: #6c757d; margin-top: 0.25rem;"><em>{notes}</em></div>' if notes else ''}
+                                <div style="background-color: {colors['background']}; padding: 0.75rem; border-left: 3px solid {colors['border_medium']}; margin-bottom: 0.5rem; border-radius: 4px;">
+                                    <div style="font-weight: 600; color: {colors['text_primary']};">{safe_exercise_name}</div>
+                                    <div style="font-size: 0.9rem; color: {colors['text_secondary']};">{safe_info_str}</div>
+                                    {f'<div style="font-size: 0.85rem; color: {colors["text_secondary"]}; margin-top: 0.25rem;"><em>{safe_notes}</em></div>' if notes else ''}
                                 </div>
                                 """, unsafe_allow_html=True)
 
@@ -335,7 +340,7 @@ def show():
                         st.metric(f"Top {lift}", f"{weight} kg")
             else:
                 st.markdown("""
-                <div style="text-align:center;padding:2rem;color:#888;">
+                <div style="text-align:center;padding:2rem;color:var(--color-text-secondary);">
                     <div style="font-size:2rem;margin-bottom:0.5rem;">💪</div>
                     <div>No main lift PRs this week - keep pushing!</div>
                 </div>
@@ -352,6 +357,6 @@ def show():
     st.markdown("---")
     col1, col2 = st.columns(2)
     with col1:
-        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
     with col2:
-        action_button("View Progress", "progress", "📈", use_container_width=True)
+        action_button("View Progress", "progress", "📈", width="stretch")

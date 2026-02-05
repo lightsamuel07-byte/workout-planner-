@@ -100,6 +100,7 @@ def show():
     date_str = today.strftime("%B %d, %Y")
 
     render_page_header("Log Workout", f"{day_name}, {date_str}", "📝")
+    colors = get_colors()
 
     try:
         # Get authenticated reader
@@ -114,7 +115,7 @@ def show():
                 "No Workout Plan",
                 "Generate a plan first, then come back to log your workouts!"
             )
-            action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
+            action_button("Generate Plan Now", "generate", "🚀", accent=True, width="stretch")
             return
 
         # Use the most recent sheet
@@ -125,11 +126,11 @@ def show():
         week_data = reader.read_workout_history()
 
         if not week_data:
-            st.markdown("""
-            <div style="text-align:center;padding:2rem;background:#f0f2f6;border-radius:8px;">
+            st.markdown(f"""
+            <div style="text-align:center;padding:2rem;background:{colors['background']};border-radius:8px;border:1px solid {colors['border_light']};">
                 <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
-                <div style="font-weight:600;margin-bottom:0.5rem;">Empty Sheet</div>
-                <div style="color:#666;">The sheet `{current_sheet}` exists but has no workout data.</div>
+                <div style="font-weight:600;margin-bottom:0.5rem;color:{colors['text_primary']};">Empty Sheet</div>
+                <div style="color:{colors['text_secondary']};">The sheet `{current_sheet}` exists but has no workout data.</div>
             </div>
             """, unsafe_allow_html=True)
             return
@@ -148,21 +149,21 @@ def show():
                 "Rest Day",
                 f"No workout scheduled for {day_name}. Enjoy your recovery!"
             )
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         # Display today's workout plan
         exercises = todays_workout.get('exercises', [])
 
         if not exercises:
-            st.markdown("""
-            <div style="text-align:center;padding:2rem;background:linear-gradient(135deg, #f0f2f6 0%, #e8eaf0 100%);border-radius:12px;border:2px solid #ddd;">
+            st.markdown(f"""
+            <div style="text-align:center;padding:2rem;background:linear-gradient(135deg, {colors['background']} 0%, {colors['surface']} 100%);border-radius:12px;border:1px solid {colors['border_light']};">
                 <div style="font-size:3rem;margin-bottom:1rem;">🤔</div>
-                <div style="font-weight:700;margin-bottom:0.5rem;font-size:1.3rem;">No Exercises Found</div>
-                <div style="color:#666;margin-bottom:1.5rem;">Today's workout appears empty.</div>
-                <div style="text-align:left;display:inline-block;background:white;padding:1rem;border-radius:8px;border-left:4px solid #00D4AA;">
-                    <div style="font-weight:600;margin-bottom:0.5rem;">💡 Troubleshooting:</div>
-                    <div style="font-size:0.9rem;color:#666;">
+                <div style="font-weight:700;margin-bottom:0.5rem;font-size:1.3rem;color:{colors['text_primary']};">No Exercises Found</div>
+                <div style="color:{colors['text_secondary']};margin-bottom:1.5rem;">Today's workout appears empty.</div>
+                <div style="text-align:left;display:inline-block;background:{colors['surface']};padding:1rem;border-radius:8px;border-left:3px solid {colors['accent']};">
+                    <div style="font-weight:600;margin-bottom:0.5rem;color:{colors['text_primary']};">💡 Troubleshooting:</div>
+                    <div style="font-size:0.9rem;color:{colors['text_secondary']};">
                         • Check if your plan is generated in Google Sheets<br>
                         • Verify the correct week is selected<br>
                         • Make sure today's date matches the plan<br>
@@ -174,9 +175,9 @@ def show():
             st.markdown("<br>", unsafe_allow_html=True)
             col1, col2 = st.columns(2)
             with col1:
-                action_button("View Plan", "plans", "📋", use_container_width=True)
+                action_button("View Plan", "plans", "📋", width="stretch")
             with col2:
-                action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+                action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         # Progress display with bar
@@ -191,13 +192,12 @@ def show():
                     session_logged += 1
             total_logged = max(logged_count, session_logged)
             completion_percentage = (total_logged / len(exercises) * 100) if len(exercises) > 0 else 0
-            colors = get_colors()
             completion_emoji = "🏆" if completion_percentage == 100 else "🏋️"
             
             # Show celebration for 100% completion
             if completion_percentage == 100:
                 border_color = colors['accent']
-                background = f"linear-gradient(135deg, rgba(0, 212, 170, 0.1) 0%, rgba(0, 230, 118, 0.1) 100%)"
+                background = f"linear-gradient(135deg, {colors['surface']} 0%, rgba(0, 212, 170, 0.12) 100%)"
                 message = "🎉 Amazing work! All exercises logged!"
             else:
                 border_color = colors['border_strong']
@@ -205,7 +205,7 @@ def show():
                 message = "Keep going! 💪"
 
             st.markdown(f"""
-            <div style="background: {background}; border: 2px solid {border_color}; padding: 1.5rem; border-radius: 12px; margin: 2rem 0;">
+            <div style="background: {background}; border: 1px solid {border_color}; padding: 1.25rem; border-radius: 12px; margin: 1.25rem 0;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
                     <div>
                         <div style="font-size: 2rem; font-weight: 700; color: {colors['text_primary']};">{total_logged}/{len(exercises)} Complete</div>
@@ -214,9 +214,9 @@ def show():
                     </div>
                     <div style="font-size: 3rem;">{completion_emoji}</div>
                 </div>
-                <div style="background: #e0e0e0; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 1rem;">
+                <div style="background: {colors['border_light']}; height: 12px; border-radius: 6px; overflow: hidden; margin-top: 1rem;">
                     <div style="
-                        background: linear-gradient(90deg, {colors['accent']} 0%, #00e676 100%);
+                        background: linear-gradient(90deg, {colors['accent']} 0%, {colors['accent_dark']} 100%);
                         height: 100%;
                         width: {completion_percentage}%;
                         transition: width 0.3s ease;
@@ -273,28 +273,31 @@ def show():
                         # 4-column grid for metrics with improved styling
                         st.markdown(f"""
                         <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem; margin: 0.75rem 0;">
-                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">SETS</div>
-                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(sets) if sets else '-'}</div>
+                            <div style="border: 1px solid {colors['border_medium']}; padding: 0.55rem 0.5rem; background: {colors['surface']}; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: {colors['text_secondary']}; letter-spacing: 0.5px; margin-bottom: 0.2rem;">SETS</div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: {colors['text_primary']};">{html.escape(sets) if sets else '-'}</div>
                             </div>
-                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">REPS</div>
-                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(reps) if reps else '-'}</div>
+                            <div style="border: 1px solid {colors['border_medium']}; padding: 0.55rem 0.5rem; background: {colors['surface']}; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: {colors['text_secondary']}; letter-spacing: 0.5px; margin-bottom: 0.2rem;">REPS</div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: {colors['text_primary']};">{html.escape(reps) if reps else '-'}</div>
                             </div>
-                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">LOAD</div>
-                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(load) if load else '-'}</div>
+                            <div style="border: 1px solid {colors['border_medium']}; padding: 0.55rem 0.5rem; background: {colors['surface']}; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: {colors['text_secondary']}; letter-spacing: 0.5px; margin-bottom: 0.2rem;">LOAD</div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: {colors['text_primary']};">{html.escape(load) if load else '-'}</div>
                             </div>
-                            <div style="border: 2px solid #1a1a1a; padding: 0.75rem 0.5rem; background: #fff; border-radius: 4px;">
-                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: #666; letter-spacing: 0.5px; margin-bottom: 0.25rem;">REST</div>
-                                <div style="font-weight: 700; font-size: 0.95rem;">{html.escape(rest) if rest else '-'}</div>
+                            <div style="border: 1px solid {colors['border_medium']}; padding: 0.55rem 0.5rem; background: {colors['surface']}; border-radius: 4px;">
+                                <div style="font-size: 0.7rem; text-transform: uppercase; font-weight: 700; color: {colors['text_secondary']}; letter-spacing: 0.5px; margin-bottom: 0.2rem;">REST</div>
+                                <div style="font-weight: 700; font-size: 0.95rem; color: {colors['text_primary']};">{html.escape(rest) if rest else '-'}</div>
                             </div>
                         </div>
                         """, unsafe_allow_html=True)
 
                         # Notes below grid
                         if notes:
-                            st.markdown(f"<span style='color: #888; font-size: 0.9rem; font-style: italic;'>💡 {html.escape(notes)}</span>", unsafe_allow_html=True)
+                            st.markdown(
+                                f"<span style='color: {colors['text_secondary']}; font-size: 0.9rem; font-style: italic;'>💡 {html.escape(notes)}</span>",
+                                unsafe_allow_html=True,
+                            )
 
                     with col2:
                         # Logging input
@@ -305,7 +308,10 @@ def show():
 
                         # Show existing log if present (unless manually editing)
                         if existing_log and not st.session_state.get(edit_key):
-                            st.markdown(f"<div style='background-color: #d4edda; padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem;'><span style='color: #155724; font-size: 0.9rem;'>✅ Logged: {html.escape(existing_log)}</span></div>", unsafe_allow_html=True)
+                            st.markdown(
+                                f"<div style='background-color: rgba(0, 212, 170, 0.1); padding: 0.5rem; border-radius: 4px; margin-top: 0.5rem; border-left: 3px solid {colors['success']};'><span style='color: {colors['text_primary']}; font-size: 0.9rem;'>✅ Logged: {html.escape(existing_log)}</span></div>",
+                                unsafe_allow_html=True,
+                            )
 
                             parsed_perf, parsed_rpe, parsed_note = parse_existing_log_fields(existing_log)
                             parsed_parts = []
@@ -317,7 +323,7 @@ def show():
                                 st.caption(" • ".join(parsed_parts))
 
                             # Enter edit mode
-                            if st.button("✏️ Edit", key=f"edit_{idx}", use_container_width=True):
+                            if st.button("✏️ Edit", key=f"edit_{idx}", width="stretch"):
                                 st.session_state.workout_logs[log_key] = parsed_perf
                                 if parsed_rpe:
                                     st.session_state.workout_rpe[rpe_key] = parsed_rpe
@@ -340,12 +346,12 @@ def show():
                             # Quick action buttons
                             qcol1, qcol2 = st.columns(2)
                             with qcol1:
-                                if st.button("✓ Done", key=f"done_{idx}", use_container_width=True, help="Mark as completed as prescribed"):
+                                if st.button("✓ Done", key=f"done_{idx}", width="stretch", help="Mark as completed as prescribed"):
                                     st.session_state.workout_logs[log_key] = "Done"
                                     st.session_state[f"input_{log_key}"] = "Done"
                                     st.rerun()
                             with qcol2:
-                                if st.button("⊗ Skip", key=f"skip_{idx}", use_container_width=True, help="Mark as skipped"):
+                                if st.button("⊗ Skip", key=f"skip_{idx}", width="stretch", help="Mark as skipped"):
                                     st.session_state.workout_logs[log_key] = "Skipped"
                                     st.session_state[f"input_{log_key}"] = "Skipped"
                                     st.rerun()
@@ -371,8 +377,7 @@ def show():
                                 value=default_value,
                                 placeholder=placeholder,
                                 key=f"input_{log_key}",
-                                help=help_text,
-                                label_visibility="collapsed"
+                                help=help_text
                             )
 
                             current_rpe = st.session_state.workout_rpe.get(rpe_key, "")
@@ -383,8 +388,7 @@ def show():
                                 options=RPE_OPTIONS,
                                 index=RPE_OPTIONS.index(current_rpe),
                                 key=f"input_{rpe_key}",
-                                help="RPE scale 1-10 (0.5 increments)",
-                                label_visibility="collapsed"
+                                help="RPE scale 1-10 (0.5 increments)"
                             )
 
                             note_default = st.session_state.workout_notes.get(note_key, "")
@@ -392,8 +396,7 @@ def show():
                                 "Notes (Optional)",
                                 value=note_default,
                                 placeholder="Optional notes (pain, form, fatigue, etc.)",
-                                key=f"input_{note_key}",
-                                label_visibility="collapsed"
+                                key=f"input_{note_key}"
                             )
 
                             if log_input.strip():
@@ -411,7 +414,7 @@ def show():
                             else:
                                 st.session_state.workout_notes.pop(note_key, None)
 
-                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("<div style='height: 0.4rem;'></div>", unsafe_allow_html=True)
 
         st.markdown("---")
 
@@ -421,9 +424,9 @@ def show():
         .save-button-container {
             position: sticky;
             bottom: 0;
-            background: white;
+            background: var(--color-surface);
             padding: 1rem;
-            border-top: 2px solid #000;
+            border-top: 1px solid var(--color-border-medium);
             z-index: 999;
             margin: 0 -1rem;
         }
@@ -433,8 +436,8 @@ def show():
                 bottom: 0;
                 left: 0;
                 right: 0;
-                padding: 1rem;
-                box-shadow: 0 -2px 10px rgba(0,0,0,0.1);
+                padding: 1rem 1rem calc(1rem + env(safe-area-inset-bottom)) 1rem;
+                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.08);
             }
         }
         </style>
@@ -449,19 +452,17 @@ def show():
             if performance or rpe_value or note_value:
                 logs_count += 1
         
-        colors = get_colors()
-
         # Show save status with accent color
         if 'last_save_time' in st.session_state and st.session_state.last_save_time:
             save_time = st.session_state.last_save_time
             st.markdown(f"""
-            <div style="background: rgba(0, 200, 83, 0.1); border-left: 4px solid #00C853; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+            <div style="background: rgba(0, 212, 170, 0.1); border-left: 3px solid {colors['success']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
                 ✅ <strong>Last saved: {save_time}</strong> ({logs_count}/{len(exercises)} exercises logged)
             </div>
             """, unsafe_allow_html=True)
         elif logs_count > 0:
             st.markdown(f"""
-            <div style="background: rgba(255, 152, 0, 0.1); border-left: 4px solid {colors['accent']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+            <div style="background: rgba(255, 107, 53, 0.1); border-left: 3px solid {colors['warning']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
                 📝 <strong>{logs_count}/{len(exercises)} exercises logged</strong> - Don't forget to save!
             </div>
             """, unsafe_allow_html=True)
@@ -480,7 +481,7 @@ def show():
                 100% { box-shadow: 0 0 0 0 rgba(0, 212, 170, 0); }
             }
             button[kind="primary"] {
-                animation: pulse 2s infinite;
+                animation: pulse 2.5s 2;
             }
             </style>
             """, unsafe_allow_html=True)
@@ -489,12 +490,12 @@ def show():
         col1, col2, col3 = st.columns([1, 2, 1])
 
         with col1:
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
 
         with col2:
             save_button_key = "save_workout_main"
             save_button_label = "💾 Save (Sheets + DB)" if logs_count == 0 else f"💾 Save {logs_count} Exercise{'s' if logs_count != 1 else ''} (Sheets + DB)"
-            if st.button(save_button_label, type="primary", use_container_width=True, help="Saves all workout logs to your Google Sheet", key=save_button_key):
+            if st.button(save_button_label, type="primary", width="stretch", help="Saves all workout logs to your Google Sheet", key=save_button_key):
                 # Prepare log data to write back to sheets
                 logs_to_save = []
                 db_entries = []
@@ -600,7 +601,7 @@ def show():
                 st.warning("⚠️ Clear all unsaved logs?")
                 ccol1, ccol2 = st.columns(2)
                 with ccol1:
-                    if st.button("Yes, Clear", type="primary", use_container_width=True, key="confirm_clear_yes"):
+                    if st.button("Yes, Clear", type="primary", width="stretch", key="confirm_clear_yes"):
                         st.session_state.workout_logs = {}
                         st.session_state.workout_rpe = {}
                         st.session_state.workout_notes = {}
@@ -609,11 +610,11 @@ def show():
                         st.session_state.confirm_clear = False
                         st.rerun()
                 with ccol2:
-                    if st.button("Cancel", use_container_width=True, key="confirm_clear_no"):
+                    if st.button("Cancel", width="stretch", key="confirm_clear_no"):
                         st.session_state.confirm_clear = False
                         st.rerun()
             else:
-                if st.button("🗑️ Clear All", use_container_width=True, help="Clear all unsaved logs"):
+                if st.button("🗑️ Clear All", width="stretch", help="Clear all unsaved logs"):
                     st.session_state.confirm_clear = True
                     st.rerun()
 
@@ -621,4 +622,4 @@ def show():
         st.error(f"Unable to load workout plan: {e}")
         st.info("Make sure you have a workout plan generated in Google Sheets.")
 
-        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")

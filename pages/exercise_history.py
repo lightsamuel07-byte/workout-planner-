@@ -46,7 +46,7 @@ def show():
                 "No Exercise History",
                 "Log your workouts to track progress on individual exercises!"
             )
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         # Get unique exercise list
@@ -63,7 +63,7 @@ def show():
                 "No Exercises Found",
                 "Your workout history doesn't contain any exercise data yet."
             )
-            action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
             return
 
         # Search/Filter UI with improved styling
@@ -74,7 +74,7 @@ def show():
         st.markdown(f"""
         <div style="
             background: {colors['surface']};
-            border: 2px solid {colors['border_strong']};
+            border: 1px solid {colors['border_medium']};
             border-radius: 8px;
             padding: 1rem;
             margin-bottom: 1.5rem;
@@ -116,8 +116,8 @@ def show():
         """, unsafe_allow_html=True)
 
         if not filtered_exercises:
-            st.markdown("""
-            <div style="text-align:center;padding:2rem;color:#888;">
+            st.markdown(f"""
+            <div style="text-align:center;padding:2rem;color:{colors['text_secondary']};">
                 <div style="font-size:3rem;margin-bottom:1rem;">🤔</div>
                 <div style="font-weight:600;margin-bottom:0.5rem;">No Matches Found</div>
                 <div style="font-size:0.9rem;">Try a different search term</div>
@@ -157,7 +157,7 @@ def show():
             # Display history
             if not exercise_history:
                 st.markdown(f"""
-                <div style="text-align:center;padding:2rem;color:#888;">
+                <div style="text-align:center;padding:2rem;color:{colors['text_secondary']};">
                     <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
                     <div style="font-weight:600;margin-bottom:0.5rem;">No History for {selected_exercise}</div>
                     <div style="font-size:0.9rem;">No records found in the last {weeks_filter} weeks</div>
@@ -268,4 +268,4 @@ def show():
     st.markdown("---")
 
     # Back button
-    action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+    action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")

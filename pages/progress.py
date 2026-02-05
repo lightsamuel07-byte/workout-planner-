@@ -18,8 +18,8 @@ def show():
     st.markdown(f"""
     <div style="
         background: {colors['surface']};
-        border: 2px solid {colors['border_light']};
-        border-left: 4px solid {colors['accent']};
+        border: 1px solid {colors['border_light']};
+        border-left: 3px solid {colors['accent']};
         border-radius: 8px;
         padding: 1rem;
         margin-bottom: 2rem;
@@ -220,7 +220,7 @@ def show():
             <div style="
                 padding: 1rem; 
                 background-color: {colors['surface']}; 
-                border: 2px solid {colors['border_light']};
+                border: 1px solid {colors['border_light']};
                 border-radius: 8px; 
                 text-align: center; 
                 min-height: 120px;
@@ -235,4 +235,4 @@ def show():
     st.markdown("---")
 
     # Back button
-    action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+    action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")

@@ -108,6 +108,7 @@ class PlanGenerator:
 
             plan = message.content[0].text
             plan = self._apply_exercise_swaps_to_text(plan)
+            plan = self._enforce_even_dumbbell_loads(plan)
 
             # Validate and enforce no ranges (hybrid: retry once, then collapse)
             plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
@@ -133,6 +134,7 @@ Return ONLY the corrected lines in the same format. Here's the full plan to fix:
                 )
                 plan = message2.content[0].text
                 plan = self._apply_exercise_swaps_to_text(plan)
+                plan = self._enforce_even_dumbbell_loads(plan)
                 plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=2)
 
             # Generate explanation file
@@ -196,6 +198,55 @@ PREAMBLE:
             text = pattern.sub(str(replacement), text)
 
         return text
+
+    def _enforce_even_dumbbell_loads(self, text):
+        """
+        Enforce even-number dumbbell loads only.
+        Any DB exercise prescription like "@ 7 kg" will be coerced to an even load.
+        Tie behavior (exact odd integers) is conservative: rounds down (7 -> 6).
+        """
+        lines = text.split('\n')
+        current_is_db = False
+        current_is_main_lift = False
+        header_re = re.compile(r'^\s*###\s+[A-Z]\d+\.\s*(.+)$', re.IGNORECASE)
+        load_re = re.compile(r'@\s*([\d]+(?:\.\d+)?)\s*kg\b', re.IGNORECASE)
+
+        def coerce_even(value):
+            rounded = int(round(value))
+            if rounded % 2 == 0:
+                return rounded
+
+            lower_even = rounded - 1
+            upper_even = rounded + 1
+            if abs(value - lower_even) <= abs(value - upper_even):
+                return lower_even
+            return upper_even
+
+        for i, line in enumerate(lines):
+            header_match = header_re.match(line.strip())
+            if header_match:
+                exercise_name = header_match.group(1).lower()
+                current_is_db = ('db' in exercise_name) or ('dumbbell' in exercise_name)
+                current_is_main_lift = any(
+                    keyword in exercise_name
+                    for keyword in ['squat', 'deadlift', 'bench press', 'chest press']
+                )
+                continue
+
+            if not current_is_db or current_is_main_lift:
+                continue
+
+            if '@' not in line or 'kg' not in line.lower():
+                continue
+
+            def repl(match):
+                raw = float(match.group(1))
+                even_load = coerce_even(raw)
+                return f"@ {even_load} kg"
+
+            lines[i] = load_re.sub(repl, line)
+
+        return '\n'.join(lines)
 
     def _validate_no_ranges(self, text, attempt=1):
         """
@@ -408,6 +459,7 @@ Sat (post-deadlift): Upper body only. NO heavy lower back/leg compounds
 
 MANDATORY HARD RULES:
 • Equipment: No belt on pulls, standing calves only, no split squats
+• Dumbbells: even-number loads only (no odd-number DB loads)
 • Biceps: Rotate grips (sup→neutral→pron), never same grip consecutive days, ≤12 sets/4days
 • Triceps: Vary attachments Tue/Fri/Sat, no single-arm D-handle Sat
 • Carries: Tuesday only, moderate load (preserve Friday grip)

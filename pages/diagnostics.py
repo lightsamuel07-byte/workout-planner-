@@ -130,6 +130,6 @@ def show():
 
     st.markdown("---")
 
-    if st.button("🏠 Back to Dashboard", use_container_width=True):
+    if st.button("🏠 Back to Dashboard", width="stretch"):
         st.session_state.current_page = 'dashboard'
         st.rerun()

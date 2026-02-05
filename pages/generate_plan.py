@@ -116,7 +116,7 @@ def show():
     st.markdown(f"""
     <div style="
         background: linear-gradient(135deg, {colors['accent']}15 0%, {colors['surface']} 100%);
-        border: 2px solid {colors['accent']};
+        border: 1px solid {colors['accent']};
         border-radius: 12px;
         padding: 1.5rem;
         margin-bottom: 2rem;
@@ -137,8 +137,8 @@ def show():
     st.markdown(f"""
     <div style="
         background: {colors['surface']};
-        border: 2px solid {colors['border_light']};
-        border-left: 4px solid {colors['accent']};
+        border: 1px solid {colors['border_light']};
+        border-left: 3px solid {colors['accent']};
         border-radius: 8px;
         padding: 1rem;
         margin-bottom: 1.5rem;
@@ -270,7 +270,7 @@ def show():
     
     if not all_workouts_filled:
         st.markdown(f"""
-        <div style="background: rgba(255, 107, 53, 0.1); border-left: 4px solid {colors['warning']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
+        <div style="background: rgba(255, 107, 53, 0.1); border-left: 3px solid {colors['warning']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
             ⚠️ <strong>Please paste all three Fort workouts</strong> (Monday, Wednesday, Friday) to continue.
         </div>
         """, unsafe_allow_html=True)
@@ -284,7 +284,7 @@ def show():
         generate_button = st.button(
             "🚀 Generate Workout Plan with AI",
             type="primary",
-            use_container_width=True,
+            width="stretch",
             disabled=(not all_workouts_filled) or st.session_state.plan_generation_in_progress,
             on_click=_start_plan_generation
         )
@@ -467,7 +467,7 @@ USER PREFERENCES:
                     st.markdown(f"""
                     <div style="
                         background: rgba(0, 212, 170, 0.1);
-                        border: 2px solid {colors['accent']};
+                        border: 1px solid {colors['accent']};
                         border-radius: 8px;
                         padding: 2rem;
                         text-align: center;
@@ -486,9 +486,9 @@ USER PREFERENCES:
 
                     col1, col2 = st.columns(2)
                     with col1:
-                        action_button("📋 View Generated Plan", "plans", accent=True, use_container_width=True)
+                        action_button("📋 View Generated Plan", "plans", accent=True, width="stretch")
                     with col2:
-                        action_button("📊 Back to Dashboard", "dashboard", use_container_width=True)
+                        action_button("📊 Back to Dashboard", "dashboard", width="stretch")
 
                 else:
                     st.error("❌ Failed to generate plan. Please check your API key and try again.")

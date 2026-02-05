@@ -8,7 +8,6 @@ import os
 import glob
 from src.ui_utils import (
     render_page_header, 
-    nav_button, 
     empty_state,
     action_button,
     completion_badge
@@ -95,11 +94,8 @@ def get_latest_sheet_plan():
         if all_sheets:
             return all_sheets[-1]  # Return most recent sheet name
         return None
-    except Exception as e:
-        # Log the actual error for debugging
-        st.error(f"Error loading Google Sheets plan: {e}")
-        import traceback
-        st.code(traceback.format_exc())
+    except Exception:
+        # Fail soft on dashboard when Sheets is temporarily unavailable.
         return None
 
 def parse_plan_summary(plan_path):
@@ -148,14 +144,11 @@ def show():
             "No Workout Plan Yet",
             "Generate your first personalized plan to get started!"
         )
-        action_button("Generate Plan Now", "generate", "🚀", accent=True, use_container_width=True)
+        action_button("Generate Plan Now", "generate", "🚀", accent=True, width="stretch")
         return
 
     # Weekly Calendar View
     st.markdown("### 📆 This Week's Schedule")
-
-    # Create 7 columns for each day
-    cols = st.columns(7)
 
     days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
     workouts = [
@@ -170,65 +163,82 @@ def show():
     
     colors = get_colors()
 
-    for i, (col, day, date, workout) in enumerate(zip(cols, days, week_dates, workouts)):
-        with col:
-            emoji, title, subtitle = workout
+    st.markdown("""
+    <style>
+    .dashboard-week-grid {
+        display: grid;
+        grid-template-columns: repeat(7, minmax(0, 1fr));
+        gap: 0.5rem;
+    }
+    @media (max-width: 1100px) {
+        .dashboard-week-grid {
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 768px) {
+        .dashboard-week-grid {
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+    }
+    @media (max-width: 480px) {
+        .dashboard-week-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-            # Check if this is today
-            is_today = date.date() == datetime.now().date()
-            
-            # Check if completed (simplified - could be enhanced with actual data)
-            is_completed = date.date() < datetime.now().date()
-            
-            completion_icon = completion_badge(is_completed)
+    day_cards = []
+    for day, date, workout in zip(days, week_dates, workouts):
+        emoji, title, subtitle = workout
+        is_today = date.date() == datetime.now().date()
+        is_completed = date.date() < datetime.now().date()
+        completion_icon = completion_badge(is_completed)
+        border_color = colors['accent'] if is_today else colors['border_medium']
+        border_width = '2px' if is_today else '1px'
+        box_shadow = '0 3px 8px rgba(0, 212, 170, 0.12)' if is_today else '0 1px 2px rgba(0,0,0,0.04)'
+        card_class = "day-card today" if is_today else "day-card"
 
-            # Simple alternating colors
-            bg_color = colors['surface']
-            border_color = colors['accent'] if is_today else colors['border_strong']
-            border_width = '3px' if is_today else '2px'
+        day_cards.append(f"""
+            <div class="{card_class}" style="
+                background: {colors['surface']};
+                border: {border_width} solid {border_color};
+                border-radius: 12px;
+                padding: 0.75rem 0.5rem;
+                text-align: center;
+                min-height: 116px;
+                transition: all 0.2s ease;
+                box-shadow: {box_shadow};
+            ">
+                <div style="
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    color: {colors['text_secondary']};
+                    text-transform: uppercase;
+                    letter-spacing: 0.5px;
+                    margin-bottom: 0.25rem;
+                ">{day}</div>
+                <div style="
+                    font-size: 0.7rem;
+                    color: {colors['text_secondary']};
+                    margin-bottom: 0.5rem;
+                ">{date.strftime('%m/%d')}</div>
+                <div style="font-size: 2rem; margin-bottom: 0.5rem;">{emoji}</div>
+                <div style="
+                    font-size: 0.8rem;
+                    font-weight: 700;
+                    color: {colors['text_primary']};
+                    margin-bottom: 0.2rem;
+                ">{title}</div>
+                <div style="
+                    font-size: 0.7rem;
+                    color: {colors['text_secondary']};
+                ">{subtitle}</div>
+                <div style="margin-top: 0.45rem; font-size: 1.1rem;">{completion_icon}</div>
+            </div>
+        """)
 
-            card_class = "day-card today" if is_today else "day-card"
-
-            st.markdown(f"""
-                <div class="{card_class}" style="
-                    background: {bg_color};
-                    border: {border_width} solid {border_color};
-                    border-radius: 12px;
-                    padding: 1rem 0.5rem;
-                    text-align: center;
-                    min-height: 140px;
-                    transition: all 0.2s ease;
-                    box-shadow: {('0 4px 12px rgba(0, 212, 170, 0.15)' if is_today else '0 2px 4px rgba(0,0,0,0.05)')};
-                ">
-                    <div style="
-                        font-size: 0.7rem; 
-                        font-weight: 700; 
-                        color: {colors['text_secondary']}; 
-                        text-transform: uppercase;
-                        letter-spacing: 0.5px;
-                        margin-bottom: 0.25rem;
-                    ">{day}</div>
-                    <div style="
-                        font-size: 0.7rem; 
-                        color: {colors['text_secondary']}; 
-                        margin-bottom: 0.5rem;
-                    ">{date.strftime('%m/%d')}</div>
-                    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{emoji}</div>
-                    <div style="
-                        font-size: 0.8rem; 
-                        font-weight: 700; 
-                        color: {colors['text_primary']}; 
-                        margin-bottom: 0.2rem;
-                    ">{title}</div>
-                    <div style="
-                        font-size: 0.7rem; 
-                        color: {colors['text_secondary']};
-                    ">{subtitle}</div>
-                    <div style="margin-top: 0.75rem; font-size: 1.2rem;">{completion_icon}</div>
-                </div>
-            """, unsafe_allow_html=True)
-
-    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown(f'<div class="dashboard-week-grid">{"".join(day_cards)}</div>', unsafe_allow_html=True)
 
     # Initialize analytics ONCE for all sections to use
     analytics = None
@@ -321,13 +331,13 @@ def show():
     with col3:
         st.markdown("### 🎯 Quick Actions")
 
-        action_button("Log Today's Workout", "log_workout", "📝", accent=True, use_container_width=True)
+        action_button("Log Today's Workout", "log_workout", "📝", accent=True, width="stretch")
 
-        action_button("View Full Week Plan", "plans", "📋", use_container_width=True)
+        action_button("View Full Week Plan", "plans", "📋", width="stretch")
         
-        action_button("View Progress Charts", "progress", "📈", use_container_width=True)
+        action_button("View Progress Charts", "progress", "📈", width="stretch")
 
-        action_button("Generate New Week Plan", "generate", "🆕", use_container_width=True)
+        action_button("Generate New Week Plan", "generate", "🆕", width="stretch")
 
     st.markdown("---")
 
@@ -350,7 +360,7 @@ def show():
                 st.write("📊 Data in Google Sheets")
             except Exception:
                 st.markdown("""
-                <div style="color:#888;text-align:center;padding:1rem;">
+                <div style="color:var(--color-text-secondary);text-align:center;padding:1rem;">
                     <div style="font-size:2rem;margin-bottom:0.5rem;">📝</div>
                     No recent workouts
                 </div>

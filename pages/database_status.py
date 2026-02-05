@@ -111,7 +111,7 @@ def show():
             "so local DB files are not automatically shared."
         )
         st.code(f"python3 scripts/import_google_sheets_history.py --db-path {db_path}")
-        if st.button("⚡ Build DB from Google Sheets now", type="primary", use_container_width=True):
+        if st.button("⚡ Build DB from Google Sheets now", type="primary", width="stretch"):
             with st.spinner("Importing weekly plan history from Google Sheets..."):
                 try:
                     result = bootstrap_database_from_sheets(db_path)
@@ -124,7 +124,7 @@ def show():
                     st.rerun()
                 except Exception as exc:
                     st.error(f"Could not build DB automatically: {exc}")
-        action_button("Back to Dashboard", "dashboard", "🏠", use_container_width=True)
+        action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
         return
 
     file_size_kb = os.path.getsize(db_path) / 1024
