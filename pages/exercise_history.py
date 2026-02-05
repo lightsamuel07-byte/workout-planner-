@@ -31,7 +31,7 @@ def extract_rpe_value(*fields):
 def show():
     """Render the exercise history page"""
 
-    render_page_header("Exercise History", "View detailed progression for any exercise", "📋")
+    render_page_header("Exercise History", "View detailed progression for any exercise")
 
     try:
         # Get authenticated reader
@@ -42,11 +42,11 @@ def show():
 
         if not analytics.historical_data:
             empty_state(
-                "📋",
+                "",
                 "No Exercise History",
                 "Log your workouts to track progress on individual exercises!"
             )
-            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
+            action_button("Back to Dashboard", "dashboard", width="stretch")
             return
 
         # Get unique exercise list
@@ -59,15 +59,15 @@ def show():
 
         if not all_exercises:
             empty_state(
-                "🔍",
+                "",
                 "No Exercises Found",
                 "Your workout history doesn't contain any exercise data yet."
             )
-            action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
+            action_button("Back to Dashboard", "dashboard", width="stretch")
             return
 
         # Search/Filter UI with improved styling
-        st.markdown("### 🔍 Search Exercises")
+        st.markdown("### Search Exercises")
         
         colors = get_colors()
         
@@ -75,16 +75,16 @@ def show():
         <div style="
             background: {colors['surface']};
             border: 1px solid {colors['border_medium']};
-            border-radius: 8px;
+            border-radius: 10px;
             padding: 1rem;
             margin-bottom: 1.5rem;
         ">
-            <div style="font-weight: 600; margin-bottom: 0.5rem;">💡 Quick Tip</div>
+            <div style="font-weight: 600; margin-bottom: 0.5rem;">Quick Tip</div>
             <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
                 Search for any exercise to see your progression over time. Track weights, reps, and performance trends.
             </div>
         </div>
-        """, unsafe_allow_html=True)
+        """.strip(), unsafe_allow_html=True)
 
         col1, col2 = st.columns([3, 1])
 
@@ -111,18 +111,17 @@ def show():
 
         st.markdown(f"""
         <div style="padding: 0.5rem 0; font-size: 0.9rem; color: {colors['text_secondary']};">
-            📊 Found <strong style="color: {colors['accent']};">{len(filtered_exercises)}</strong> exercise(s) in your history
+            Found <strong style="color: {colors['accent']};">{len(filtered_exercises)}</strong> exercise(s) in your history
         </div>
-        """, unsafe_allow_html=True)
+        """.strip(), unsafe_allow_html=True)
 
         if not filtered_exercises:
             st.markdown(f"""
             <div style="text-align:center;padding:2rem;color:{colors['text_secondary']};">
-                <div style="font-size:3rem;margin-bottom:1rem;">🤔</div>
                 <div style="font-weight:600;margin-bottom:0.5rem;">No Matches Found</div>
                 <div style="font-size:0.9rem;">Try a different search term</div>
             </div>
-            """, unsafe_allow_html=True)
+            """.strip(), unsafe_allow_html=True)
             return
 
         # Exercise selector
@@ -133,7 +132,7 @@ def show():
 
         if selected_exercise:
             st.markdown("---")
-            st.markdown(f"## 📊 {selected_exercise}")
+            st.markdown(f"## {selected_exercise}")
 
             # Filter workouts for this exercise (respecting time filter)
             filtered_data = analytics.historical_data[-(weeks_filter * 7):] if len(analytics.historical_data) > weeks_filter * 7 else analytics.historical_data
@@ -158,11 +157,10 @@ def show():
             if not exercise_history:
                 st.markdown(f"""
                 <div style="text-align:center;padding:2rem;color:{colors['text_secondary']};">
-                    <div style="font-size:3rem;margin-bottom:1rem;">📊</div>
                     <div style="font-weight:600;margin-bottom:0.5rem;">No History for {selected_exercise}</div>
                     <div style="font-size:0.9rem;">No records found in the last {weeks_filter} weeks</div>
                 </div>
-                """, unsafe_allow_html=True)
+                """.strip(), unsafe_allow_html=True)
                 return
 
             # Summary metrics
@@ -213,7 +211,7 @@ def show():
                         })
 
                 if len(chart_data) >= 2:
-                    st.markdown("### 📈 Load Progression")
+                    st.markdown("### Load Progression")
                     df = pd.DataFrame(chart_data)
                     st.line_chart(df.set_index('Session'))
             except Exception as e:
@@ -222,7 +220,7 @@ def show():
             st.markdown("---")
 
             # Session-by-session breakdown
-            st.markdown("### 📝 Session History")
+            st.markdown("### Session History")
 
             for i, session in enumerate(reversed(exercise_history)):
                 # Build summary line
@@ -234,9 +232,9 @@ def show():
                 if session['load']:
                     summary_parts.append(f"@ {session['load']}")
 
-                summary = " × ".join(summary_parts) if summary_parts else "No data"
+                summary = " x ".join(summary_parts) if summary_parts else "No data"
 
-                with st.expander(f"**{len(exercise_history) - i}.** {session['date']} — {summary}"):
+                with st.expander(f"**{len(exercise_history) - i}.** {session['date']} - {summary}"):
                     col1, col2 = st.columns(2)
 
                     with col1:
@@ -251,7 +249,7 @@ def show():
                     with col2:
                         st.markdown("**Logged Performance:**")
                         if session['log']:
-                            st.success(f"✅ {session['log']}")
+                            st.success(f"{session['log']}")
                         else:
                             st.info("Not logged")
 
@@ -268,4 +266,4 @@ def show():
     st.markdown("---")
 
     # Back button
-    action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
+    action_button("Back to Dashboard", "dashboard", width="stretch")

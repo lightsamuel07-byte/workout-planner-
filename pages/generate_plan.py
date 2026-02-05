@@ -103,7 +103,7 @@ def extract_fort_preamble(workout_text):
 def show():
     """Render the generate plan page"""
 
-    render_page_header("Generate New Workout Plan", "Create your personalized weekly workout plan", "🆕")
+    render_page_header("Generate New Workout Plan", "Create your personalized weekly workout plan")
 
     if 'plan_generation_in_progress' not in st.session_state:
         st.session_state.plan_generation_in_progress = False
@@ -115,42 +115,43 @@ def show():
     # Week info card
     st.markdown(f"""
     <div style="
-        background: linear-gradient(135deg, {colors['accent']}15 0%, {colors['surface']} 100%);
-        border: 1px solid {colors['accent']};
-        border-radius: 12px;
+        background: {colors['surface']};
+        border: 1px solid {colors['border_medium']};
+        border-radius: 16px;
         padding: 1.5rem;
         margin-bottom: 2rem;
         text-align: center;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     ">
         <div style="font-size: 0.85rem; text-transform: uppercase; font-weight: 700; color: {colors['text_secondary']}; letter-spacing: 0.5px; margin-bottom: 0.5rem;">
-            WEEK STARTING
+            Week Starting
         </div>
-        <div style="font-size: 1.75rem; font-weight: 700; color: {colors['text_primary']};">
-            📅 {next_monday.strftime('%A, %B %d, %Y')}
+        <div style="font-size: 1.75rem; font-weight: 600; color: {colors['text_primary']};">
+            {next_monday.strftime('%A, %B %d, %Y')}
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.strip(), unsafe_allow_html=True)
 
     # Step 1: Fort Workouts Input
-    st.markdown("### 📋 STEP 1: Fort Workouts (Mon/Wed/Fri)")
+    st.markdown("### Step 1: Fort Workouts (Mon/Wed/Fri)")
     
     st.markdown(f"""
     <div style="
         background: {colors['surface']};
-        border: 1px solid {colors['border_light']};
+        border: 1px solid {colors['border_medium']};
         border-left: 3px solid {colors['accent']};
-        border-radius: 8px;
+        border-radius: 10px;
         padding: 1rem;
         margin-bottom: 1.5rem;
     ">
-        <div style="font-weight: 600; margin-bottom: 0.5rem;">💡 How to use:</div>
+        <div style="font-weight: 600; margin-bottom: 0.5rem;">How to use:</div>
         <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
             Copy your Fort workouts from Train Heroic and paste them into the boxes below. The AI will analyze them and create complementary supplemental exercises.
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.strip(), unsafe_allow_html=True)
 
-    with st.expander("📝 MONDAY WORKOUT", expanded=True):
+    with st.expander("Monday Workout", expanded=True):
         monday_workout = st.text_area(
             label="monday_input",
             height=200,
@@ -159,7 +160,7 @@ def show():
             label_visibility="collapsed"
         )
 
-    with st.expander("📝 WEDNESDAY WORKOUT"):
+    with st.expander("Wednesday Workout"):
         wednesday_workout = st.text_area(
             label="wednesday_input",
             height=200,
@@ -168,7 +169,7 @@ def show():
             label_visibility="collapsed"
         )
 
-    with st.expander("📝 FRIDAY WORKOUT"):
+    with st.expander("Friday Workout"):
         friday_workout = st.text_area(
             label="friday_input",
             height=200,
@@ -180,26 +181,26 @@ def show():
     st.markdown("---")
 
     # Step 2: Program Status
-    st.markdown("### 🔄 STEP 2: Program Status")
+    st.markdown("### Step 2: Program Status")
 
     is_new_program = st.radio(
         "Is this a new Fort program?",
         options=[False, True],
-        format_func=lambda x: "🆕 Yes - Design fresh supplemental workouts" if x else "📈 No - Continue with progressive overload",
+        format_func=lambda x: "Yes - Design fresh supplemental workouts" if x else "No - Continue with progressive overload",
         key="is_new_program"
     )
 
     if not is_new_program:
-        st.info("✅ The AI will continue your current supplemental exercises with progressive overload based on last week's performance.")
+        st.info("The AI will continue your current supplemental exercises with progressive overload based on last week's performance.")
     else:
-        st.info("🆕 The AI will design brand new supplemental workouts aligned with your new Fort program.")
+        st.info("The AI will design brand new supplemental workouts aligned with your new Fort program.")
 
     st.markdown("---")
 
     # Step 2.5: Select Prior Week Sheet
     prior_week_sheet = None
     if not is_new_program:
-        st.markdown("### 📋 STEP 2.5: Select Prior Week's Sheet")
+        st.markdown("### Step 2.5: Select Prior Week's Sheet")
 
         try:
             from src.sheets_reader import SheetsReader
@@ -232,23 +233,23 @@ def show():
                     help="Choose the sheet containing last week's logged performance. The AI will use Column H (Log) data for progressive overload."
                 )
 
-                st.success(f"✅ Will read workout history from: **{prior_week_sheet}**")
+                st.success(f"Will read workout history from: **{prior_week_sheet}**")
             else:
-                st.warning("⚠️ No weekly plan sheets found. The AI will generate workouts without prior history.")
+                st.warning("No weekly plan sheets found. The AI will generate workouts without prior history.")
 
         except Exception as e:
-            st.warning(f"⚠️ Could not load sheet list: {str(e)}")
-            st.info("💡 The AI will use the default sheet from config.yaml")
+            st.warning(f"Could not load sheet list: {str(e)}")
+            st.info("The AI will use the default sheet from config.yaml")
 
     st.markdown("---")
 
     # Step 3: Review Last Week (Optional)
-    st.markdown("### 📊 STEP 3: Last Week's Performance (Optional)")
+    st.markdown("### Step 3: Last Week's Performance (Optional)")
 
     with st.expander("View Last Week's Log"):
         if prior_week_sheet:
             st.markdown(f"""
-            📊 **Auto-loaded from Google Sheets**
+            **Auto-loaded from Google Sheets**
 
             *Reading workout history from: **{prior_week_sheet}***
 
@@ -256,7 +257,7 @@ def show():
             """)
         else:
             st.markdown("""
-            📊 **Auto-loaded from Google Sheets**
+            **Auto-loaded from Google Sheets**
 
             *Last week's data will be automatically loaded and used for progressive overload recommendations.*
             """)
@@ -270,10 +271,10 @@ def show():
     
     if not all_workouts_filled:
         st.markdown(f"""
-        <div style="background: rgba(255, 107, 53, 0.1); border-left: 3px solid {colors['warning']}; padding: 1rem; border-radius: 4px; margin: 1rem 0;">
-            ⚠️ <strong>Please paste all three Fort workouts</strong> (Monday, Wednesday, Friday) to continue.
+        <div style="background: rgba(255, 159, 10, 0.12); border-left: 3px solid {colors['warning']}; padding: 1rem; border-radius: 10px; margin: 1rem 0;">
+            <strong>Please paste all three Fort workouts</strong> (Monday, Wednesday, Friday) to continue.
         </div>
-        """, unsafe_allow_html=True)
+        """.strip(), unsafe_allow_html=True)
 
     col1, col2, col3 = st.columns([1, 2, 1])
 
@@ -282,7 +283,7 @@ def show():
             st.session_state.plan_generation_in_progress = True
 
         generate_button = st.button(
-            "🚀 Generate Workout Plan with AI",
+            "Generate Workout Plan with AI",
             type="primary",
             width="stretch",
             disabled=(not all_workouts_filled) or st.session_state.plan_generation_in_progress,
@@ -290,7 +291,7 @@ def show():
         )
 
     if generate_button:
-        with st.spinner("🤖 Generating your personalized workout plan..."):
+        with st.spinner("Generating your personalized workout plan..."):
             try:
                 # Import after user clicks to avoid loading on page load
                 from src.plan_generator import PlanGenerator
@@ -316,7 +317,7 @@ def show():
                     api_key = os.getenv(config['claude']['api_key_env'])
 
                 if not api_key:
-                    st.error("❌ API key not found. Please check your .env file or Streamlit secrets.")
+                    st.error("API key not found. Please check your .env file or Streamlit secrets.")
                     return
 
                 # Format trainer workouts
@@ -358,10 +359,10 @@ TRAINER WORKOUTS FROM TRAIN HEROIC:
                 # Fixed preferences
                 preferences = """
 USER PREFERENCES:
-• Goal: maximize aesthetics without interfering with Mon/Wed/Fri Fort program
-• Training Approach: progressive overload
-• Supplemental Days: Tuesday, Thursday, Saturday
-• Rest Day: Sunday
+- Goal: maximize aesthetics without interfering with Mon/Wed/Fri Fort program
+- Training Approach: progressive overload
+- Supplemental Days: Tuesday, Thursday, Saturday
+- Rest Day: Sunday
 """
 
                 # Get workout history (optional)
@@ -391,9 +392,9 @@ USER PREFERENCES:
                             logs_per_exercise=2,
                         )
 
-                        st.info(f"✅ Loaded workout history from: **{sheet_to_read}**")
+                        st.info(f"Loaded workout history from: **{sheet_to_read}**")
                         if db_context:
-                            st.caption("🗄️ Added compact long-term context from local DB.")
+                            st.caption("Added compact long-term context from local DB.")
                     except Exception as e:
                         st.warning(f"Could not load prior week data: {e}")
 
@@ -461,40 +462,39 @@ USER PREFERENCES:
                     sheets_writer.archive_sheet_if_exists(archived_sheet_name)
                     sheets_writer.write_workout_plan(plan)
 
-                    st.success("✅ Workout plan generated successfully!")
-                    st.balloons()
+                    st.success("Workout plan generated successfully!")
 
                     st.markdown(f"""
                     <div style="
-                        background: rgba(0, 212, 170, 0.1);
-                        border: 1px solid {colors['accent']};
-                        border-radius: 8px;
+                        background: {colors['surface']};
+                        border: 1px solid {colors['border_medium']};
+                        border-radius: 16px;
                         padding: 2rem;
                         text-align: center;
                         margin: 2rem 0;
+                        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
                     ">
-                        <div style="font-size: 3rem; margin-bottom: 1rem;">🎉</div>
-                        <div style="font-size: 1.5rem; font-weight: 700; color: {colors['text_primary']}; margin-bottom: 1rem;">Success!</div>
+                        <div style="font-size: 1.5rem; font-weight: 600; color: {colors['text_primary']}; margin-bottom: 1rem;">Plan Generated</div>
                         <div style="color: {colors['text_secondary']}; margin-bottom: 1rem;">
                             Your workout plan has been generated and saved to:<br>
-                            📄 Markdown file: <code>{output_file}</code><br>
-                            📝 Explanation file: <code>{os.path.join(output_folder, f'workout_plan_{week_stamp}_explanation.md')}</code><br>
-                            📊 Google Sheets: <code>{sheet_name}</code>
+                            Markdown file: <code>{output_file}</code><br>
+                            Explanation file: <code>{os.path.join(output_folder, f'workout_plan_{week_stamp}_explanation.md')}</code><br>
+                            Google Sheets: <code>{sheet_name}</code>
                         </div>
                     </div>
-                    """, unsafe_allow_html=True)
+                    """.strip(), unsafe_allow_html=True)
 
                     col1, col2 = st.columns(2)
                     with col1:
-                        action_button("📋 View Generated Plan", "plans", accent=True, width="stretch")
+                        action_button("View Generated Plan", "plans", accent=True, width="stretch")
                     with col2:
-                        action_button("📊 Back to Dashboard", "dashboard", width="stretch")
+                        action_button("Back to Dashboard", "dashboard", width="stretch")
 
                 else:
-                    st.error("❌ Failed to generate plan. Please check your API key and try again.")
+                    st.error("Failed to generate plan. Please check your API key and try again.")
 
             except Exception as e:
-                st.error(f"❌ Error: {str(e)}")
+                st.error(f"Error: {str(e)}")
                 import traceback
                 with st.expander("View Error Details"):
                     st.code(traceback.format_exc())
@@ -506,16 +506,14 @@ USER PREFERENCES:
     
     colors = get_colors()
     st.markdown(f"""
-    <div style="display: flex; justify-content: space-around; padding: 1rem; background: {colors['surface']}; border: 1px solid {colors['border_light']}; border-radius: 8px;">
+    <div style="display: flex; justify-content: space-around; padding: 1rem; background: {colors['surface']}; border: 1px solid {colors['border_medium']}; border-radius: 16px;">
         <div style="text-align: center;">
-            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">⏱️</div>
             <div style="font-size: 0.875rem; color: {colors['text_secondary']};">Estimated time</div>
             <div style="font-weight: 600; color: {colors['text_primary']};">30-45 seconds</div>
         </div>
         <div style="text-align: center;">
-            <div style="font-size: 1.5rem; margin-bottom: 0.25rem;">💰</div>
             <div style="font-size: 0.875rem; color: {colors['text_secondary']};">API cost</div>
             <div style="font-weight: 600; color: {colors['text_primary']};">~$0.30</div>
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.strip(), unsafe_allow_html=True)

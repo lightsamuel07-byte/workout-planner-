@@ -1,43 +1,23 @@
-# Session Plan - UX Audit (2026-02-05)
+# Session Plan - Apple-Style UI Refresh (2026-02-05)
 
 ## Checklist
-- [x] Confirm AGENTS workflow requirements and startup document order.
-- [x] Scan repository for canonical documentation files required by startup checklist.
-- [x] Create missing canonical docs from current codebase.
-- [x] Read startup documents in required order from newly created canonical docs.
-- [x] Audit app screens/components via code + Streamlit test runtime (live network-dependent data unavailable in sandbox).
-- [x] Produce phased UX plan (Phase 1/2/3) with implementation-ready notes.
-- [x] Confirm phase order and scope with user before any implementation.
-- [x] Implement approved Phase 1 mobile-critical UX updates.
-- [x] Verify app compiles and key pages render after Phase 1 changes.
-- [x] Implement Phase 2 refinement updates (hierarchy, spacing, border consistency, tokenized styling) across all primary pages.
-- [x] Implement Phase 3 polish updates (responsive weekly grid, button API consistency, calmer motion/status treatment).
-- [x] Re-verify compile/import/startup smoke checks after refinement pass.
-- [x] Add regression tests for workout log field parsing/serialization.
-- [x] Run iterative debug loop (compile + tests + startup smoke + targeted refinement).
-- [x] Refactor dashboard day-card renderer into design-system helper to remove repetitive inline template code.
-- [x] Add unit tests for day-card HTML rendering and escaping behavior.
+- [x] Confirm this session plan with the user before any code changes.
+- [x] Update design tokens in `DESIGN_SYSTEM.md`, `src/design_system.py`, and `assets/styles.css` (Apple palette, SF Pro stack, motion timing, radii).
+- [x] Restyle global CSS in `assets/styles.css` (remove ripple/hover lift, flatten shadows, button and input focus ring updates, reduce empty-state icon size).
+- [x] Remove emoji from headers/nav/section titles across `app.py`, `src/ui_utils.py` usage, and `pages/*.py` (keep emoji only in empty states if needed).
+- [x] Refine day cards (`src/design_system.py`, `pages/dashboard.py`): hide emoji block if empty, adjust typography, monochrome completion icon.
+- [x] Consistency cleanup across pages (`pages/dashboard.py`, `pages/view_plans.py`, `pages/workout_logger.py`, `pages/weekly_review.py`, `pages/progress.py`, `pages/exercise_history.py`): border/radius/accents aligned to tokens.
+- [x] Ensure HTML rendering safety for any HTML blocks (strip/dedent; no Markdown code block rendering).
+- [x] Run validation: `python3 -m compileall app.py pages src`, `python3 -m unittest discover -s tests -p "test_*.py" -v`, `python3 -m streamlit run app.py --server.headless true --server.port 85xx`.
+- [x] Update `progress.txt` with completed work and next steps; fill Review section here.
+- [x] Commit and push to git.
 
-## Blockers
-- No active blockers.
-
-## Review (to fill at end of session)
+## Review (fill in at end of session)
 - Findings:
-  - Canonical doc set was missing and blocked doc-locked UX workflow.
-  - Canonical docs are now present and aligned to current app behavior.
-  - UX audit completed; critical issues identified in theming, component consistency, and state design.
-  - Phase 1 shipped focused fixes for mobile layout behavior, border emphasis, safe-area spacing, and logger input clarity.
-  - Phase 2/3 refinement pass unified border weight rhythm to 1px default/2px emphasis and removed hardcoded color drift on key screens.
-  - Dashboard weekly schedule now uses a responsive CSS grid that adapts cleanly from desktop to phone instead of fixed 7-column Streamlit layout.
-  - Primary navigation and action buttons now use `width="stretch"` consistently (with legacy compatibility in `src/ui_utils.py`) to avoid deprecated usage patterns.
-  - Added unit coverage for workout logger parsing/formatting logic (`tests/test_workout_logger_fields.py`).
-  - Added unit coverage for design-system day card rendering (`tests/test_design_system_day_card.py`).
-  - Added HTML-escaping hardening for weekly review and plan-view exercise rendering to avoid markup breakage from logged text.
-  - Dashboard now fails soft when Sheets is unavailable (no raw traceback noise in user-facing UI).
-  - Dashboard weekly card HTML moved into `get_day_card_html(...)` to keep page code clean and easier to maintain.
+  - Apple-style palette + typography applied across tokens and CSS; emoji removed from headers/CTAs.
+  - Day cards now hide emoji blocks when empty and use monochrome completion markers.
+  - HTML blocks are left-aligned to prevent code-block rendering issues.
 - Decisions:
-  - Use current codebase as source of truth for initial canonical documentation baseline.
-  - Keep functionality unchanged; queue visual/system changes by approved phases.
-  - Continue autonomously through Phase 2/3 per user instruction while preserving existing functionality.
-- Next step:
-  - Capture user screenshot feedback after this refinement cycle; if needed, run one final micro-polish pass only on screens that still feel visually dense.
+  - Created `DESIGN_SYSTEM_2026-02-05_2219.md` instead of overwriting `DESIGN_SYSTEM.md` to preserve doc history.
+- Next steps:
+  - Capture updated screenshots (mobile/tablet/desktop, light/dark) for review.

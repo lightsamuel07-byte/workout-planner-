@@ -130,7 +130,7 @@ def show():
     week_end = week_dates[6].strftime("%b %d, %Y")
 
     # Header
-    render_page_header("Weekly Dashboard", f"Week of {week_start} - {week_end}", "📅")
+    render_page_header("Weekly Dashboard", f"Week of {week_start} - {week_end}")
 
     # Get latest plan (try markdown file first, then Google Sheets)
     latest_plan = get_latest_plan()
@@ -139,25 +139,25 @@ def show():
 
     if not latest_plan and not latest_sheet_plan:
         empty_state(
-            "🎯",
+            "",
             "No Workout Plan Yet",
             "Generate your first personalized plan to get started!"
         )
-        action_button("Generate Plan Now", "generate", "🚀", accent=True, width="stretch")
+        action_button("Generate Plan Now", "generate", accent=True, width="stretch")
         return
 
     # Weekly Calendar View
-    st.markdown("### 📆 This Week's Schedule")
+    st.markdown("### This Week's Schedule")
 
     days = ['MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT', 'SUN']
     workouts = [
-        ('🏋️', 'FORT', 'Back Squat'),
-        ('💪', 'ARMS', 'Aesthetics'),
-        ('🏋️', 'FORT', 'Bench Press'),
-        ('💪', 'BACK', 'Detail'),
-        ('🏋️', 'FORT', 'Deadlift'),
-        ('💪', 'UPPER', '+ Arms'),
-        ('😌', 'REST', 'Recovery')
+        ('', 'FORT', 'Back Squat'),
+        ('', 'ARMS', 'Aesthetics'),
+        ('', 'FORT', 'Bench Press'),
+        ('', 'BACK', 'Detail'),
+        ('', 'FORT', 'Deadlift'),
+        ('', 'UPPER', '+ Arms'),
+        ('', 'REST', 'Recovery')
     ]
     
     colors = get_colors()
@@ -185,7 +185,7 @@ def show():
         }
     }
     </style>
-    """, unsafe_allow_html=True)
+    """.strip(), unsafe_allow_html=True)
 
     day_cards = []
     for day, date, workout in zip(days, week_dates, workouts):
@@ -233,7 +233,7 @@ def show():
     col1, col2, col3 = st.columns([2, 2, 3])
 
     with col1:
-        st.markdown("### 📊 This Week")
+        st.markdown("### This Week")
         st.metric("Total Exercises", plan_summary.get('total_exercises', 0))
 
         # Get real completion data
@@ -257,7 +257,7 @@ def show():
             st.metric("Weekly Volume", fallback['weekly_volume'])
 
     with col2:
-        st.markdown("### 🔥 Progress")
+        st.markdown("### Progress")
 
         # Get real lift progression data
         fallback = get_fallback_stats()
@@ -294,20 +294,20 @@ def show():
             st.metric("Deadlift", *fallback['deadlift'])
 
     with col3:
-        st.markdown("### 🎯 Quick Actions")
+        st.markdown("### Quick Actions")
 
-        action_button("Log Today's Workout", "log_workout", "📝", accent=True, width="stretch")
+        action_button("Log Today's Workout", "log_workout", accent=True, width="stretch")
 
-        action_button("View Full Week Plan", "plans", "📋", width="stretch")
+        action_button("View Full Week Plan", "plans", width="stretch")
         
-        action_button("View Progress Charts", "progress", "📈", width="stretch")
+        action_button("View Progress Charts", "progress", width="stretch")
 
-        action_button("Generate New Week Plan", "generate", "🆕", width="stretch")
+        action_button("Generate New Week Plan", "generate", width="stretch")
 
     st.markdown("---")
 
     # Recent Activity
-    st.markdown("### 📝 Recent Activity")
+    st.markdown("### Recent Activity")
 
     col1, col2 = st.columns(2)
 
@@ -321,23 +321,21 @@ def show():
                 exercise_count = len(recent_workout.get('exercises', []))
 
                 st.write(f"**{workout_date}**")
-                st.write(f"✅ {exercise_count} exercises")
-                st.write("📊 Data in Google Sheets")
+                st.write(f"{exercise_count} exercises")
+                st.write("Data in Google Sheets")
             except Exception:
                 st.markdown("""
                 <div style="color:var(--color-text-secondary);text-align:center;padding:1rem;">
-                    <div style="font-size:2rem;margin-bottom:0.5rem;">📝</div>
                     No recent workouts
                 </div>
-                """)
+                """.strip(), unsafe_allow_html=True)
         else:
             st.markdown("""
             <div style="text-align:center;padding:2rem;">
-                <div style="font-size:3rem;margin-bottom:1rem;">🏋️</div>
                 <div style="font-weight:600;margin-bottom:0.5rem;color: var(--color-text-primary);">No Workouts Logged Yet</div>
                 <div style="font-size:0.9rem;color: var(--color-text-secondary);">Start logging your workouts to see your history here!</div>
             </div>
-            """)
+            """.strip(), unsafe_allow_html=True)
 
     with col2:
         st.markdown("#### Latest Plan")
@@ -345,13 +343,13 @@ def show():
             plan_name = os.path.basename(latest_plan)
             plan_date = plan_name.replace('workout_plan_', '').replace('.md', '')
             st.write(f"**Generated:** {plan_date[:8]}")
-            st.write(f"📄 {plan_summary.get('total_exercises', 0)} exercises")
-            st.write("✅ Saved to Google Sheets")
-            action_button("View Plan →", "plans")
+            st.write(f"{plan_summary.get('total_exercises', 0)} exercises")
+            st.write("Saved to Google Sheets")
+            action_button("View Plan", "plans")
         elif latest_sheet_plan:
             # Show plan from Google Sheets if no markdown file
             plan_date = latest_sheet_plan.replace('Weekly Plan (', '').replace('(Weekly Plan) ', '').replace(')', '')
             st.write(f"**Sheet:** {plan_date}")
-            st.write(f"📊 Plan in Google Sheets")
-            st.write("✅ Ready to log workouts")
-            action_button("View Plan →", "plans")
+            st.write("Plan in Google Sheets")
+            st.write("Ready to log workouts")
+            action_button("View Plan", "plans")

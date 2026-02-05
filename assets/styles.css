@@ -1,24 +1,24 @@
 /* Global Design System Styles */
-/* Conservative animations, teal/mint accent, mobile-first */
+/* Apple-style neutral palette, minimal motion, mobile-first */
 
 :root {
     /* Colors - Light Mode */
-    --color-primary: #000000;
-    --color-primary-variant: #1A1A1A;
-    --color-accent: #00D4AA;
-    --color-accent-dark: #00B894;
-    --color-background: #FAFAFA;
+    --color-primary: #111111;
+    --color-primary-variant: #1D1D1F;
+    --color-accent: #0071E3;
+    --color-accent-dark: #0066CC;
+    --color-background: #F5F5F7;
     --color-surface: #FFFFFF;
-    --color-success: #00D4AA;
-    --color-warning: #FF6B35;
-    --color-error: #DC3545;
-    --color-info: #3B82F6;
-    --color-text-primary: #000000;
-    --color-text-secondary: #6B7280;
-    --color-text-disabled: #9CA3AF;
-    --color-border-strong: #000000;
-    --color-border-medium: #D1D5DB;
-    --color-border-light: #E5E7EB;
+    --color-success: #34C759;
+    --color-warning: #FF9F0A;
+    --color-error: #FF3B30;
+    --color-info: #0071E3;
+    --color-text-primary: #111111;
+    --color-text-secondary: #6E6E73;
+    --color-text-disabled: #A1A1A6;
+    --color-border-strong: #1D1D1F;
+    --color-border-medium: #D2D2D7;
+    --color-border-light: #E5E5EA;
     --border-width-subtle: 1px;
     --border-width-strong: 2px;
     
@@ -31,27 +31,33 @@
     --spacing-2xl: 3rem;
     
     /* Typography */
-    --font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-    --font-family-heading: 'Space Grotesk', 'Inter', sans-serif;
+    --font-family: -apple-system, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
+    --font-family-heading: -apple-system, "SF Pro Text", "SF Pro Display", "Segoe UI", system-ui, sans-serif;
     
     /* Animation */
-    --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-standard: 250ms cubic-bezier(0.4, 0, 0.2, 1);
-    --transition-slow: 350ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: 120ms ease-out;
+    --transition-standard: 180ms ease-out;
+    --transition-slow: 240ms ease-out;
 }
 
 /* Dark Mode */
 [data-theme="dark"] {
     --color-primary: #FFFFFF;
     --color-primary-variant: #E5E5E5;
-    --color-background: #0F0F0F;
-    --color-surface: #1A1A1A;
-    --color-text-primary: #FFFFFF;
-    --color-text-secondary: #9CA3AF;
-    --color-text-disabled: #6B7280;
-    --color-border-strong: #FFFFFF;
-    --color-border-medium: #374151;
-    --color-border-light: #1F2937;
+    --color-accent: #0A84FF;
+    --color-accent-dark: #006EDB;
+    --color-background: #0B0B0C;
+    --color-surface: #1C1C1E;
+    --color-success: #30D158;
+    --color-warning: #FF9F0A;
+    --color-error: #FF453A;
+    --color-info: #0A84FF;
+    --color-text-primary: #F5F5F7;
+    --color-text-secondary: #8E8E93;
+    --color-text-disabled: #636366;
+    --color-border-strong: #F5F5F7;
+    --color-border-medium: #2C2C2E;
+    --color-border-light: #3A3A3C;
 }
 
 /* Base Styles */
@@ -82,10 +88,10 @@ h1, h2, h3, h4, h5, h6 {
 /* Enhanced Buttons */
 .stButton > button {
     font-family: var(--font-family);
-    font-weight: 600;
-    border-radius: 8px !important;
+    font-weight: 500;
+    border-radius: 10px !important;
     border: var(--border-width-subtle) solid var(--color-border-medium) !important;
-    transition: all var(--transition-fast) !important;
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast), background-color var(--transition-fast) !important;
     min-height: 44px !important;
     padding: 0.75rem 1.5rem !important;
     cursor: pointer;
@@ -93,97 +99,81 @@ h1, h2, h3, h4, h5, h6 {
     overflow: hidden;
 }
 
-.stButton > button::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 0;
-    height: 0;
-    border-radius: 50%;
-    background: rgba(255, 255, 255, 0.3);
-    transform: translate(-50%, -50%);
-    transition: width 0.6s, height 0.6s;
-}
-
-.stButton > button:active::before {
-    width: 300px;
-    height: 300px;
-}
-
 .stButton > button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 12px rgba(0, 0, 0, 0.15);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+    border-color: var(--color-border-strong);
 }
 
 .stButton > button:active {
-    transform: translateY(0);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
 
 /* Accent Button */
 .accent-button button,
 button[kind="primary"] {
     background-color: var(--color-accent) !important;
-    color: var(--color-primary) !important;
+    color: #FFFFFF !important;
     border-color: var(--color-accent) !important;
 }
 
 .accent-button button:hover,
 button[kind="primary"]:hover {
     background-color: var(--color-accent-dark) !important;
-    box-shadow: 0 4px 12px rgba(0, 212, 170, 0.3) !important;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
 }
 
 /* Metric Cards */
 .metric-card {
     background: var(--color-surface);
-    border: var(--border-width-subtle) solid var(--color-border-light);
-    border-radius: 8px;
+    border: var(--border-width-subtle) solid var(--color-border-medium);
+    border-radius: 10px;
     padding: var(--spacing-md);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .metric-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-border-strong);
 }
 
 /* Exercise Cards */
 .exercise-card {
     background: var(--color-surface);
     border: var(--border-width-subtle) solid var(--color-border-medium);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: var(--spacing-md);
     margin-bottom: var(--spacing-md);
-    transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
 }
 
 .exercise-card:hover {
-    transform: translateY(-1px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-border-strong);
 }
 
 /* Day Cards */
 .day-card {
     background: var(--color-surface);
     border: var(--border-width-subtle) solid var(--color-border-medium);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: var(--spacing-md);
     text-align: center;
-    transition: all var(--transition-fast);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
     min-width: 100px;
 }
 
 .day-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-border-strong);
 }
 
 .day-card.today {
     border-color: var(--color-accent);
     border-width: var(--border-width-strong);
-    box-shadow: 0 0 0 1px var(--color-accent);
+    box-shadow: 0 2px 6px rgba(0, 113, 227, 0.16);
 }
 
 /* Loading Skeleton */
@@ -201,7 +191,7 @@ button[kind="primary"]:hover {
     );
     background-size: 200% 100%;
     animation: shimmer 1.5s infinite;
-    border-radius: 8px;
+    border-radius: 10px;
 }
 
 /* Inputs */
@@ -210,7 +200,7 @@ button[kind="primary"]:hover {
 .stSelectbox > div > div > select,
 .stNumberInput > div > div > input {
     font-family: var(--font-family);
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     border: var(--border-width-subtle) solid var(--color-border-medium) !important;
     min-height: 44px !important;
     transition: all var(--transition-fast) !important;
@@ -223,7 +213,7 @@ button[kind="primary"]:hover {
 .stSelectbox > div > div > select:hover,
 .stNumberInput > div > div > input:hover {
     border-color: var(--color-accent) !important;
-    background-color: rgba(0, 212, 170, 0.02) !important;
+    background-color: rgba(0, 113, 227, 0.02) !important;
 }
 
 .stTextInput > div > div > input:focus,
@@ -231,54 +221,48 @@ button[kind="primary"]:hover {
 .stSelectbox > div > div > select:focus,
 .stNumberInput > div > div > input:focus {
     border-color: var(--color-accent) !important;
-    box-shadow: 0 0 0 3px rgba(0, 212, 170, 0.15) !important;
-    transform: translateY(-1px);
+    box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.2) !important;
     background-color: var(--color-surface) !important;
 }
 
 /* Success/Error/Info Messages */
 .stSuccess {
-    background-color: rgba(0, 212, 170, 0.1) !important;
+    background-color: rgba(52, 199, 89, 0.12) !important;
     border-left: 4px solid var(--color-success) !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
 }
 
 .stError {
-    background-color: rgba(220, 53, 69, 0.1) !important;
+    background-color: rgba(255, 59, 48, 0.12) !important;
     border-left: 4px solid var(--color-error) !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
 }
 
 .stWarning {
-    background-color: rgba(255, 107, 53, 0.1) !important;
+    background-color: rgba(255, 159, 10, 0.12) !important;
     border-left: 4px solid var(--color-warning) !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
 }
 
 .stInfo {
-    background-color: rgba(59, 130, 246, 0.1) !important;
+    background-color: rgba(0, 113, 227, 0.12) !important;
     border-left: 4px solid var(--color-info) !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
 }
 
 /* Expanders */
 .streamlit-expanderHeader {
     font-weight: 600 !important;
-    border-radius: 8px !important;
+    border-radius: 10px !important;
     background-color: var(--color-surface) !important;
-    border: var(--border-width-subtle) solid var(--color-border-light) !important;
-    transition: all var(--transition-fast) !important;
+    border: var(--border-width-subtle) solid var(--color-border-medium) !important;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast), background-color var(--transition-fast) !important;
     cursor: pointer !important;
 }
 
 .streamlit-expanderHeader:hover {
     border-color: var(--color-accent) !important;
-    background-color: rgba(0, 212, 170, 0.05) !important;
-    transform: translateX(4px);
-}
-
-.streamlit-expanderHeader:active {
-    transform: translateX(2px);
+    background-color: rgba(0, 113, 227, 0.04) !important;
 }
 
 /* Progress Bars */
@@ -289,33 +273,18 @@ button[kind="primary"]:hover {
 /* Metrics */
 [data-testid="stMetric"] {
     background: var(--color-surface);
-    border: var(--border-width-subtle) solid var(--color-border-light);
-    border-radius: 8px;
+    border: var(--border-width-subtle) solid var(--color-border-medium);
+    border-radius: 10px;
     padding: var(--spacing-md);
-    transition: all var(--transition-fast);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+    transition: box-shadow var(--transition-fast), border-color var(--transition-fast);
     position: relative;
     overflow: hidden;
 }
 
-[data-testid="stMetric"]::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(0, 212, 170, 0.1), transparent);
-    transition: left 0.5s;
-}
-
 [data-testid="stMetric"]:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    border-color: var(--color-accent);
-}
-
-[data-testid="stMetric"]:hover::before {
-    left: 100%;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+    border-color: var(--color-border-strong);
 }
 
 [data-testid="stMetricLabel"] {
@@ -412,7 +381,7 @@ button[kind="primary"]:hover {
     border-top: var(--border-width-subtle) solid var(--color-border-medium);
     z-index: 999;
     margin: 0 calc(-1 * var(--spacing-md));
-    box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 -2px 6px rgba(0, 0, 0, 0.08);
 }
 
 @media (max-width: 768px) {
@@ -435,7 +404,7 @@ button[kind="primary"]:hover {
 [data-testid="stRadio"] label {
     background: var(--color-surface);
     border: 2px solid var(--color-border-medium);
-    border-radius: 8px;
+    border-radius: 10px;
     padding: var(--spacing-sm) var(--spacing-md);
     cursor: pointer;
     transition: all var(--transition-fast);
@@ -444,13 +413,13 @@ button[kind="primary"]:hover {
 
 [data-testid="stRadio"] label:hover {
     border-color: var(--color-accent);
-    background: rgba(0, 212, 170, 0.05);
+    background: rgba(0, 113, 227, 0.05);
 }
 
 [data-testid="stRadio"] input:checked + label {
     background: var(--color-accent);
     border-color: var(--color-accent);
-    color: var(--color-primary);
+    color: #FFFFFF;
 }
 
 /* Tabs */
@@ -459,7 +428,7 @@ button[kind="primary"]:hover {
 }
 
 .stTabs [data-baseweb="tab"] {
-    border-radius: 8px;
+    border-radius: 10px;
     border: var(--border-width-subtle) solid var(--color-border-medium);
     background: var(--color-surface);
     transition: all var(--transition-fast);
@@ -472,7 +441,7 @@ button[kind="primary"]:hover {
 .stTabs [aria-selected="true"] {
     background: var(--color-accent);
     border-color: var(--color-accent);
-    color: var(--color-primary) !important;
+    color: #FFFFFF !important;
 }
 
 /* Scrollbar */

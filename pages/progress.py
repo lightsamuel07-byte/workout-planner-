@@ -10,7 +10,7 @@ from src.design_system import get_colors
 def show():
     """Render the progress page"""
 
-    render_page_header("Progress Dashboard", "Track your strength gains and training progress", "📈")
+    render_page_header("Progress Dashboard", "Track your strength gains and training progress")
     
     colors = get_colors()
     
@@ -18,20 +18,21 @@ def show():
     st.markdown(f"""
     <div style="
         background: {colors['surface']};
-        border: 1px solid {colors['border_light']};
+        border: 1px solid {colors['border_medium']};
         border-left: 3px solid {colors['accent']};
-        border-radius: 8px;
+        border-radius: 10px;
         padding: 1rem;
         margin-bottom: 2rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
     ">
-        <div style="font-weight: 600; margin-bottom: 0.5rem;">📊 Progress Tracking</div>
+        <div style="font-weight: 600; margin-bottom: 0.5rem;">Progress Tracking</div>
         <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
             See your strength progression on the main compound lifts over the last 8 weeks. Keep logging your workouts to track improvements!
         </div>
     </div>
-    """, unsafe_allow_html=True)
+    """.strip(), unsafe_allow_html=True)
 
-    st.markdown("### 🏋️ Main Lifts Progress (Last 8 Weeks)")
+    st.markdown("### Main Lifts Progress (Last 8 Weeks)")
 
     analytics = None  # Initialize to None to avoid NameError later
 
@@ -88,7 +89,7 @@ def show():
                     st.metric("Deadlift", "No data", "")
         else:
             empty_state(
-                "📈",
+                "",
                 "Not Enough Data",
                 "Keep logging workouts to see your progress trends!"
             )
@@ -100,7 +101,7 @@ def show():
     st.markdown("---")
 
     # Volume tracking
-    st.markdown("### 💪 Weekly Volume Tracking")
+    st.markdown("### Weekly Volume Tracking")
 
     try:
         if not analytics:
@@ -134,11 +135,10 @@ def show():
         else:
             st.markdown("""
             <div style="text-align:center;padding:2rem;">
-                <div style="font-size:3rem;margin-bottom:1rem;">💪</div>
                 <div style="font-weight:600;margin-bottom:0.5rem;color: var(--color-text-primary);">No Volume Data</div>
                 <div style="font-size:0.9rem;color: var(--color-text-secondary);">Log more workouts to see volume trends</div>
             </div>
-            """, unsafe_allow_html=True)
+            """.strip(), unsafe_allow_html=True)
 
     except Exception as e:
         st.error(f"Unable to load volume data: {e}")
@@ -146,7 +146,7 @@ def show():
     st.markdown("---")
 
     # Body focus progress
-    st.markdown("### 🎯 Muscle Group Focus Progress")
+    st.markdown("### Muscle Group Focus Progress")
 
     col1, col2 = st.columns(2)
 
@@ -167,14 +167,13 @@ def show():
                     first_week = volumes[0]
                     last_week = volumes[-1]
                     
-                    emoji = {'arms': '💪', 'shoulders': '🔥', 'chest': '📈', 'back': '💪'}.get(group, '✅')
                     if first_week > 0:
                         pct_increase = ((last_week - first_week) / first_week) * 100
-                        st.write(f"{emoji} {group.title()}: +{pct_increase:.0f}% volume")
+                        st.write(f"{group.title()}: +{pct_increase:.0f}% volume")
                     else:
-                        st.write(f"{emoji} {group.title()}: {last_week:.0f} kg volume")
+                        st.write(f"{group.title()}: {last_week:.0f} kg volume")
                 else:
-                    st.write(f"✅ {group.title()}: insufficient data")
+                    st.write(f"{group.title()}: insufficient data")
 
         except Exception as e:
             st.write("Unable to calculate muscle group progress")
@@ -189,10 +188,10 @@ def show():
             bicep_compliance = analytics.get_bicep_grip_rotation_compliance(weeks=4)
 
             if bicep_compliance['compliant']:
-                st.write("✅ Perfect rotation compliance")
-                st.write(f"✅ {bicep_compliance['total_bicep_sessions']} sessions tracked")
+                st.write("Perfect rotation compliance")
+                st.write(f"{bicep_compliance['total_bicep_sessions']} sessions tracked")
             else:
-                st.write(f"⚠️ {len(bicep_compliance['violations'])} violations")
+                st.write(f"{len(bicep_compliance['violations'])} violations")
                 for violation in bicep_compliance['violations']:
                     st.write(f"- {violation}")
 
@@ -202,37 +201,37 @@ def show():
     st.markdown("---")
 
     # Achievements
-    st.markdown("### 🏆 Achievements")
+    st.markdown("### Achievements")
     
     colors = get_colors()
 
     achievements = [
-        ("🥇", "8-Week Consistency Streak", "Never missed a scheduled workout"),
-        ("💪", "Squat +20kg Milestone", "Added 20kg to back squat in 12 weeks"),
-        ("📈", "12 Consecutive PRs", "Set personal records 12 sessions in a row"),
-        ("🎯", "Perfect Programming", "24 weeks of optimal bicep grip rotation"),
+        ("8-Week Consistency Streak", "Never missed a scheduled workout"),
+        ("Squat +20kg Milestone", "Added 20kg to back squat in 12 weeks"),
+        ("12 Consecutive PRs", "Set personal records 12 sessions in a row"),
+        ("Perfect Programming", "24 weeks of optimal bicep grip rotation"),
     ]
 
     cols = st.columns(4)
-    for col, (emoji, title, desc) in zip(cols, achievements):
+    for col, (title, desc) in zip(cols, achievements):
         with col:
             st.markdown(f"""
             <div style="
                 padding: 1rem; 
                 background-color: {colors['surface']}; 
-                border: 1px solid {colors['border_light']};
-                border-radius: 8px; 
+                border: 1px solid {colors['border_medium']};
+                border-radius: 10px; 
                 text-align: center; 
                 min-height: 120px;
-                transition: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+                transition: box-shadow 120ms ease-out, border-color 120ms ease-out;
+                box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
             " class="metric-card">
-                <div style="font-size: 2rem; margin-bottom: 0.5rem;">{emoji}</div>
                 <div style="font-weight: bold; margin-bottom: 0.25rem; color: {colors['text_primary']};">{title}</div>
                 <div style="font-size: 0.8rem; color: {colors['text_secondary']};">{desc}</div>
             </div>
-            """, unsafe_allow_html=True)
+            """.strip(), unsafe_allow_html=True)
 
     st.markdown("---")
 
     # Back button
-    action_button("Back to Dashboard", "dashboard", "🏠", width="stretch")
+    action_button("Back to Dashboard", "dashboard", width="stretch")

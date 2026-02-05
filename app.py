@@ -46,7 +46,7 @@ except ImportError as e:
 
 # Configure the page
 st.set_page_config(
-    page_title="💪 Samuel's Workout Planner",
+    page_title="Samuel's Workout Planner",
     page_icon="💪",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -62,8 +62,8 @@ def check_password():
         try:
             correct_password = st.secrets["APP_PASSWORD"]
         except (AttributeError, KeyError):
-            st.error("❌ APP_PASSWORD not configured in Streamlit secrets")
-            st.info("💡 Please add APP_PASSWORD to your .streamlit/secrets.toml file")
+            st.error("APP_PASSWORD not configured in Streamlit secrets")
+            st.info("Please add APP_PASSWORD to your .streamlit/secrets.toml file")
             st.stop()
 
         # Use .get() to safely access the password - it may not exist yet in callback
@@ -85,15 +85,14 @@ def check_password():
             margin: 4rem auto;
             text-align: center;
         ">
-            <div style="font-size: 4rem; margin-bottom: 1rem;">💪</div>
             <h1 style="
-                font-family: 'Space Grotesk', sans-serif;
+                font-family: -apple-system, 'SF Pro Text', 'SF Pro Display', 'Segoe UI', system-ui, sans-serif;
                 font-size: 2rem;
-                font-weight: 700;
+                font-weight: 600;
                 margin-bottom: 0.5rem;
             ">Samuel's Workout Planner</h1>
             <p style="
-                color: #6B7280;
+                color: #6E6E73;
                 margin-bottom: 2rem;
             ">Track your strength journey</p>
         </div>
@@ -111,14 +110,14 @@ def check_password():
         return False
     elif not st.session_state["password_correct"]:
         # Password incorrect, show input again
-        st.markdown("## 🔒 Authentication Required")
+        st.markdown("## Authentication Required")
         st.text_input(
             "Enter password to access the app:",
             type="password",
             on_change=password_entered,
             key="password"
         )
-        st.error("😕 Password incorrect. Please try again.")
+        st.error("Password incorrect. Please try again.")
         return False
     else:
         # Password correct
@@ -147,7 +146,7 @@ st.markdown("""
         font-size: 2.5rem;
         font-weight: 700;
         margin-bottom: 0.5rem;
-        font-family: 'Space Grotesk', sans-serif;
+        font-family: var(--font-family-heading);
     }
     
     .sub-header {
@@ -206,7 +205,7 @@ if 'dark_mode' not in st.session_state:
 
 # Sidebar navigation
 with st.sidebar:
-    st.markdown("# 💪 Workout Planner")
+    st.markdown("# Workout Planner")
     st.markdown("---")
     
     # THIS WEEK section
@@ -216,24 +215,25 @@ with st.sidebar:
     st.markdown("""
     <style>
     div[data-testid="stSidebar"] button[kind="primary"] {
-        background: linear-gradient(135deg, var(--color-accent) 0%, var(--color-accent-dark) 100%) !important;
-        font-weight: 700 !important;
-        box-shadow: 0 2px 8px rgba(0, 212, 170, 0.25) !important;
+        background-color: var(--color-accent) !important;
+        color: #FFFFFF !important;
+        font-weight: 600 !important;
+        box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12) !important;
     }
     </style>
     """, unsafe_allow_html=True)
     
-    if st.button("📊 Dashboard", width="stretch", key="nav_dashboard", 
+    if st.button("Dashboard", width="stretch", key="nav_dashboard", 
                  type="primary" if st.session_state.current_page == 'dashboard' else "secondary"):
         st.session_state.current_page = 'dashboard'
         st.rerun()
 
-    if st.button("📝 Log Workout", width="stretch", key="nav_log_workout",
+    if st.button("Log Workout", width="stretch", key="nav_log_workout",
                  type="primary" if st.session_state.current_page == 'log_workout' else "secondary"):
         st.session_state.current_page = 'log_workout'
         st.rerun()
 
-    if st.button("📋 View Plan", width="stretch", key="nav_plans",
+    if st.button("View Plan", width="stretch", key="nav_plans",
                  type="primary" if st.session_state.current_page == 'plans' else "secondary"):
         st.session_state.current_page = 'plans'
         st.rerun()
@@ -241,7 +241,7 @@ with st.sidebar:
     # PLANNING section
     st.markdown('<div class="nav-section-header">PLANNING</div>', unsafe_allow_html=True)
     
-    if st.button("🆕 Generate Plan", width="stretch", key="nav_generate",
+    if st.button("Generate Plan", width="stretch", key="nav_generate",
                  type="primary" if st.session_state.current_page == 'generate' else "secondary"):
         st.session_state.current_page = 'generate'
         st.rerun()
@@ -249,22 +249,22 @@ with st.sidebar:
     # ANALYTICS section
     st.markdown('<div class="nav-section-header">ANALYTICS</div>', unsafe_allow_html=True)
 
-    if st.button("📈 Progress", width="stretch", key="nav_progress",
+    if st.button("Progress", width="stretch", key="nav_progress",
                  type="primary" if st.session_state.current_page == 'progress' else "secondary"):
         st.session_state.current_page = 'progress'
         st.rerun()
 
-    if st.button("📅 Weekly Review", width="stretch", key="nav_weekly_review",
+    if st.button("Weekly Review", width="stretch", key="nav_weekly_review",
                  type="primary" if st.session_state.current_page == 'weekly_review' else "secondary"):
         st.session_state.current_page = 'weekly_review'
         st.rerun()
 
-    if st.button("📋 Exercise History", width="stretch", key="nav_exercise_history",
+    if st.button("Exercise History", width="stretch", key="nav_exercise_history",
                  type="primary" if st.session_state.current_page == 'exercise_history' else "secondary"):
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
-    if st.button("🗄️ DB Status", width="stretch", key="nav_database_status",
+    if st.button("DB Status", width="stretch", key="nav_database_status",
                  type="primary" if st.session_state.current_page == 'database_status' else "secondary"):
         st.session_state.current_page = 'database_status'
         st.rerun()
@@ -284,12 +284,12 @@ with st.sidebar:
         st.markdown("""
         <div style="
             padding: 0.75rem;
-            background: rgba(0, 212, 170, 0.12);
+            background: rgba(52, 199, 89, 0.12);
             border-left: 3px solid {success};
-            border-radius: 4px;
+            border-radius: 10px;
             font-size: 0.85rem;
         ">
-            <div style="font-weight: 600; margin-bottom: 0.25rem;">🟢 Connected</div>
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">Connected</div>
             <div style="color: {text_secondary}; font-size: 0.8rem;">Google Sheets synced</div>
         </div>
         """.format(success=colors['success'], text_secondary=colors['text_secondary']), unsafe_allow_html=True)
@@ -297,12 +297,12 @@ with st.sidebar:
         st.markdown("""
         <div style="
             padding: 0.75rem;
-            background: rgba(244, 67, 54, 0.1);
+            background: rgba(255, 59, 48, 0.12);
             border-left: 3px solid {error};
-            border-radius: 4px;
+            border-radius: 10px;
             font-size: 0.85rem;
         ">
-            <div style="font-weight: 600; margin-bottom: 0.25rem;">🔴 Disconnected</div>
+            <div style="font-weight: 600; margin-bottom: 0.25rem;">Disconnected</div>
             <div style="color: {text_secondary}; font-size: 0.8rem;">Check your connection</div>
         </div>
         """.format(error=colors['error'], text_secondary=colors['text_secondary']), unsafe_allow_html=True)
@@ -313,7 +313,7 @@ with st.sidebar:
 
     # Quick Tips
     st.markdown("---")
-    with st.expander("💡 Quick Tips"):
+    with st.expander("Quick Tips"):
         st.markdown("""
         **Logging Workouts:**
         - Use "Done" button for quick logging
@@ -326,14 +326,14 @@ with st.sidebar:
         - Weekly Review = See past performance
         
         **Features:**
-        - 🟢 = Connected to Google Sheets
+        - Connected = Google Sheets synced
         - Progress bar shows completion %
         - All data syncs automatically
         """)
     
     # 1RM Settings
     st.markdown("---")
-    st.markdown("### 🏋️ Current 1RMs")
+    st.markdown("### Current 1RMs")
 
     # Initialize session state for 1RMs if not exists
     if 'back_squat_1rm' not in st.session_state:
@@ -364,7 +364,7 @@ with st.sidebar:
 
     # Google Sheets link
     st.markdown("---")
-    st.markdown("### 📊 Google Sheets")
+    st.markdown("### Google Sheets")
     try:
         import yaml
         with open('config.yaml', 'r') as f:
