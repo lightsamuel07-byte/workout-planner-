@@ -6,6 +6,7 @@ Current Phase
 - Phase 4.3 (Phase 1 implementation) is complete for this cycle.
 - Phase 4.3 (Phase 2 + Phase 3 refinement) is complete for this cycle.
 - Phase 4.3 iterative hardening loop (debug/check/test/refine) is complete for this cycle.
+- Phase 4.3 code-quality cleanup loop (dashboard card refactor + tests) is complete for this cycle.
 
 Built (Complete)
 - Phase 1: Streamlit shell, shared design system, shared UI helpers.
@@ -19,10 +20,12 @@ Built (Complete)
   - Added defensive HTML escaping in plan/review exercise renderers.
   - Removed dashboard traceback noise on temporary Sheets failures.
   - Added parser serialization unit tests for workout logger fields.
+  - Refactored dashboard day card markup into shared design-system helper.
+  - Added day card rendering/escaping unit tests.
 
 Built (Partially Complete)
 - Phase 3: SQLite persistence and import tooling are live; DB status page is live.
-- Remaining in Phase 3: broader automated test coverage beyond logger parsing.
+- Remaining in Phase 3: broader automated test coverage beyond logger/day-card parsing.
 
 In Progress
 - Waiting for user visual feedback on the latest refinement pass.

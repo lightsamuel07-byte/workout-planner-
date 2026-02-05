@@ -15,6 +15,8 @@
 - [x] Re-verify compile/import/startup smoke checks after refinement pass.
 - [x] Add regression tests for workout log field parsing/serialization.
 - [x] Run iterative debug loop (compile + tests + startup smoke + targeted refinement).
+- [x] Refactor dashboard day-card renderer into design-system helper to remove repetitive inline template code.
+- [x] Add unit tests for day-card HTML rendering and escaping behavior.
 
 ## Blockers
 - No active blockers.
@@ -29,8 +31,10 @@
   - Dashboard weekly schedule now uses a responsive CSS grid that adapts cleanly from desktop to phone instead of fixed 7-column Streamlit layout.
   - Primary navigation and action buttons now use `width="stretch"` consistently (with legacy compatibility in `src/ui_utils.py`) to avoid deprecated usage patterns.
   - Added unit coverage for workout logger parsing/formatting logic (`tests/test_workout_logger_fields.py`).
+  - Added unit coverage for design-system day card rendering (`tests/test_design_system_day_card.py`).
   - Added HTML-escaping hardening for weekly review and plan-view exercise rendering to avoid markup breakage from logged text.
   - Dashboard now fails soft when Sheets is unavailable (no raw traceback noise in user-facing UI).
+  - Dashboard weekly card HTML moved into `get_day_card_html(...)` to keep page code clean and easier to maintain.
 - Decisions:
   - Use current codebase as source of truth for initial canonical documentation baseline.
   - Keep functionality unchanged; queue visual/system changes by approved phases.

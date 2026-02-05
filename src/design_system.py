@@ -4,6 +4,7 @@ Conservative animations, teal/mint accent, mobile-first.
 """
 
 import streamlit as st
+import html
 
 # Color tokens
 COLORS = {
@@ -208,4 +209,70 @@ def get_accent_button_style(color_scheme=None):
     color: {color_scheme['primary']} !important;
     border: 1px solid {color_scheme['accent']} !important;
     font-weight: 600 !important;
+    """
+
+
+def get_day_card_html(
+    day_label,
+    date_label,
+    emoji,
+    title,
+    subtitle,
+    is_today=False,
+    is_completed=False,
+    color_scheme=None,
+):
+    """Weekly schedule day card used by dashboard-style views."""
+    if color_scheme is None:
+        color_scheme = get_colors()
+
+    border_color = color_scheme['accent'] if is_today else color_scheme['border_medium']
+    border_width = '2px' if is_today else '1px'
+    box_shadow = '0 3px 8px rgba(0, 212, 170, 0.12)' if is_today else '0 1px 2px rgba(0,0,0,0.04)'
+    card_class = "day-card today" if is_today else "day-card"
+    completion_icon = get_completion_badge_html(is_completed, color_scheme)
+
+    safe_day_label = html.escape(str(day_label))
+    safe_date_label = html.escape(str(date_label))
+    safe_emoji = html.escape(str(emoji))
+    safe_title = html.escape(str(title))
+    safe_subtitle = html.escape(str(subtitle))
+
+    return f"""
+    <div class="{card_class}" style="
+        background: {color_scheme['surface']};
+        border: {border_width} solid {border_color};
+        border-radius: 12px;
+        padding: 0.75rem 0.5rem;
+        text-align: center;
+        min-height: 116px;
+        transition: all 0.2s ease;
+        box-shadow: {box_shadow};
+    ">
+        <div style="
+            font-size: 0.7rem;
+            font-weight: 700;
+            color: {color_scheme['text_secondary']};
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 0.25rem;
+        ">{safe_day_label}</div>
+        <div style="
+            font-size: 0.7rem;
+            color: {color_scheme['text_secondary']};
+            margin-bottom: 0.5rem;
+        ">{safe_date_label}</div>
+        <div style="font-size: 2rem; margin-bottom: 0.5rem;">{safe_emoji}</div>
+        <div style="
+            font-size: 0.8rem;
+            font-weight: 700;
+            color: {color_scheme['text_primary']};
+            margin-bottom: 0.2rem;
+        ">{safe_title}</div>
+        <div style="
+            font-size: 0.7rem;
+            color: {color_scheme['text_secondary']};
+        ">{safe_subtitle}</div>
+        <div style="margin-top: 0.45rem; font-size: 1.1rem;">{completion_icon}</div>
+    </div>
     """

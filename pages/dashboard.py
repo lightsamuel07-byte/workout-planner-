@@ -10,9 +10,8 @@ from src.ui_utils import (
     render_page_header, 
     empty_state,
     action_button,
-    completion_badge
 )
-from src.design_system import get_colors
+from src.design_system import get_colors, get_day_card_html
 
 
 def get_fallback_stats():
@@ -191,52 +190,18 @@ def show():
     day_cards = []
     for day, date, workout in zip(days, week_dates, workouts):
         emoji, title, subtitle = workout
-        is_today = date.date() == datetime.now().date()
-        is_completed = date.date() < datetime.now().date()
-        completion_icon = completion_badge(is_completed)
-        border_color = colors['accent'] if is_today else colors['border_medium']
-        border_width = '2px' if is_today else '1px'
-        box_shadow = '0 3px 8px rgba(0, 212, 170, 0.12)' if is_today else '0 1px 2px rgba(0,0,0,0.04)'
-        card_class = "day-card today" if is_today else "day-card"
-
-        day_cards.append(f"""
-            <div class="{card_class}" style="
-                background: {colors['surface']};
-                border: {border_width} solid {border_color};
-                border-radius: 12px;
-                padding: 0.75rem 0.5rem;
-                text-align: center;
-                min-height: 116px;
-                transition: all 0.2s ease;
-                box-shadow: {box_shadow};
-            ">
-                <div style="
-                    font-size: 0.7rem;
-                    font-weight: 700;
-                    color: {colors['text_secondary']};
-                    text-transform: uppercase;
-                    letter-spacing: 0.5px;
-                    margin-bottom: 0.25rem;
-                ">{day}</div>
-                <div style="
-                    font-size: 0.7rem;
-                    color: {colors['text_secondary']};
-                    margin-bottom: 0.5rem;
-                ">{date.strftime('%m/%d')}</div>
-                <div style="font-size: 2rem; margin-bottom: 0.5rem;">{emoji}</div>
-                <div style="
-                    font-size: 0.8rem;
-                    font-weight: 700;
-                    color: {colors['text_primary']};
-                    margin-bottom: 0.2rem;
-                ">{title}</div>
-                <div style="
-                    font-size: 0.7rem;
-                    color: {colors['text_secondary']};
-                ">{subtitle}</div>
-                <div style="margin-top: 0.45rem; font-size: 1.1rem;">{completion_icon}</div>
-            </div>
-        """)
+        day_cards.append(
+            get_day_card_html(
+                day_label=day,
+                date_label=date.strftime('%m/%d'),
+                emoji=emoji,
+                title=title,
+                subtitle=subtitle,
+                is_today=(date.date() == datetime.now().date()),
+                is_completed=(date.date() < datetime.now().date()),
+                color_scheme=colors,
+            )
+        )
 
     st.markdown(f'<div class="dashboard-week-grid">{"".join(day_cards)}</div>', unsafe_allow_html=True)
 
