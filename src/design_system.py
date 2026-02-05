@@ -238,8 +238,7 @@ def get_day_card_html(
     safe_title = html.escape(str(title))
     safe_subtitle = html.escape(str(subtitle))
 
-    return f"""
-    <div class="{card_class}" style="
+    return f"""<div class="{card_class}" style="
         background: {color_scheme['surface']};
         border: {border_width} solid {border_color};
         border-radius: 12px;
@@ -274,5 +273,4 @@ def get_day_card_html(
             color: {color_scheme['text_secondary']};
         ">{safe_subtitle}</div>
         <div style="margin-top: 0.45rem; font-size: 1.1rem;">{completion_icon}</div>
-    </div>
-    """
+    </div>""".strip()
