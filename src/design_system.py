@@ -248,39 +248,48 @@ def get_day_card_html(
     if safe_emoji:
         emoji_block = f'<div style="font-size: 2rem; margin-bottom: 0.5rem;">{safe_emoji}</div>'
 
-    return f"""<div class="{card_class}" style="
-        background: {color_scheme['surface']};
-        border: {border_width} solid {border_color};
-        border-radius: 10px;
-        padding: 0.75rem 0.5rem;
-        text-align: center;
-        min-height: 116px;
-        transition: box-shadow 120ms ease-out, border-color 120ms ease-out;
-        box-shadow: {box_shadow};
-    ">
-        <div style="
-            font-size: 0.7rem;
-            font-weight: 700;
-            color: {color_scheme['text_secondary']};
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-            margin-bottom: 0.25rem;
-        ">{safe_day_label}</div>
-        <div style="
-            font-size: 0.7rem;
-            color: {color_scheme['text_secondary']};
-            margin-bottom: 0.5rem;
-        ">{safe_date_label}</div>
-        {emoji_block}
-        <div style="
-            font-size: 0.85rem;
-            font-weight: 600;
-            color: {color_scheme['text_primary']};
-            margin-bottom: 0.2rem;
-        ">{safe_title}</div>
-        <div style="
-            font-size: 0.7rem;
-            color: {color_scheme['text_secondary']};
-        ">{safe_subtitle}</div>
-        <div style="margin-top: 0.45rem;">{completion_icon}</div>
-    </div>""".strip()
+    lines = [
+        f'<div class="{card_class}" style="',
+        f'    background: {color_scheme["surface"]};',
+        f'    border: {border_width} solid {border_color};',
+        f'    border-radius: 10px;',
+        f'    padding: 0.75rem 0.5rem;',
+        f'    text-align: center;',
+        f'    min-height: 116px;',
+        f'    transition: box-shadow 120ms ease-out, border-color 120ms ease-out;',
+        f'    box-shadow: {box_shadow};',
+        f'">',
+        f'    <div style="',
+        f'        font-size: 0.7rem;',
+        f'        font-weight: 700;',
+        f'        color: {color_scheme["text_secondary"]};',
+        f'        text-transform: uppercase;',
+        f'        letter-spacing: 0.5px;',
+        f'        margin-bottom: 0.25rem;',
+        f'    ">{safe_day_label}</div>',
+        f'    <div style="',
+        f'        font-size: 0.7rem;',
+        f'        color: {color_scheme["text_secondary"]};',
+        f'        margin-bottom: 0.5rem;',
+        f'    ">{safe_date_label}</div>',
+    ]
+
+    if safe_emoji:
+        lines.append(f'    <div style="font-size: 2rem; margin-bottom: 0.5rem;">{safe_emoji}</div>')
+
+    lines.extend([
+        f'    <div style="',
+        f'        font-size: 0.85rem;',
+        f'        font-weight: 600;',
+        f'        color: {color_scheme["text_primary"]};',
+        f'        margin-bottom: 0.2rem;',
+        f'    ">{safe_title}</div>',
+        f'    <div style="',
+        f'        font-size: 0.7rem;',
+        f'        color: {color_scheme["text_secondary"]};',
+        f'    ">{safe_subtitle}</div>',
+        f'    <div style="margin-top: 0.45rem;">{completion_icon}</div>',
+        f'</div>',
+    ])
+
+    return "\n".join(lines)

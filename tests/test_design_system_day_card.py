@@ -35,6 +35,19 @@ class DayCardHtmlTests(unittest.TestCase):
         self.assertIn("Aesthetics &amp; Form", html_output)
         self.assertIn("✓", html_output)
 
+    def test_day_card_omits_emoji_block_when_empty(self):
+        html_output = get_day_card_html(
+            day_label="MON",
+            date_label="02/02",
+            emoji="",
+            title="FORT",
+            subtitle="Back Squat",
+            is_today=False,
+            is_completed=True,
+            color_scheme=COLORS,
+        )
+        self.assertNotIn("font-size: 2rem", html_output)
+
 
 if __name__ == "__main__":
     unittest.main()
