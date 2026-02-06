@@ -282,30 +282,18 @@ with st.sidebar:
             config = yaml.safe_load(f)
         
         st.markdown("""
-        <div style="
-            padding: 0.75rem;
-            background: rgba(52, 199, 89, 0.12);
-            border-left: 3px solid {success};
-            border-radius: 10px;
-            font-size: 0.85rem;
-        ">
+        <div class="callout callout--success callout--compact">
             <div style="font-weight: 600; margin-bottom: 0.25rem;">Connected</div>
             <div style="color: {text_secondary}; font-size: 0.8rem;">Google Sheets synced</div>
         </div>
-        """.format(success=colors['success'], text_secondary=colors['text_secondary']), unsafe_allow_html=True)
+        """.format(text_secondary=colors['text_secondary']), unsafe_allow_html=True)
     except Exception as e:
         st.markdown("""
-        <div style="
-            padding: 0.75rem;
-            background: rgba(255, 59, 48, 0.12);
-            border-left: 3px solid {error};
-            border-radius: 10px;
-            font-size: 0.85rem;
-        ">
+        <div class="callout callout--error callout--compact">
             <div style="font-weight: 600; margin-bottom: 0.25rem;">Disconnected</div>
             <div style="color: {text_secondary}; font-size: 0.8rem;">Check your connection</div>
         </div>
-        """.format(error=colors['error'], text_secondary=colors['text_secondary']), unsafe_allow_html=True)
+        """.format(text_secondary=colors['text_secondary']), unsafe_allow_html=True)
     
     st.markdown("---")
     st.markdown(f"**User:** Samuel")

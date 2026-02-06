@@ -202,28 +202,20 @@ def show():
                 has_logs = any(ex.get('log', '').strip() for ex in exercises)
                 completion_status = "Completed" if has_logs else "Planned"
                 status_color = colors['success'] if has_logs else colors['warning']
+                status_class = "callout--success" if has_logs else "callout--warning"
                 
                 # Create expandable section with enhanced styling
                 expander_label = f"**{workout_date}**"
                 with st.expander(expander_label, expanded=False):
                     # Show status badge at top
                     st.markdown(f"""
-                    <div style="
-                        display: inline-block;
-                        padding: 0.5rem 1rem;
-                        background: {status_color}15;
-                        border-left: 4px solid {status_color};
-                        border-radius: 10px;
-                        margin-bottom: 1rem;
-                        font-weight: 600;
-                        color: {status_color};
-                    ">
+                    <div class="callout {status_class} callout--compact" style="display: inline-block; margin-bottom: 1rem; font-weight: 600; color: {status_color};">
                         {completion_status}
                     </div>
                     """.strip(), unsafe_allow_html=True)
                     if not exercises:
                         st.markdown(f"""
-                        <div style="text-align:center;padding:1.5rem;background:{colors['background']};border-radius:10px;border:1px solid {colors['border_medium']};">
+                        <div class="callout callout--compact" style="text-align:center; padding:1.5rem;">
                             <div style="color:{colors['text_secondary']};">Rest day - no exercises planned</div>
                         </div>
                         """.strip(), unsafe_allow_html=True)
@@ -272,7 +264,7 @@ def show():
                             if log:
                                 # Completed exercise - show with checkmark
                                 st.markdown(f"""
-                                <div style="background-color: rgba(52, 199, 89, 0.12); padding: 0.75rem; border-left: 3px solid {colors['success']}; margin-bottom: 0.5rem; border-radius: 10px;">
+                                <div class="callout callout--success callout--compact" style="margin-bottom: 0.5rem;">
                                     <div style="font-weight: 600; color: {colors['text_primary']};">{safe_exercise_name}</div>
                                     <div style="font-size: 0.9rem; color: {colors['text_secondary']};">{safe_info_str}</div>
                                     <div style="font-size: 0.85rem; color: {colors['text_secondary']}; margin-top: 0.25rem;">
@@ -283,7 +275,7 @@ def show():
                             else:
                                 # Planned but not completed
                                 st.markdown(f"""
-                                <div style="background-color: {colors['background']}; padding: 0.75rem; border-left: 3px solid {colors['border_medium']}; margin-bottom: 0.5rem; border-radius: 10px;">
+                                <div class="callout callout--compact" style="margin-bottom: 0.5rem;">
                                     <div style="font-weight: 600; color: {colors['text_primary']};">{safe_exercise_name}</div>
                                     <div style="font-size: 0.9rem; color: {colors['text_secondary']};">{safe_info_str}</div>
                                     {f'<div style="font-size: 0.85rem; color: {colors["text_secondary"]}; margin-top: 0.25rem;"><em>{safe_notes}</em></div>' if notes else ''}

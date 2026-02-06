@@ -136,14 +136,7 @@ def show():
     st.markdown("### Step 1: Fort Workouts (Mon/Wed/Fri)")
     
     st.markdown(f"""
-    <div style="
-        background: {colors['surface']};
-        border: 1px solid {colors['border_medium']};
-        border-left: 3px solid {colors['accent']};
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 1.5rem;
-    ">
+    <div class="callout callout--info">
         <div style="font-weight: 600; margin-bottom: 0.5rem;">How to use:</div>
         <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
             Copy your Fort workouts from Train Heroic and paste them into the boxes below. The AI will analyze them and create complementary supplemental exercises.
@@ -271,7 +264,7 @@ def show():
     
     if not all_workouts_filled:
         st.markdown(f"""
-        <div style="background: rgba(255, 159, 10, 0.12); border-left: 3px solid {colors['warning']}; padding: 1rem; border-radius: 10px; margin: 1rem 0;">
+        <div class="callout callout--warning">
             <strong>Please paste all three Fort workouts</strong> (Monday, Wednesday, Friday) to continue.
         </div>
         """.strip(), unsafe_allow_html=True)

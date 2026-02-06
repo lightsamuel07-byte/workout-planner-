@@ -276,7 +276,7 @@ def show():
             safe_rest = html.escape(str(ex.get('rest', ''))) if ex.get('rest') else '-'
             safe_notes = html.escape(str(ex.get('notes', '')))
             notes_html = (
-                f'<div style="margin-top: 0.75rem; padding: 0.75rem; background-color: rgba(0, 113, 227, 0.08); color: {colors["text_primary"]}; border-left: 3px solid {colors["accent"]}; border-radius: 10px; font-size: 0.9rem; font-weight: 600;">{safe_notes}</div>'
+                f'<div class="callout callout--info callout--compact" style="margin-top: 0.75rem; font-size: 0.9rem; font-weight: 500;">{safe_notes}</div>'
                 if safe_notes
                 else ""
             )
@@ -290,10 +290,10 @@ def show():
                     padding: 1rem;
                     margin-bottom: 1rem;
                 ">
-                    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 2px solid {colors['accent']}; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: start; border-bottom: 1px solid {colors['border_light']}; padding-bottom: 0.5rem; margin-bottom: 0.75rem;">
                         <div style="flex: 1;">
                             <div style="font-size: 1.5rem; color: {colors['text_primary']}; font-weight: 700; font-family: var(--font-family-heading);">{safe_block}</div>
-                            <div style="font-size: 1.1rem; font-weight: 700; margin: 0.25rem 0; color: {colors['text_primary']}; text-transform: uppercase;">{safe_name}</div>
+                            <div style="font-size: 1.1rem; font-weight: 600; margin: 0.25rem 0; color: {colors['text_primary']};">{safe_name}</div>
                         </div>
                     </div>
                     <div style="margin-top: 0.75rem; display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.5rem;">

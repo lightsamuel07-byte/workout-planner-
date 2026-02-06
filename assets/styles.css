@@ -19,6 +19,10 @@
     --color-border-strong: #1D1D1F;
     --color-border-medium: #D2D2D7;
     --color-border-light: #E5E5EA;
+    --color-success-bg: rgba(52, 199, 89, 0.08);
+    --color-warning-bg: rgba(255, 159, 10, 0.10);
+    --color-error-bg: rgba(255, 59, 48, 0.10);
+    --color-info-bg: rgba(0, 113, 227, 0.08);
     --border-width-subtle: 1px;
     --border-width-strong: 2px;
     
@@ -58,6 +62,10 @@
     --color-border-strong: #F5F5F7;
     --color-border-medium: #2C2C2E;
     --color-border-light: #3A3A3C;
+    --color-success-bg: rgba(48, 209, 88, 0.16);
+    --color-warning-bg: rgba(255, 159, 10, 0.16);
+    --color-error-bg: rgba(255, 69, 58, 0.16);
+    --color-info-bg: rgba(10, 132, 255, 0.16);
 }
 
 /* Base Styles */
@@ -227,26 +235,26 @@ button[kind="primary"]:hover {
 
 /* Success/Error/Info Messages */
 .stSuccess {
-    background-color: rgba(52, 199, 89, 0.12) !important;
-    border-left: 4px solid var(--color-success) !important;
+    background-color: var(--color-success-bg) !important;
+    border: 1px solid var(--color-success) !important;
     border-radius: 10px !important;
 }
 
 .stError {
-    background-color: rgba(255, 59, 48, 0.12) !important;
-    border-left: 4px solid var(--color-error) !important;
+    background-color: var(--color-error-bg) !important;
+    border: 1px solid var(--color-error) !important;
     border-radius: 10px !important;
 }
 
 .stWarning {
-    background-color: rgba(255, 159, 10, 0.12) !important;
-    border-left: 4px solid var(--color-warning) !important;
+    background-color: var(--color-warning-bg) !important;
+    border: 1px solid var(--color-warning) !important;
     border-radius: 10px !important;
 }
 
 .stInfo {
-    background-color: rgba(0, 113, 227, 0.12) !important;
-    border-left: 4px solid var(--color-info) !important;
+    background-color: var(--color-info-bg) !important;
+    border: 1px solid var(--color-info) !important;
     border-radius: 10px !important;
 }
 
@@ -320,6 +328,46 @@ button[kind="primary"]:hover {
     letter-spacing: 0.05em;
     margin: var(--spacing-lg) 0 var(--spacing-sm) 0;
     padding: 0 var(--spacing-sm);
+}
+
+/* Callouts */
+.callout {
+    background: var(--color-surface);
+    border: var(--border-width-subtle) solid var(--color-border-medium);
+    border-radius: 10px;
+    padding: 0.875rem 1rem;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.callout--compact {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+}
+
+.callout--success {
+    background: var(--color-success-bg);
+    border-color: var(--color-success);
+}
+
+.callout--warning {
+    background: var(--color-warning-bg);
+    border-color: var(--color-warning);
+}
+
+.callout--error {
+    background: var(--color-error-bg);
+    border-color: var(--color-error);
+}
+
+.callout--info {
+    background: var(--color-info-bg);
+    border-color: var(--color-info);
+}
+
+.section-divider {
+    height: 1px;
+    background: var(--color-border-light);
+    margin: var(--spacing-lg) 0;
 }
 
 /* Mobile Optimizations */

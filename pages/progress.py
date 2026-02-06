@@ -16,15 +16,7 @@ def show():
     
     # Info card
     st.markdown(f"""
-    <div style="
-        background: {colors['surface']};
-        border: 1px solid {colors['border_medium']};
-        border-left: 3px solid {colors['accent']};
-        border-radius: 10px;
-        padding: 1rem;
-        margin-bottom: 2rem;
-        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
-    ">
+    <div class="callout callout--info">
         <div style="font-weight: 600; margin-bottom: 0.5rem;">Progress Tracking</div>
         <div style="color: {colors['text_secondary']}; font-size: 0.9rem;">
             See your strength progression on the main compound lifts over the last 8 weeks. Keep logging your workouts to track improvements!

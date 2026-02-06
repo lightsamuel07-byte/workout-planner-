@@ -88,3 +88,28 @@ Blocked
 
 Next
 1. Capture updated screenshots (mobile/tablet/desktop) to confirm day-card rendering.
+
+---
+
+Progress Snapshot
+Date: 2026-02-06
+
+Current Phase
+- Phase 4.3 (Apple-style UI refresh) remains complete.
+- Apple-style polish pass applied to callouts and plan headers.
+
+Built (Complete)
+- Added Apple-style callout utilities and dark-mode variants in `assets/styles.css`.
+- Replaced left-border callouts across core pages with neutral Apple callouts.
+- Reduced accent-heavy exercise header styling in plan views.
+- Created new design-system snapshot: `DESIGN_SYSTEM_2026-02-06_1115.md`.
+- Validation run: compileall, unit tests, headless Streamlit boot.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Capture updated screenshots (mobile/tablet/desktop) to validate new callout styles.

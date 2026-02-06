@@ -127,7 +127,7 @@ def show():
 
         if not week_data:
             st.markdown(f"""
-            <div style="text-align:center;padding:2rem;background:{colors['background']};border-radius:10px;border:1px solid {colors['border_medium']};">
+            <div class="callout callout--warning" style="text-align:center; padding:2rem;">
                 <div style="font-weight:600;margin-bottom:0.5rem;color:{colors['text_primary']};">Empty Sheet</div>
                 <div style="color:{colors['text_secondary']};">The sheet `{current_sheet}` exists but has no workout data.</div>
             </div>
@@ -156,10 +156,10 @@ def show():
 
         if not exercises:
             st.markdown(f"""
-            <div style="text-align:center;padding:2rem;background:{colors['surface']};border-radius:16px;border:1px solid {colors['border_medium']};box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);">
+            <div class="callout" style="text-align:center; padding:2rem;">
                 <div style="font-weight:700;margin-bottom:0.5rem;font-size:1.3rem;color:{colors['text_primary']};">No Exercises Found</div>
                 <div style="color:{colors['text_secondary']};margin-bottom:1.5rem;">Today's workout appears empty.</div>
-                <div style="text-align:left;display:inline-block;background:{colors['surface']};padding:1rem;border-radius:10px;border-left:3px solid {colors['accent']};">
+                <div class="callout callout--info callout--compact" style="text-align:left;display:inline-block;">
                     <div style="font-weight:600;margin-bottom:0.5rem;color:{colors['text_primary']};">Troubleshooting:</div>
                     <div style="font-size:0.9rem;color:{colors['text_secondary']};">
                         - Check if your plan is generated in Google Sheets<br>
@@ -304,7 +304,7 @@ def show():
                         # Show existing log if present (unless manually editing)
                         if existing_log and not st.session_state.get(edit_key):
                             st.markdown(
-                                f"<div style='background-color: rgba(52, 199, 89, 0.12); padding: 0.5rem; border-radius: 10px; margin-top: 0.5rem; border-left: 3px solid {colors['success']};'><span style='color: {colors['text_primary']}; font-size: 0.9rem;'>Logged: {html.escape(existing_log)}</span></div>",
+                                f"<div class='callout callout--success callout--compact' style='margin-top: 0.5rem;'><span style='color: {colors['text_primary']}; font-size: 0.9rem;'>Logged: {html.escape(existing_log)}</span></div>",
                                 unsafe_allow_html=True,
                             )
 
@@ -451,13 +451,13 @@ def show():
         if 'last_save_time' in st.session_state and st.session_state.last_save_time:
             save_time = st.session_state.last_save_time
             st.markdown(f"""
-            <div style="background: rgba(52, 199, 89, 0.12); border-left: 3px solid {colors['success']}; padding: 1rem; border-radius: 10px; margin: 1rem 0;">
+            <div class="callout callout--success">
                 <strong>Last saved: {save_time}</strong> ({logs_count}/{len(exercises)} exercises logged)
             </div>
             """.strip(), unsafe_allow_html=True)
         elif logs_count > 0:
             st.markdown(f"""
-            <div style="background: rgba(255, 159, 10, 0.12); border-left: 3px solid {colors['warning']}; padding: 1rem; border-radius: 10px; margin: 1rem 0;">
+            <div class="callout callout--warning">
                 <strong>{logs_count}/{len(exercises)} exercises logged</strong> - Don't forget to save!
             </div>
             """.strip(), unsafe_allow_html=True)
