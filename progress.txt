@@ -113,3 +113,24 @@ Blocked
 
 Next
 1. Capture updated screenshots (mobile/tablet/desktop) to validate new callout styles.
+
+---
+
+Progress Snapshot
+Date: 2026-02-06
+
+Current Phase
+- Phase 4.3 (Apple-style UI polish) follow-up applied to error callouts.
+
+Built (Complete)
+- Replaced save-failure messages in workout logger with Apple-style callout blocks.
+- Validation run: compileall, unit tests, headless Streamlit boot.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Capture updated screenshots (mobile/tablet/desktop) to confirm callout styling.

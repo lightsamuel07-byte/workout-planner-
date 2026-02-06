@@ -540,14 +540,20 @@ def show():
                         # Don't clear session state or redirect - let user stay on page
                         st.rerun()
                     else:
-                        st.error("Failed to save workout log")
-                        st.warning("""
-                        **Troubleshooting Steps:**
-                        1. Check your internet connection
-                        2. Verify Google Sheets is accessible
-                        3. Ensure today's workout exists in the sheet
-                        4. Try refreshing the page and logging in again
-                        """)
+                        st.markdown(f"""
+                        <div class="callout callout--error">
+                            <div style="font-weight: 600; margin-bottom: 0.5rem;">Failed to save workout log</div>
+                            <div style="color: {colors['text_secondary']}; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                                Troubleshooting steps:
+                            </div>
+                            <ul style="margin: 0; padding-left: 1.1rem; color: {colors['text_secondary']}; font-size: 0.9rem;">
+                                <li>Check your internet connection</li>
+                                <li>Verify Google Sheets is accessible</li>
+                                <li>Ensure today's workout exists in the sheet</li>
+                                <li>Try refreshing the page and logging in again</li>
+                            </ul>
+                        </div>
+                        """.strip(), unsafe_allow_html=True)
                         
                         # Show what was being saved for debugging
                         with st.expander("Debug: What was being saved"):
@@ -557,14 +563,23 @@ def show():
                                 st.write(f"{i+1}. {log['exercise']}: '{log['log'][:50]}'")
 
                 except Exception as e:
-                    st.error(f"Error saving workout: {str(e)}")
-                    st.warning("""
-                    **Troubleshooting Steps:**
-                    1. Check your internet connection
-                    2. Verify Google Sheets is accessible  
-                    3. Try refreshing the page
-                    4. Contact support if issue persists
-                    """)
+                    st.markdown(f"""
+                    <div class="callout callout--error">
+                        <div style="font-weight: 600; margin-bottom: 0.5rem;">Error saving workout</div>
+                        <div style="color: {colors['text_secondary']}; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                            {html.escape(str(e))}
+                        </div>
+                        <div style="color: {colors['text_secondary']}; font-size: 0.9rem; margin-bottom: 0.5rem;">
+                            Troubleshooting steps:
+                        </div>
+                        <ul style="margin: 0; padding-left: 1.1rem; color: {colors['text_secondary']}; font-size: 0.9rem;">
+                            <li>Check your internet connection</li>
+                            <li>Verify Google Sheets is accessible</li>
+                            <li>Try refreshing the page</li>
+                            <li>Contact support if issue persists</li>
+                        </ul>
+                    </div>
+                    """.strip(), unsafe_allow_html=True)
                     
                     with st.expander("Technical Details"):
                         import traceback
