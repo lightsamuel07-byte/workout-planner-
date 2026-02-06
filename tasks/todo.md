@@ -15,7 +15,7 @@
 - [x] Create a new timestamped design-system snapshot documenting any new callout tokens or component rules (do not overwrite `DESIGN_SYSTEM.md`).
 - [x] Run validation: `python3 -m compileall app.py pages src`, `python3 -m unittest discover -s tests -p "test_*.py" -v`, `python3 -m streamlit run app.py --server.headless true --server.port 85xx`.
 - [x] Update `progress.txt` with work completed and next steps; fill Review section here.
-- [ ] Commit and push to git.
+- [x] Commit and push to git.
 
 ## Review (fill in at end of session)
 - Findings:
@@ -25,4 +25,4 @@
 - Decisions:
   - Documented new callout utilities in a timestamped design-system snapshot.
 - Next steps:
-  - Push changes to git.
+  - Capture updated screenshots for visual verification.
