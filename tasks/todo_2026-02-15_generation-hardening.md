@@ -23,6 +23,7 @@
   - Audit patch: fixed CLI `save_plan()` tuple handling in `main.py` so saved plan/explanation paths are printed correctly.
   - Audit patch: converted prompt test scripts to explicit `main()` execution to prevent `unittest discover` import-time API calls.
   - Post-push fix: generation start is now driven by explicit request state with stale in-progress auto-recovery to prevent dropped clicks in Streamlit reruns.
+  - Post-push fix: biceps grip-repeat validator now ignores mixed cross-day note references and prioritizes explicit per-exercise grip declarations.
 - Decisions:
   - Keep model responsible for structure/exercise composition, while hard constraints and locked progression are code-enforced.
   - Keep Google Sheets as cloud-visible persistence layer for generation metadata.

@@ -266,3 +266,33 @@ Blocked
 Next
 1. User retest: click Generate and confirm spinner appears and plan run starts.
 2. If still failing, capture UI state (button disabled/enabled, any warning/error text) and patch immediately.
+
+---
+
+Progress Snapshot
+Date: 2026-02-15
+
+Current Phase
+- Phase 3 reliability hardening: validator correctness pass.
+
+Built (Complete)
+- Fixed biceps grip rotation false positives in `src/plan_validator.py`:
+  - Grip detection now prioritizes explicit `<grip> grip` declarations.
+  - Falls back to exercise-name cues before notes.
+  - Mixed note signals across multiple grips are treated as ambiguous and ignored for repeat checks.
+  - Day-level grip detection now scans day curl entries until a valid grip is found.
+- Added regression test in `tests/test_plan_validator.py` to ensure notes containing cross-day grip text do not trigger `biceps_grip_repeat`.
+
+Validation Run
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (19 tests).
+- `python3 -m compileall src/plan_validator.py tests/test_plan_validator.py` passed.
+
+In Progress
+- Awaiting user re-run to confirm `AI Generation Summary` no longer reports false biceps-repeat violations.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Generate a fresh plan and verify validation summary drops prior false-positive biceps violations.
+2. If summary still reports unresolved violations, inspect exact code(s) and patch deterministically.

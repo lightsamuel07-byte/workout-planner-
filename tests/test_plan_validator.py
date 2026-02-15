@@ -46,6 +46,27 @@ class PlanValidatorTests(unittest.TestCase):
         codes = {v["code"] for v in result["violations"]}
         self.assertIn("odd_db_load", codes)
 
+    def test_does_not_flag_biceps_rotation_when_notes_mention_other_days(self):
+        plan = """## TUESDAY
+### D1. Incline DB Curl (Supinated)
+- 3 x 12 @ 14 kg
+- **Rest:** 60 seconds
+- **Notes:** Supinated grip. Long-length stimulus.
+## THURSDAY
+### D1. Cable Curl (Straight Bar, Pronated Grip)
+- 3 x 10 @ 27 kg
+- **Rest:** 60 seconds
+- **Notes:** Pronated grip to avoid repeat (Tue supinated -> Thu pronated -> Sat neutral).
+## SATURDAY
+### D1. Hammer Curl (Neutral Grip)
+- 3 x 15 @ 14 kg
+- **Rest:** 60 seconds
+- **Notes:** Neutral grip to complete rotation (Tue supinated -> Thu pronated -> Sat neutral).
+"""
+        result = validate_plan(plan, progression_directives=[])
+        codes = {v["code"] for v in result["violations"]}
+        self.assertNotIn("biceps_grip_repeat", codes)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -117,14 +117,32 @@ def _identify_triceps_attachment(name):
 def _identify_biceps_grip(entry):
     value = _normalize_text(entry.get("exercise"))
     notes = _normalize_text(entry.get("notes"))
-    combined = f"{value} {notes}"
 
-    if any(token in combined for token in ["supinated", "supination"]):
-        return "supinated"
-    if any(token in combined for token in ["pronated", "reverse curl", "pronation"]):
+    # Prefer explicit "<grip> grip" declarations first.
+    for text in [value, notes]:
+        match = re.search(r"\b(supinated|pronated|neutral)\s+grip\b", text)
+        if match:
+            return match.group(1)
+
+    # Exercise name cues are next most reliable.
+    if any(token in value for token in ["pronated", "pronation", "reverse curl"]):
         return "pronated"
-    if any(token in combined for token in ["neutral", "hammer"]):
+    if any(token in value for token in ["neutral", "hammer"]):
         return "neutral"
+    if any(token in value for token in ["supinated", "supination"]):
+        return "supinated"
+
+    # Notes fallback: only use when a single grip signal is present.
+    note_signals = set()
+    if any(token in notes for token in ["pronated", "pronation", "reverse curl"]):
+        note_signals.add("pronated")
+    if any(token in notes for token in ["neutral", "hammer"]):
+        note_signals.add("neutral")
+    if any(token in notes for token in ["supinated", "supination"]):
+        note_signals.add("supinated")
+
+    if len(note_signals) == 1:
+        return next(iter(note_signals))
     return ""
 
 
@@ -232,7 +250,11 @@ def validate_plan(plan_text, progression_directives=None):
         ]
         if not day_entries:
             continue
-        grip = _identify_biceps_grip(day_entries[0])
+        grip = ""
+        for day_entry in day_entries:
+            grip = _identify_biceps_grip(day_entry)
+            if grip:
+                break
         if grip:
             grip_by_day[day] = grip
 

@@ -49,3 +49,5 @@ Last updated: 2026-02-15
 - New rule: main-lift exemptions must exclude DB-tagged exercise names; only barbell main lifts are exempt from DB parity enforcement.
 - Correction received: Generate button clicks can be lost if session state gets stuck as "in progress".
 - New rule: generation flow must use an explicit request flag and stale-state recovery (timeout reset) so spinner/start state is reliable after reruns.
+- Correction received: biceps rotation validator flagged false repeats when notes referenced other-day grip sequence text.
+- New rule: grip detection must prioritize explicit per-exercise grip declarations and treat mixed note signals as ambiguous (not a repeat violation).
