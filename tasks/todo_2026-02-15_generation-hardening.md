@@ -22,6 +22,7 @@
   - Audit patch: tightened main-lift detection so odd DB loads are still rejected for DB squat/press variants while barbell main lifts remain exempt.
   - Audit patch: fixed CLI `save_plan()` tuple handling in `main.py` so saved plan/explanation paths are printed correctly.
   - Audit patch: converted prompt test scripts to explicit `main()` execution to prevent `unittest discover` import-time API calls.
+  - Post-push fix: generation start is now driven by explicit request state with stale in-progress auto-recovery to prevent dropped clicks in Streamlit reruns.
 - Decisions:
   - Keep model responsible for structure/exercise composition, while hard constraints and locked progression are code-enforced.
   - Keep Google Sheets as cloud-visible persistence layer for generation metadata.

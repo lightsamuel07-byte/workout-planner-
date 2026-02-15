@@ -100,9 +100,17 @@ def extract_fort_preamble(workout_text):
     return preamble or None
 
 
-def should_start_plan_generation(generate_button_clicked, plan_generation_in_progress):
-    """Guard generation start so button events are not dropped by disabled state reruns."""
-    return bool(generate_button_clicked and not plan_generation_in_progress)
+def should_start_plan_generation(
+    generation_requested,
+    plan_generation_in_progress,
+    all_workouts_filled=True,
+):
+    """Only start generation when requested, not already running, and inputs are complete."""
+    return bool(
+        generation_requested
+        and not plan_generation_in_progress
+        and all_workouts_filled
+    )
 
 
 def show():
@@ -112,6 +120,23 @@ def show():
 
     if 'plan_generation_in_progress' not in st.session_state:
         st.session_state.plan_generation_in_progress = False
+    if 'plan_generation_requested' not in st.session_state:
+        st.session_state.plan_generation_requested = False
+    if 'plan_generation_started_at' not in st.session_state:
+        st.session_state.plan_generation_started_at = None
+
+    # Recover automatically if a prior run left the session in a stuck state.
+    started_at_raw = st.session_state.plan_generation_started_at
+    if st.session_state.plan_generation_in_progress and started_at_raw:
+        try:
+            started_at = datetime.fromisoformat(started_at_raw)
+        except ValueError:
+            started_at = None
+        if started_at and (datetime.now() - started_at) > timedelta(minutes=15):
+            st.session_state.plan_generation_in_progress = False
+            st.session_state.plan_generation_requested = False
+            st.session_state.plan_generation_started_at = None
+            st.warning("Recovered from a stuck generation state. You can generate again.")
 
     # Calculate next Monday
     next_monday = get_next_monday()
@@ -283,14 +308,19 @@ def show():
             width="stretch",
             disabled=(not all_workouts_filled) or st.session_state.plan_generation_in_progress,
         )
+        if generate_button:
+            st.session_state.plan_generation_requested = True
 
     should_generate = should_start_plan_generation(
-        generate_button_clicked=generate_button,
+        generation_requested=st.session_state.plan_generation_requested,
         plan_generation_in_progress=st.session_state.plan_generation_in_progress,
+        all_workouts_filled=all_workouts_filled,
     )
 
     if should_generate:
+        st.session_state.plan_generation_requested = False
         st.session_state.plan_generation_in_progress = True
+        st.session_state.plan_generation_started_at = datetime.now().isoformat()
         with st.spinner("Generating your personalized workout plan..."):
             try:
                 # Import after user clicks to avoid loading on page load
@@ -507,6 +537,7 @@ USER PREFERENCES:
                     st.code(traceback.format_exc())
             finally:
                 st.session_state.plan_generation_in_progress = False
+                st.session_state.plan_generation_started_at = None
 
     # Cost estimate
     st.markdown("---")

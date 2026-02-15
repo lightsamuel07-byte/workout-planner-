@@ -13,6 +13,9 @@ class GeneratePlanButtonFlowTest(unittest.TestCase):
     def test_does_not_start_without_click(self):
         self.assertFalse(should_start_plan_generation(False, False))
 
+    def test_does_not_start_with_missing_inputs(self):
+        self.assertFalse(should_start_plan_generation(True, False, all_workouts_filled=False))
+
 
 if __name__ == "__main__":
     unittest.main()

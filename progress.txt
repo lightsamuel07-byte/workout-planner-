@@ -237,3 +237,32 @@ Next
 1. Generate the next-week plan using the provided Fort inputs.
 2. Verify the sheet includes `AI Generation Summary` with both validation and explanation text.
 3. Confirm no odd DB loads appear outside barbell main-lift blocks.
+
+---
+
+Progress Snapshot
+Date: 2026-02-15
+
+Current Phase
+- Phase 3 reliability hardening: Streamlit generation trigger robustness.
+
+Built (Complete)
+- Fixed intermittent "Generate" no-op behavior in `pages/generate_plan.py` by:
+  - introducing explicit `plan_generation_requested` state,
+  - gating generation on request + readiness instead of raw button pulse only,
+  - adding stale `plan_generation_in_progress` auto-recovery after 15 minutes.
+- Added regression case for missing-input guard in `tests/test_generate_plan_button_flow.py`.
+
+Validation Run
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (18 tests).
+- `python3 -m compileall pages/generate_plan.py tests/test_generate_plan_button_flow.py` passed.
+
+In Progress
+- Awaiting user retest in Streamlit Cloud for generation spinner/start behavior.
+
+Blocked
+- No technical blockers.
+
+Next
+1. User retest: click Generate and confirm spinner appears and plan run starts.
+2. If still failing, capture UI state (button disabled/enabled, any warning/error text) and patch immediately.

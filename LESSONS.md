@@ -47,3 +47,5 @@ Last updated: 2026-02-15
 - New rule: for Streamlit Cloud flows, persist generation explanation/validation metadata in Google Sheets and surface it in app fallback views (do not assume local filesystem visibility).
 - Audit correction: odd DB loads could slip through for DB squat/press variants due broad main-lift token matching.
 - New rule: main-lift exemptions must exclude DB-tagged exercise names; only barbell main lifts are exempt from DB parity enforcement.
+- Correction received: Generate button clicks can be lost if session state gets stuck as "in progress".
+- New rule: generation flow must use an explicit request flag and stale-state recovery (timeout reset) so spinner/start state is reliable after reruns.
