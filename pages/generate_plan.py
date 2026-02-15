@@ -317,6 +317,14 @@ def show():
         all_workouts_filled=all_workouts_filled,
     )
 
+    if st.session_state.plan_generation_in_progress and not should_generate:
+        st.info("Plan generation is marked as in progress.")
+        if st.button("Reset generation state", key="reset_generation_state"):
+            st.session_state.plan_generation_in_progress = False
+            st.session_state.plan_generation_requested = False
+            st.session_state.plan_generation_started_at = None
+            st.rerun()
+
     if should_generate:
         st.session_state.plan_generation_requested = False
         st.session_state.plan_generation_in_progress = True
