@@ -594,6 +594,66 @@ class SheetsReader:
 
         return formatted
 
+    def read_generation_summary(self, sheet_name):
+        """
+        Read AI generation summary block from a weekly plan sheet.
+
+        Returns:
+            dict with keys {'validation': str, 'explanation_lines': list[str]}
+            or None when block is absent.
+        """
+        if not sheet_name:
+            return None
+
+        if not self.service:
+            raise RuntimeError("Not authenticated. Call authenticate() first.")
+
+        try:
+            range_name = f"'{sheet_name}'!A:H"
+            result = self.service.spreadsheets().values().get(
+                spreadsheetId=self.spreadsheet_id,
+                range=range_name
+            ).execute()
+            values = result.get('values', [])
+            if not values:
+                return None
+
+            start_idx = None
+            for idx, row in enumerate(values):
+                if len(row) > 0 and str(row[0]).strip() == "AI Generation Summary":
+                    start_idx = idx
+                    break
+
+            if start_idx is None:
+                return None
+
+            summary = {"validation": "", "explanation_lines": []}
+            in_explanation = False
+            for row in values[start_idx + 1:]:
+                col_a = str(row[0]).strip() if len(row) > 0 else ""
+                col_g = str(row[6]).strip() if len(row) > 6 else ""
+                if not col_a and not col_g:
+                    continue
+
+                if col_a == "Validation":
+                    summary["validation"] = col_g
+                    in_explanation = False
+                    continue
+
+                if col_a == "Explanation":
+                    in_explanation = True
+                    continue
+
+                if in_explanation and col_g:
+                    summary["explanation_lines"].append(col_g)
+
+            if not summary["validation"] and not summary["explanation_lines"]:
+                return None
+            return summary
+        except HttpError as err:
+            print(f"Error reading generation summary from {sheet_name}: {err}")
+            return None
+
     def _extract_rpe_from_text(self, text):
         """Parse explicit numeric RPE value from freeform log text."""
         if not text:

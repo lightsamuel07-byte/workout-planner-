@@ -1,6 +1,6 @@
 # LESSONS
 
-Last updated: 2026-02-05
+Last updated: 2026-02-15
 
 ## Core Lessons to Preserve
 
@@ -29,9 +29,21 @@ Last updated: 2026-02-05
    - Service account file
    - Streamlit Cloud secrets (`gcp_service_account`)
 
+7. Keep root-level utility scripts side-effect free on import:
+   - `unittest discover` imports modules matching `test_*.py`.
+   - Any top-level API calls in those files can hang audits and CI checks.
+   - Run network/manual flows only inside `main()` guarded by `if __name__ == "__main__":`.
+
 ## Session Corrections (2026-02-05)
 
 - Correction received: canonical docs did not exist, and work needed to continue in doc-locked mode.
 - New rule: when canonical docs are missing and user requests doc-locked workflow, create baseline canonical docs from the current codebase before feature work.
 - Correction received: mobile screenshots exposed spacing/border density issues that code-only review understated.
 - New rule: for UX phases, validate with real device screenshots (or equivalent) before finalizing mobile layout recommendations.
+
+## Session Corrections (2026-02-15)
+
+- Correction received: cloud-generated markdown/explanation files were not locally accessible to the user.
+- New rule: for Streamlit Cloud flows, persist generation explanation/validation metadata in Google Sheets and surface it in app fallback views (do not assume local filesystem visibility).
+- Audit correction: odd DB loads could slip through for DB squat/press variants due broad main-lift token matching.
+- New rule: main-lift exemptions must exclude DB-tagged exercise names; only barbell main lifts are exempt from DB parity enforcement.

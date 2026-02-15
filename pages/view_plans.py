@@ -50,6 +50,12 @@ def read_sheet_plan(sheet_name):
     reader.sheet_name = sheet_name
     return reader.read_workout_history(num_recent_workouts=20)
 
+
+def read_sheet_generation_summary(sheet_name):
+    """Read generation metadata from Google Sheets when available."""
+    reader = get_sheets_reader()
+    return reader.read_generation_summary(sheet_name)
+
 def parse_plan_content(plan_path):
     """Parse plan file into structured sections"""
     try:
@@ -137,6 +143,7 @@ def show():
     day_content = ""
     exercises = []
     data_source = "local"
+    generation_summary = None
 
     if plans:
         # Local markdown plan selector
@@ -221,6 +228,7 @@ def show():
         )
 
         workouts = read_sheet_plan(selected_sheet_name)
+        generation_summary = read_sheet_generation_summary(selected_sheet_name)
         if not workouts:
             st.warning(f"No workout data found in sheet `{selected_sheet_name}`.")
             action_button("Back to Dashboard", "dashboard", width="stretch")
@@ -333,6 +341,14 @@ def show():
                     st.markdown(explanation_content)
                 except Exception as e:
                     st.error(f"Error reading explanation file: {e}")
+    elif data_source == "sheets" and generation_summary:
+        with st.expander("View AI Explanation and Validation Summary", expanded=False):
+            validation = generation_summary.get("validation", "")
+            if validation:
+                st.markdown(f"**Validation**: {validation}")
+            explanation_lines = generation_summary.get("explanation_lines", [])
+            if explanation_lines:
+                st.markdown("\n".join(explanation_lines))
 
     st.markdown("---")
 

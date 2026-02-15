@@ -100,6 +100,11 @@ def extract_fort_preamble(workout_text):
     return preamble or None
 
 
+def should_start_plan_generation(generate_button_clicked, plan_generation_in_progress):
+    """Guard generation start so button events are not dropped by disabled state reruns."""
+    return bool(generate_button_clicked and not plan_generation_in_progress)
+
+
 def show():
     """Render the generate plan page"""
 
@@ -272,18 +277,20 @@ def show():
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-        def _start_plan_generation():
-            st.session_state.plan_generation_in_progress = True
-
         generate_button = st.button(
             "Generate Workout Plan with AI",
             type="primary",
             width="stretch",
             disabled=(not all_workouts_filled) or st.session_state.plan_generation_in_progress,
-            on_click=_start_plan_generation
         )
 
-    if generate_button:
+    should_generate = should_start_plan_generation(
+        generate_button_clicked=generate_button,
+        plan_generation_in_progress=st.session_state.plan_generation_in_progress,
+    )
+
+    if should_generate:
+        st.session_state.plan_generation_in_progress = True
         with st.spinner("Generating your personalized workout plan..."):
             try:
                 # Import after user clicks to avoid loading on page load
@@ -406,12 +413,13 @@ USER PREFERENCES:
                             "Continuing without summarized Fort constraints."
                         )
 
-                plan, explanation = plan_gen.generate_plan(
+                plan, explanation, validation_summary = plan_gen.generate_plan(
                     workout_history,
                     formatted_workouts,
                     preferences,
                     fort_week_constraints=fort_week_constraints,
                     db_context=db_context,
+                    prior_supplemental=prior_supplemental,
                 )
 
                 if plan:
@@ -453,9 +461,15 @@ USER PREFERENCES:
 
                     archived_sheet_name = f"{sheet_name} [archived {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}]"
                     sheets_writer.archive_sheet_if_exists(archived_sheet_name)
-                    sheets_writer.write_workout_plan(plan)
+                    sheets_writer.write_workout_plan(
+                        plan,
+                        explanation_text=explanation,
+                        validation_summary=validation_summary,
+                    )
 
                     st.success("Workout plan generated successfully!")
+                    if validation_summary:
+                        st.caption(validation_summary)
 
                     st.markdown(f"""
                     <div style="

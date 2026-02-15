@@ -179,7 +179,7 @@ def show():
                     }
                     for row in recent_sessions
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
         else:
@@ -212,7 +212,7 @@ def show():
                     }
                     for row in top_exercises
                 ],
-                use_container_width=True,
+                width="stretch",
                 hide_index=True,
             )
 

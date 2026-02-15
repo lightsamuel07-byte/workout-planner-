@@ -143,12 +143,14 @@ class SheetsWriter:
             scopes=SCOPES
         )
 
-    def write_workout_plan(self, plan_text):
+    def write_workout_plan(self, plan_text, explanation_text=None, validation_summary=None):
         """
         Write the workout plan to Google Sheets.
 
         Args:
             plan_text: The generated workout plan as markdown text
+            explanation_text: Optional explanation text to persist in-sheet
+            validation_summary: Optional validation summary string
 
         Returns:
             True if successful, False otherwise
@@ -157,7 +159,11 @@ class SheetsWriter:
             raise Exception("Not authenticated. Call authenticate() first.")
 
         # Parse the plan into structured data
-        rows = self._parse_plan_to_rows(plan_text)
+        rows = self._parse_plan_to_rows(
+            plan_text,
+            explanation_text=explanation_text,
+            validation_summary=validation_summary,
+        )
 
         # Check if sheet exists, create if not
         self._ensure_sheet_exists()
@@ -199,7 +205,7 @@ class SheetsWriter:
 
         return True
 
-    def _parse_plan_to_rows(self, plan_text):
+    def _parse_plan_to_rows(self, plan_text, explanation_text=None, validation_summary=None):
         """
         Parse the markdown plan into structured rows for Google Sheets.
         NOW handles a single unified format for all exercises.
@@ -248,6 +254,22 @@ class SheetsWriter:
                         rows.append([block_label, exercise_name, sets, reps, load, rest, notes, ''])
 
             i += 1
+
+        # Append generation metadata for Streamlit Cloud visibility.
+        if validation_summary or explanation_text:
+            rows.append([])
+            rows.append(["AI Generation Summary", "", "", "", "", "", "", ""])
+
+            if validation_summary:
+                rows.append(["Validation", "", "", "", "", "", validation_summary, ""])
+
+            if explanation_text:
+                rows.append(["Explanation", "", "", "", "", "", "", ""])
+                for line in explanation_text.splitlines():
+                    line = line.strip()
+                    if not line:
+                        continue
+                    rows.append(["", "", "", "", "", "", line, ""])
 
         return rows
 

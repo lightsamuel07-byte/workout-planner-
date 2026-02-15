@@ -159,7 +159,7 @@ def main():
         program_context = "\n\nCONTINUING FORT PROGRAM: Maintain the same supplemental workout structure with progressive overload based on prior week's data.\n"
         program_context += f"\n{formatted_prior_supplemental}\n"
 
-    plan, explanation = plan_generator.generate_plan(
+    plan, explanation, validation_summary = plan_generator.generate_plan(
         workout_history=formatted_history,
         trainer_workouts=formatted_trainer_workouts + program_context,
         preferences=""  # Already included in formatted_trainer_workouts
@@ -180,12 +180,14 @@ def main():
         print("PLAN EXPLANATION")
         print("=" * 60)
         print("\n" + explanation + "\n")
+    if validation_summary:
+        print("Validation:", validation_summary)
 
     # Save the plan to file
     output_folder = config['output']['folder']
     output_format = config['output']['format']
 
-    filepath = plan_generator.save_plan(
+    plan_filepath, explanation_filepath = plan_generator.save_plan(
         plan=plan,
         output_folder=output_folder,
         format=output_format
@@ -198,11 +200,15 @@ def main():
 
     try:
         sheets_writer.authenticate()
-        sheets_writer.write_workout_plan(plan)
+        sheets_writer.write_workout_plan(
+            plan,
+            explanation_text=explanation,
+            validation_summary=validation_summary,
+        )
         print("\n✓ Successfully written to Google Sheets!")
     except Exception as e:
         print(f"\n⚠ Warning: Could not write to Google Sheets: {e}")
-        print(f"Your plan was still saved to: {filepath}")
+        print(f"Your plan was still saved to: {plan_filepath}")
 
     # Finish
     print("\n" + "=" * 60)
@@ -210,7 +216,9 @@ def main():
     print("=" * 60)
     print(f"\nYour workout plan has been:")
     print(f"  • Written to Google Sheets (sheet: '{sheet_name}')")
-    print(f"  • Saved locally to: {filepath}")
+    print(f"  • Saved locally to: {plan_filepath}")
+    if explanation_filepath:
+        print(f"  • Explanation saved locally to: {explanation_filepath}")
     print("\nGood luck with your training! 💪\n")
 
 

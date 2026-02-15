@@ -134,3 +134,106 @@ Blocked
 
 Next
 1. Capture updated screenshots (mobile/tablet/desktop) to confirm callout styling.
+
+---
+
+Progress Snapshot
+Date: 2026-02-08
+
+Current Phase
+- Phase 3 reliability hardening: generation flow bugfix and regression coverage.
+
+Built (Complete)
+- Fixed Generate Plan click-flow bug where button callback state could prevent generation from starting.
+- Added generation-start guard helper in `pages/generate_plan.py`.
+- Added regression tests in `tests/test_generate_plan_button_flow.py`.
+- Validation run completed:
+  - `python3 -m compileall app.py pages src`
+  - `python3 -m unittest discover -s tests -p "test_*.py" -v` (12 tests, all passing)
+
+In Progress
+- Awaiting user confirmation from a fresh Generate Plan run in the app.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Verify generation works end-to-end in deployed Streamlit environment.
+2. If any remaining generation failures appear, capture exact on-screen error and stack details for targeted fix.
+
+---
+
+Progress Snapshot
+Date: 2026-02-15
+
+Current Phase
+- Phase 3 reliability hardening: deterministic progression and validation enforcement integrated into generation.
+
+Built (Complete)
+- Added deterministic progression directives from prior-week logs in `src/progression_rules.py`.
+  - Enforces explicit keep/stay-here lock behavior for matched supplemental exercises.
+- Added hard-rule validator in `src/plan_validator.py`.
+  - Validates DB parity, carry day placement, split-squat exclusion, range-prescription violations, triceps attachment variation, biceps grip sequence, and hold-lock compliance.
+- Integrated deterministic repair + validation-first flow in `src/plan_generator.py`.
+  - Post-generation order: swaps -> DB parity -> hold-lock apply -> range collapse -> validator -> deterministic repair -> optional correction prompt.
+- Extended generation outputs to include validation summary.
+  - Updated call sites in `pages/generate_plan.py` and `main.py`.
+- Persisted explanation/validation summary directly in Google Sheets via `src/sheets_writer.py`.
+- Added sheet-side summary reader in `src/sheets_reader.py` and rendered it in `pages/view_plans.py` fallback mode.
+- Added regression tests:
+  - `tests/test_progression_rules.py`
+  - `tests/test_plan_validator.py`
+- Audit cleanup:
+  - Removed remaining deprecated `use_container_width` usage in `pages/database_status.py`.
+  - Refactored `test_sheets_writer.py` to safe `main()` execution to avoid import-time side effects.
+
+Validation Run
+- `python3 -m compileall app.py pages src tests test_format_prompt.py test_compressed_prompt.py` passed.
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (16 tests).
+- `python3 -m compileall .` passed.
+
+In Progress
+- Awaiting user run of next-week generation in Streamlit Cloud with provided Fort inputs.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Generate next weekly plan in Streamlit Cloud and review the in-sheet `AI Generation Summary`.
+2. Spot-check hold-lock exercises versus prior logs (e.g., any explicit keep/stay-here notes).
+3. If violations remain, tune validator/correction prompt policy against the generated sheet diff.
+
+---
+
+Progress Snapshot
+Date: 2026-02-15
+
+Current Phase
+- Phase 3 reliability hardening: post-implementation audit pass and bug tightening.
+
+Built (Complete)
+- Fixed DB parity edge case:
+  - Dumbbell squat/press variants are now still enforced as even loads.
+  - Main barbell lifts remain exempt from DB parity logic.
+  - Files: `src/plan_generator.py`, `src/plan_validator.py`, `tests/test_plan_validator.py`.
+- Fixed CLI output path handling in `main.py`:
+  - `save_plan()` tuple is now unpacked and both plan/explanation paths print correctly.
+- Hardened test script behavior:
+  - Converted `test_format_prompt.py` and `test_compressed_prompt.py` to explicit `main()` scripts with no import-time API calls.
+  - This prevents hangs during broad discovery/audit commands.
+
+Validation Run
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (17 tests).
+- `python3 -m compileall app.py pages src tests test_format_prompt.py test_compressed_prompt.py test_sheets_writer.py main.py` passed.
+- `python3 -m unittest discover -p "test_*.py" -v` now exits cleanly (no hangs; no tests in repo root by design).
+
+In Progress
+- Awaiting user run of next-week generation in Streamlit Cloud with latest hardening.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Generate the next-week plan using the provided Fort inputs.
+2. Verify the sheet includes `AI Generation Summary` with both validation and explanation text.
+3. Confirm no odd DB loads appear outside barbell main-lift blocks.

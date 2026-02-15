@@ -7,6 +7,12 @@ import os
 import yaml
 import re
 from datetime import datetime
+from src.progression_rules import (
+    apply_locked_directives_to_plan,
+    build_progression_directives,
+    format_directives_for_prompt,
+)
+from src.plan_validator import validate_plan
 
 
 class PlanGenerator:
@@ -69,7 +75,8 @@ class PlanGenerator:
         trainer_workouts,
         preferences,
         fort_week_constraints=None,
-        db_context=None
+        db_context=None,
+        prior_supplemental=None,
     ):
         """
         Generate a weekly workout plan using Claude AI.
@@ -84,13 +91,17 @@ class PlanGenerator:
         """
         print("\n🤖 Generating your personalized workout plan with Claude AI...")
 
+        progression_directives = build_progression_directives(prior_supplemental)
+        directives_block = format_directives_for_prompt(progression_directives)
+
         # Construct the prompt
         prompt = self._build_prompt(
             workout_history,
             trainer_workouts,
             preferences,
             fort_week_constraints=fort_week_constraints,
-            db_context=db_context
+            db_context=db_context,
+            progression_directives_block=directives_block,
         )
 
         try:
@@ -109,22 +120,16 @@ class PlanGenerator:
             plan = message.content[0].text
             plan = self._apply_exercise_swaps_to_text(plan)
             plan = self._enforce_even_dumbbell_loads(plan)
+            plan, locked_applied = apply_locked_directives_to_plan(plan, progression_directives)
 
-            # Validate and enforce no ranges (hybrid: retry once, then collapse)
-            plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=1)
-            if violations and not was_collapsed:
-                # Lightweight retry: just send the plan + specific corrections (no full context)
-                correction_prompt = f"""Fix these {len(violations)} range violations in the workout plan below:
+            # Deterministic range collapse and deterministic repairs happen before any correction call.
+            plan, range_violations, range_collapsed = self._validate_no_ranges(plan, attempt=2)
+            plan = self._repair_plan_deterministically(plan, progression_directives)
+            validation = validate_plan(plan, progression_directives)
 
-{chr(10).join(f"• {v[1]}: {v[2][0]}-{v[2][1]} (use higher value for reps, midpoint for load)" for v in violations[:15])}
-
-Rules:
-- Reps ranges (e.g., 12-15): use HIGHER value → 15
-- Load ranges (e.g., 22-26 kg): use MIDPOINT → 24 kg
-
-Return ONLY the corrected lines in the same format. Here's the full plan to fix:
-
-{plan}"""
+            unresolved_violations = validation["violations"]
+            if unresolved_violations:
+                correction_prompt = self._build_correction_prompt(plan, unresolved_violations)
                 message2 = self.client.messages.create(
                     model=self.model,
                     max_tokens=self.max_tokens,
@@ -134,18 +139,30 @@ Return ONLY the corrected lines in the same format. Here's the full plan to fix:
                 )
                 plan = message2.content[0].text
                 plan = self._apply_exercise_swaps_to_text(plan)
-                plan = self._enforce_even_dumbbell_loads(plan)
-                plan, violations, was_collapsed = self._validate_no_ranges(plan, attempt=2)
+                plan = self._repair_plan_deterministically(plan, progression_directives)
+                validation = validate_plan(plan, progression_directives)
+                unresolved_violations = validation["violations"]
+
+            validation_summary = (
+                f"{validation['summary']} Locked directives applied: {locked_applied}. "
+                f"Unresolved violations: {len(unresolved_violations)}."
+            )
 
             # Generate explanation file
-            explanation = self._generate_explanation(plan, workout_history, violations if was_collapsed else None)
+            explanation = self._generate_explanation(
+                plan,
+                workout_history,
+                violations_collapsed=range_violations if range_collapsed else None,
+                validation_summary=validation_summary,
+                unresolved_violations=unresolved_violations,
+            )
 
             print("✓ Workout plan generated successfully!\n")
-            return plan, explanation
+            return plan, explanation, validation_summary
 
         except Exception as e:
             print(f"Error generating plan: {e}")
-            return None, None
+            return None, None, None
 
     def summarize_fort_preamble(self, preamble_text):
         if not preamble_text or not preamble_text.strip():
@@ -211,6 +228,16 @@ PREAMBLE:
         header_re = re.compile(r'^\s*###\s+[A-Z]\d+\.\s*(.+)$', re.IGNORECASE)
         load_re = re.compile(r'@\s*([\d]+(?:\.\d+)?)\s*kg\b', re.IGNORECASE)
 
+        def is_main_plate_lift(exercise_name):
+            normalized = re.sub(r"[^a-z0-9]+", " ", (exercise_name or "").lower()).strip()
+            is_db = (' db ' in f' {normalized} ') or ('dumbbell' in normalized)
+            if is_db:
+                return False
+            return any(
+                token in normalized
+                for token in ['back squat', 'front squat', 'deadlift', 'bench press', 'chest press']
+            )
+
         def coerce_even(value):
             rounded = int(round(value))
             if rounded % 2 == 0:
@@ -227,10 +254,7 @@ PREAMBLE:
             if header_match:
                 exercise_name = header_match.group(1).lower()
                 current_is_db = ('db' in exercise_name) or ('dumbbell' in exercise_name)
-                current_is_main_lift = any(
-                    keyword in exercise_name
-                    for keyword in ['squat', 'deadlift', 'bench press', 'chest press']
-                )
+                current_is_main_lift = is_main_plate_lift(exercise_name)
                 continue
 
             if not current_is_db or current_is_main_lift:
@@ -305,7 +329,8 @@ PREAMBLE:
             at_pos = stripped.find('@')
             range_pos = stripped.find(f"{low}")
             if at_pos != -1 and range_pos != -1 and range_pos > at_pos:
-                replacement = str(int(round((low_val + high_val) / 2.0)))
+                midpoint = (low_val + high_val) / 2.0
+                replacement = f"{midpoint:.1f}".rstrip("0").rstrip(".")
             else:
                 replacement = str(high_val)
 
@@ -317,7 +342,14 @@ PREAMBLE:
 
         return collapsed_text, violations, True
 
-    def _generate_explanation(self, plan, workout_history, violations_collapsed=None):
+    def _generate_explanation(
+        self,
+        plan,
+        workout_history,
+        violations_collapsed=None,
+        validation_summary=None,
+        unresolved_violations=None,
+    ):
         """Generate short explanation file (5-15 bullets)."""
         bullets = []
 
@@ -348,11 +380,52 @@ PREAMBLE:
         if violations_collapsed:
             bullets.append(f"Auto-corrected {len(violations_collapsed)} range violations to single values")
 
+        if validation_summary:
+            bullets.append(validation_summary)
+
+        unresolved_count = len(unresolved_violations or [])
+        if unresolved_count:
+            bullets.append(f"Remaining violations after repair/correction: {unresolved_count}")
+
         # Focus areas
         bullets.append("Focus: arms, medial delts, upper chest, back detail")
         bullets.append("Incline walking included on all supplemental days")
 
         return "\n".join(f"• {b}" for b in bullets[:15])  # Cap at 15 bullets
+
+    def _repair_plan_deterministically(self, text, progression_directives):
+        """Apply deterministic post-generation repairs."""
+        repaired = self._enforce_even_dumbbell_loads(text)
+        repaired, _ = apply_locked_directives_to_plan(repaired, progression_directives)
+        repaired, _, _ = self._validate_no_ranges(repaired, attempt=2)
+        return repaired
+
+    def _build_correction_prompt(self, plan, violations):
+        """Build compact correction prompt from unresolved validator violations."""
+        lines = []
+        for violation in violations[:20]:
+            day = violation.get("day") or "Unknown day"
+            exercise = violation.get("exercise") or "Unknown exercise"
+            message = violation.get("message", "")
+            lines.append(f"- {violation['code']} | {day} | {exercise} | {message}")
+
+        return f"""Correct this workout plan to satisfy all listed validation violations.
+
+Violations:
+{chr(10).join(lines)}
+
+Hard requirements:
+- Keep overall structure and exercise order unless violation requires change.
+- Preserve Fort day content and supplemental intent.
+- Keep no-range rule in prescription lines.
+- Keep dumbbell parity rule (even DB loads, except main barbell lifts).
+- Respect explicit keep/stay-here progression constraints from prior logs.
+
+Return the full corrected plan in the same markdown format.
+
+PLAN:
+{plan}
+"""
 
     def _build_prompt(
         self,
@@ -360,7 +433,8 @@ PREAMBLE:
         trainer_workouts,
         preferences,
         fort_week_constraints=None,
-        db_context=None
+        db_context=None,
+        progression_directives_block=None,
     ):
         """
         Build the AI prompt for plan generation using compressed format.
@@ -384,6 +458,10 @@ PREAMBLE:
         if db_context:
             db_context_block = f"\n{db_context}\n\n---\n"
 
+        directives_block = ""
+        if progression_directives_block:
+            directives_block = f"\n{progression_directives_block}\n\n---\n"
+
         prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
 
 CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
@@ -399,6 +477,8 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 ---
 
 {db_context_block}
+
+{directives_block}
 
 FORT WORKOUT CONVERSION (CRITICAL):
 The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the exercise format:
