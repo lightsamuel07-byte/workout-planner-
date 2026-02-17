@@ -339,3 +339,50 @@ Blocked
 Next
 1. Run a live generation using a non-cluster Fort day set and inspect Mon/Wed/Fri conversion fidelity.
 2. If anchor drift remains, add deterministic post-generation Fort-day anchor validator.
+
+---
+
+Progress Snapshot
+Date: 2026-02-17
+
+Current Phase
+- Phase 3 reliability hardening: full Fort compiler + fidelity loop + backtest harness.
+
+Built (Complete)
+- Extended `src/fort_compiler.py` beyond section anchors:
+  - deterministic compiled section templates with stable block labels,
+  - plan-parsing utilities for Fort-day fidelity checks,
+  - `validate_fort_fidelity()` for required anchor presence, section order drift, and main-lift load presence in strength sections.
+- Extended `src/plan_generator.py` generation loop:
+  - accepts `fort_compiler_meta`,
+  - combines core validator violations with Fort fidelity violations,
+  - runs up to 2 correction attempts including Fort compiler context/fidelity summary.
+- Integrated Fort compiler metadata into both runtimes:
+  - Streamlit: `pages/generate_plan.py`
+  - CLI: `main.py`
+- Added historical quality backtest harness:
+  - `scripts/backtest_generation_quality.py`
+  - supports local XLSX export or live Google Sheets
+  - emits markdown/json reports under `output/backtest/`.
+- Added Fort fidelity regression coverage in `tests/test_fort_compiler.py`:
+  - missing-anchor detection,
+  - alias-tolerant anchor matching.
+
+Validation Run
+- `python3 -m unittest tests/test_fort_compiler.py -v` passed (6 tests).
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (25 tests).
+- `python3 -m compileall src/fort_compiler.py src/plan_generator.py pages/generate_plan.py main.py scripts/backtest_generation_quality.py tests/test_fort_compiler.py test_compressed_prompt.py` passed.
+- Backtest run:
+  - `python3 scripts/backtest_generation_quality.py --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --limit 6`
+  - Aggregate score: 93.33
+  - Violations: `odd_db_load` only, concentrated in older week `Weekly Plan (222026)`.
+
+In Progress
+- Awaiting live run with non-cluster Fort input to verify unresolved Fort fidelity violations remain 0 after correction loop.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Run a live non-cluster generation and inspect `AI Generation Summary` for Fort fidelity status.
+2. If missing anchors persist, add deterministic insertion repair for unmatched Fort anchors before correction pass.

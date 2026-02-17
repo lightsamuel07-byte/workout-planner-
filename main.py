@@ -152,12 +152,14 @@ def main():
 
     formatted_trainer_workouts = input_handler.format_for_ai()
     fort_compiler_context = None
+    fort_compiler_meta = None
     try:
         fort_compiler_context, fort_compiler_meta = build_fort_compiler_context(input_handler.trainer_workouts)
         print(f"Fort parser confidence: {fort_compiler_meta.get('overall_confidence', 0.0):.2f}")
     except Exception as parser_exc:
         print(f"Fort parser fallback to raw text: {parser_exc}")
         fort_compiler_context = None
+        fort_compiler_meta = None
 
     # Add context about new program vs continuing program
     program_context = ""
@@ -172,6 +174,7 @@ def main():
         trainer_workouts=formatted_trainer_workouts + program_context,
         preferences="",  # Already included in formatted_trainer_workouts
         fort_compiler_context=fort_compiler_context,
+        fort_compiler_meta=fort_compiler_meta,
     )
 
     if not plan:

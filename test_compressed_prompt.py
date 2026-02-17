@@ -21,6 +21,7 @@ class CompressedPlanGenerator(PlanGenerator):
         trainer_workouts,
         preferences,
         fort_week_constraints=None,
+        fort_compiler_context=None,
         db_context=None,
         progression_directives_block=None,
     ):

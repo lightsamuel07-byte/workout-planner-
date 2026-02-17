@@ -60,3 +60,5 @@ Last updated: 2026-02-17
 
 - Correction received: Fort day inputs are not always cluster-based; older programs use different section naming and flow.
 - New rule: generation context must use a deterministic, program-agnostic Fort parser/compiler with section alias mapping, rather than hard-coded cluster section assumptions.
+- Correction received: user expected overnight-depth scope, not a fast foundation slice.
+- New rule: when tackling large feature requests, explicitly separate foundation slice vs full-scope deliverables upfront and continue through full scope when requested.

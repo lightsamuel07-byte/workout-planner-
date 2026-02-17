@@ -13,6 +13,7 @@ from src.progression_rules import (
     format_directives_for_prompt,
 )
 from src.plan_validator import validate_plan
+from src.fort_compiler import validate_fort_fidelity
 
 
 class PlanGenerator:
@@ -69,6 +70,16 @@ class PlanGenerator:
 
         return formatted
 
+    def _load_exercise_aliases(self):
+        """Load exercise swap aliases as a name->name mapping for validators."""
+        swaps_file = 'exercise_swaps.yaml'
+        if not os.path.exists(swaps_file):
+            return {}
+
+        with open(swaps_file, 'r') as f:
+            swaps_config = yaml.safe_load(f) or {}
+        return swaps_config.get('exercise_swaps', {}) or {}
+
     def generate_plan(
         self,
         workout_history,
@@ -76,6 +87,7 @@ class PlanGenerator:
         preferences,
         fort_week_constraints=None,
         fort_compiler_context=None,
+        fort_compiler_meta=None,
         db_context=None,
         prior_supplemental=None,
     ):
@@ -128,10 +140,22 @@ class PlanGenerator:
             plan, range_violations, range_collapsed = self._validate_no_ranges(plan, attempt=2)
             plan = self._repair_plan_deterministically(plan, progression_directives)
             validation = validate_plan(plan, progression_directives)
+            fort_fidelity = validate_fort_fidelity(
+                plan,
+                fort_compiler_meta,
+                exercise_aliases=self._load_exercise_aliases(),
+            )
 
-            unresolved_violations = validation["violations"]
-            if unresolved_violations:
-                correction_prompt = self._build_correction_prompt(plan, unresolved_violations)
+            unresolved_violations = validation["violations"] + fort_fidelity["violations"]
+            correction_attempts = 0
+            max_correction_attempts = 2
+            while unresolved_violations and correction_attempts < max_correction_attempts:
+                correction_prompt = self._build_correction_prompt(
+                    plan,
+                    unresolved_violations,
+                    fort_compiler_context=fort_compiler_context,
+                    fort_fidelity_summary=fort_fidelity.get("summary"),
+                )
                 message2 = self.client.messages.create(
                     model=self.model,
                     max_tokens=self.max_tokens,
@@ -142,11 +166,20 @@ class PlanGenerator:
                 plan = message2.content[0].text
                 plan = self._apply_exercise_swaps_to_text(plan)
                 plan = self._repair_plan_deterministically(plan, progression_directives)
+
                 validation = validate_plan(plan, progression_directives)
-                unresolved_violations = validation["violations"]
+                fort_fidelity = validate_fort_fidelity(
+                    plan,
+                    fort_compiler_meta,
+                    exercise_aliases=self._load_exercise_aliases(),
+                )
+                unresolved_violations = validation["violations"] + fort_fidelity["violations"]
+                correction_attempts += 1
 
             validation_summary = (
-                f"{validation['summary']} Locked directives applied: {locked_applied}. "
+                f"{validation['summary']} {fort_fidelity['summary']} "
+                f"Locked directives applied: {locked_applied}. "
+                f"Correction attempts: {correction_attempts}. "
                 f"Unresolved violations: {len(unresolved_violations)}."
             )
 
@@ -156,6 +189,7 @@ class PlanGenerator:
                 workout_history,
                 violations_collapsed=range_violations if range_collapsed else None,
                 validation_summary=validation_summary,
+                fort_fidelity_summary=fort_fidelity["summary"],
                 unresolved_violations=unresolved_violations,
             )
 
@@ -350,6 +384,7 @@ PREAMBLE:
         workout_history,
         violations_collapsed=None,
         validation_summary=None,
+        fort_fidelity_summary=None,
         unresolved_violations=None,
     ):
         """Generate short explanation file (5-15 bullets)."""
@@ -384,6 +419,8 @@ PREAMBLE:
 
         if validation_summary:
             bullets.append(validation_summary)
+        elif fort_fidelity_summary:
+            bullets.append(fort_fidelity_summary)
 
         unresolved_count = len(unresolved_violations or [])
         if unresolved_count:
@@ -402,7 +439,13 @@ PREAMBLE:
         repaired, _, _ = self._validate_no_ranges(repaired, attempt=2)
         return repaired
 
-    def _build_correction_prompt(self, plan, violations):
+    def _build_correction_prompt(
+        self,
+        plan,
+        violations,
+        fort_compiler_context=None,
+        fort_fidelity_summary=None,
+    ):
         """Build compact correction prompt from unresolved validator violations."""
         lines = []
         for violation in violations[:20]:
@@ -411,10 +454,22 @@ PREAMBLE:
             message = violation.get("message", "")
             lines.append(f"- {violation['code']} | {day} | {exercise} | {message}")
 
+        fort_context_block = ""
+        if fort_compiler_context:
+            fort_context_block = f"\nFORT COMPILER DIRECTIVES:\n{fort_compiler_context}\n"
+
+        fort_summary_block = ""
+        if fort_fidelity_summary:
+            fort_summary_block = f"\nCurrent fort fidelity status: {fort_fidelity_summary}\n"
+
         return f"""Correct this workout plan to satisfy all listed validation violations.
 
 Violations:
 {chr(10).join(lines)}
+
+{fort_summary_block}
+
+{fort_context_block}
 
 Hard requirements:
 - Keep overall structure and exercise order unless violation requires change.

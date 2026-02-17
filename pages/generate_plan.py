@@ -455,6 +455,7 @@ USER PREFERENCES:
                     preferences,
                     fort_week_constraints=fort_week_constraints,
                     fort_compiler_context=fort_compiler_context,
+                    fort_compiler_meta=fort_compiler_meta,
                     db_context=db_context,
                     prior_supplemental=prior_supplemental,
                 )

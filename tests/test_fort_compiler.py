@@ -4,6 +4,7 @@ from src.fort_compiler import (
     build_fort_compiler_context,
     find_first_section_index,
     parse_fort_day,
+    validate_fort_fidelity,
 )
 
 
@@ -63,6 +64,17 @@ ROWERG
 ROWERG
 """
 
+MINIMAL_SAMPLE = """
+Monday 1.01.26
+Mini Cycle
+WARM UP
+PUSH UPS
+BARBELL BREAKPOINT
+BACK SQUAT
+THAW PREP
+ROWERG
+"""
+
 
 class FortCompilerTests(unittest.TestCase):
     def test_find_first_section_index_skips_narrative_lines(self):
@@ -114,6 +126,51 @@ class FortCompilerTests(unittest.TestCase):
         self.assertIn("WEDNESDAY", context)
         self.assertIn("FRIDAY", context)
         self.assertGreater(metadata["overall_confidence"], 0.5)
+
+    def test_validate_fort_fidelity_detects_missing_anchor(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": MINIMAL_SAMPLE, "Wednesday": "", "Friday": ""}
+        )
+        generated_plan = """## MONDAY
+### A1. Push Ups
+- 1 x 20 @ 0 kg
+- **Rest:** None
+- **Notes:** Bodyweight breakpoint set.
+### B1. Back Squat
+- 4 x 8 @ 80 kg
+- **Rest:** 120 seconds
+- **Notes:** Main lift.
+"""
+        fidelity = validate_fort_fidelity(generated_plan, metadata)
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertIn("fort_missing_anchor", codes)
+
+    def test_validate_fort_fidelity_passes_with_alias_match(self):
+        context, metadata = build_fort_compiler_context(
+            {"Monday": MINIMAL_SAMPLE, "Wednesday": "", "Friday": ""}
+        )
+        self.assertIn("FORT COMPILER DIRECTIVES", context)
+        generated_plan = """## MONDAY
+### A1. Push Ups
+- 1 x 20 @ 0 kg
+- **Rest:** None
+- **Notes:** Bodyweight breakpoint set.
+### B1. Back Squat
+- 4 x 8 @ 80 kg
+- **Rest:** 120 seconds
+- **Notes:** Main lift.
+### C1. Rower
+- 1 x 45 @ 0 kg
+- **Rest:** 45 seconds
+- **Notes:** THAW prep.
+"""
+        fidelity = validate_fort_fidelity(
+            generated_plan,
+            metadata,
+            exercise_aliases={"ROWERG": "Rower"},
+        )
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertNotIn("fort_missing_anchor", codes)
 
 
 if __name__ == "__main__":

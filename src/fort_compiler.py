@@ -119,6 +119,13 @@ METADATA_RE = [
     re.compile(r"^(REPS?|WEIGHT|TIME|TIME\s*\(MM:SS\)|HEIGHT\s*\(IN\)|DIST\.?\s*\(M\)|WATTS|OTHER NUMBER|RX)$", re.IGNORECASE),
 ]
 
+PLAN_DAY_RE = re.compile(r"^\s*##\s+([A-Z]+DAY)\b", re.IGNORECASE)
+PLAN_EXERCISE_RE = re.compile(r"^\s*###\s+([A-Z]\d+)\.\s*(.+)$", re.IGNORECASE)
+PLAN_PRESCRIPTION_RE = re.compile(
+    r"^\s*-\s*(\d+)\s*x\s*([\d:]+)\s*@\s*([\d]+(?:\.\d+)?)\s*kg\b",
+    re.IGNORECASE,
+)
+
 
 def _normalize_space(value):
     return re.sub(r"\s+", " ", (value or "").strip())
@@ -293,6 +300,331 @@ def parse_fort_day(day_name, workout_text):
     }
 
 
+def _normalize_exercise_name(value):
+    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+
+
+def _extract_day_name(value):
+    upper = (value or "").upper()
+    for day in ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY", "SUNDAY"]:
+        if day in upper:
+            return day
+    return None
+
+
+def _is_main_lift_name(value):
+    normalized = _normalize_exercise_name(value)
+    if " db " in f" {normalized} " or "dumbbell" in normalized:
+        return False
+    return any(token in normalized for token in ["squat", "deadlift", "bench press", "chest press"])
+
+
+def _section_base_rank(section_id):
+    mapping = {
+        "prep_mobility": 1,
+        "power_activation": 2,
+        "strength_build": 2,
+        "strength_work": 3,
+        "strength_backoff": 4,
+        "auxiliary_hypertrophy": 5,
+        "conditioning": 6,
+    }
+    return mapping.get(section_id, 6)
+
+
+def _rank_to_letter(rank):
+    bounded = max(1, min(int(rank), 26))
+    return chr(64 + bounded)
+
+
+def _block_rank(block_label):
+    if not block_label:
+        return None
+    letter = block_label[0].upper()
+    if "A" <= letter <= "Z":
+        return (ord(letter) - ord("A")) + 1
+    return None
+
+
+def _build_compiled_templates(parsed_day, max_exercises_per_section):
+    section_blocks = []
+    used_ranks = set()
+    current_rank = 1
+
+    for section in parsed_day.get("sections", []):
+        desired_rank = _section_base_rank(section["section_id"])
+        rank = max(desired_rank, current_rank)
+        while rank in used_ranks and rank <= 26:
+            rank += 1
+        if rank > 26:
+            rank = max(used_ranks) + 1 if used_ranks else 1
+        rank = min(rank, 26)
+        used_ranks.add(rank)
+        current_rank = rank
+        letter = _rank_to_letter(rank)
+
+        exercises = section["exercises"][:max_exercises_per_section]
+        exercise_blocks = []
+        for idx, exercise_name in enumerate(exercises, start=1):
+            exercise_blocks.append(
+                {
+                    "block": f"{letter}{idx}",
+                    "exercise": exercise_name,
+                    "section_id": section["section_id"],
+                    "section_label": section["section_label"],
+                    "raw_header": section["raw_header"],
+                }
+            )
+
+        section_blocks.append(
+            {
+                "section_id": section["section_id"],
+                "section_label": section["section_label"],
+                "raw_header": section["raw_header"],
+                "block_letter": letter,
+                "exercises": exercise_blocks,
+            }
+        )
+
+    return section_blocks
+
+
+def _build_alias_map(exercise_aliases):
+    alias_map = {}
+    if not exercise_aliases:
+        return alias_map
+
+    for source, target in exercise_aliases.items():
+        source_norm = _normalize_exercise_name(source)
+        target_norm = _normalize_exercise_name(target)
+        if not source_norm or not target_norm:
+            continue
+        alias_map.setdefault(source_norm, set()).add(target_norm)
+        alias_map.setdefault(target_norm, set()).add(source_norm)
+
+    return alias_map
+
+
+def _matches_expected_exercise(expected_name, actual_name, alias_map):
+    expected_norm = _normalize_exercise_name(expected_name)
+    actual_norm = _normalize_exercise_name(actual_name)
+    if not expected_norm or not actual_norm:
+        return False
+
+    candidates = {expected_norm}
+    candidates.update(alias_map.get(expected_norm, set()))
+    for candidate in candidates:
+        if candidate == actual_norm or candidate in actual_norm or actual_norm in candidate:
+            return True
+    return False
+
+
+def parse_plan_fort_entries(plan_text):
+    """Parse generated markdown plan entries by day for Fort fidelity checks."""
+    entries_by_day = {}
+    current_day = None
+    current_entry = None
+
+    for line in (plan_text or "").splitlines():
+        day_match = PLAN_DAY_RE.match(line)
+        if day_match:
+            current_day = _extract_day_name(day_match.group(1))
+            current_entry = None
+            if current_day:
+                entries_by_day.setdefault(current_day, [])
+            continue
+
+        exercise_match = PLAN_EXERCISE_RE.match(line)
+        if exercise_match and current_day:
+            block = exercise_match.group(1).strip()
+            exercise = exercise_match.group(2).strip()
+            current_entry = {
+                "day": current_day,
+                "block": block,
+                "block_rank": _block_rank(block),
+                "exercise": exercise,
+                "load": None,
+                "reps": None,
+            }
+            entries_by_day.setdefault(current_day, []).append(current_entry)
+            continue
+
+        if not current_entry:
+            continue
+
+        prescription_match = PLAN_PRESCRIPTION_RE.match(line.strip())
+        if prescription_match:
+            _sets, reps, load = prescription_match.groups()
+            current_entry["reps"] = reps
+            current_entry["load"] = float(load)
+
+    return entries_by_day
+
+
+def validate_fort_fidelity(plan_text, fort_metadata, exercise_aliases=None):
+    """
+    Validate Fort day conversion fidelity against parsed compiler metadata.
+
+    Returns:
+      dict with keys: violations, summary, expected_anchors, matched_anchors
+    """
+    if not fort_metadata:
+        return {
+            "violations": [],
+            "summary": "Fort fidelity: no compiler metadata provided.",
+            "expected_anchors": 0,
+            "matched_anchors": 0,
+        }
+
+    day_specs = fort_metadata.get("days", [])
+    if not day_specs:
+        return {
+            "violations": [],
+            "summary": "Fort fidelity: no parsed Fort days to validate.",
+            "expected_anchors": 0,
+            "matched_anchors": 0,
+        }
+
+    alias_map = _build_alias_map(exercise_aliases or {})
+    entries_by_day = parse_plan_fort_entries(plan_text)
+
+    violations = []
+    expected_anchors = 0
+    matched_anchors = 0
+
+    for day_spec in day_specs:
+        day_name = (day_spec.get("day") or "").upper()
+        compiled_sections = day_spec.get("compiled_sections") or []
+        if not compiled_sections:
+            continue
+
+        actual_entries = entries_by_day.get(day_name, [])
+        if not actual_entries:
+            violations.append(
+                {
+                    "code": "fort_day_missing",
+                    "message": f"{day_name} is missing from generated plan.",
+                    "day": day_name,
+                    "exercise": "",
+                }
+            )
+            expected_anchors += sum(len(section.get("exercises", [])) for section in compiled_sections)
+            continue
+
+        day_used_indices = set()
+        section_ranks = []
+
+        for section in compiled_sections:
+            section_matches = []
+            for expected_entry in section.get("exercises", []):
+                expected_anchors += 1
+                matched_index = None
+                for idx, actual_entry in enumerate(actual_entries):
+                    if idx in day_used_indices:
+                        continue
+                    if _matches_expected_exercise(
+                        expected_entry["exercise"],
+                        actual_entry["exercise"],
+                        alias_map,
+                    ):
+                        matched_index = idx
+                        break
+
+                if matched_index is None:
+                    violations.append(
+                        {
+                            "code": "fort_missing_anchor",
+                            "message": (
+                                f"Missing Fort anchor exercise '{expected_entry['exercise']}' "
+                                f"from section '{section['section_label']}' on {day_name}."
+                            ),
+                            "day": day_name,
+                            "exercise": expected_entry["exercise"],
+                        }
+                    )
+                    continue
+
+                day_used_indices.add(matched_index)
+                matched_entry = actual_entries[matched_index]
+                matched_anchors += 1
+                section_matches.append(matched_entry)
+
+                if section["section_id"] in {"strength_build", "strength_work", "strength_backoff"}:
+                    if _is_main_lift_name(expected_entry["exercise"]):
+                        if matched_entry.get("load") is None or matched_entry.get("load", 0) <= 0:
+                            violations.append(
+                                {
+                                    "code": "fort_missing_load",
+                                    "message": (
+                                        f"Expected explicit load for main Fort lift "
+                                        f"'{matched_entry['exercise']}' on {day_name}."
+                                    ),
+                                    "day": day_name,
+                                    "exercise": matched_entry["exercise"],
+                                }
+                            )
+
+            ranks = [entry["block_rank"] for entry in section_matches if entry.get("block_rank") is not None]
+            if ranks:
+                section_ranks.append(
+                    {
+                        "section_id": section["section_id"],
+                        "section_label": section["section_label"],
+                        "rank": min(ranks),
+                    }
+                )
+
+        previous = None
+        for section_rank in section_ranks:
+            if previous and section_rank["rank"] < previous["rank"]:
+                violations.append(
+                    {
+                        "code": "fort_section_order",
+                        "message": (
+                            f"Fort section order drift on {day_name}: "
+                            f"'{section_rank['section_label']}' appears before "
+                            f"'{previous['section_label']}'."
+                        ),
+                        "day": day_name,
+                        "exercise": "",
+                    }
+                )
+            previous = section_rank
+
+    summary = (
+        f"Fort fidelity: {matched_anchors}/{expected_anchors} anchors matched, "
+        f"{len(violations)} violation(s)."
+        if expected_anchors
+        else "Fort fidelity: no anchors available to validate."
+    )
+
+    return {
+        "violations": violations,
+        "summary": summary,
+        "expected_anchors": expected_anchors,
+        "matched_anchors": matched_anchors,
+    }
+
+
+def _render_day_template(parsed_day):
+    lines = []
+    title_suffix = f" ({parsed_day['title_line']})" if parsed_day.get("title_line") else ""
+    lines.append(f"## {parsed_day['day'].upper()}{title_suffix}")
+
+    for section in parsed_day.get("compiled_sections", []):
+        for exercise in section.get("exercises", []):
+            lines.append(f"### {exercise['block']}. {exercise['exercise']}")
+            lines.append(
+                f"- Section: {section['section_label']} | Header: {section['raw_header']} | "
+                f"Prescription: preserve from Fort source."
+            )
+        lines.append("")
+
+    while lines and not lines[-1]:
+        lines.pop()
+    return "\n".join(lines)
+
+
 def build_fort_compiler_context(day_text_map, max_exercises_per_section=4):
     """
     Build deterministic parser directives for Monday/Wednesday/Friday Fort workouts.
@@ -303,7 +635,10 @@ def build_fort_compiler_context(day_text_map, max_exercises_per_section=4):
     parsed_days = []
     ordered_days = ["Monday", "Wednesday", "Friday"]
     for day_name in ordered_days:
-        parsed_days.append(parse_fort_day(day_name, day_text_map.get(day_name, "")))
+        parsed = parse_fort_day(day_name, day_text_map.get(day_name, ""))
+        parsed["compiled_sections"] = _build_compiled_templates(parsed, max_exercises_per_section)
+        parsed["compiled_template"] = _render_day_template(parsed)
+        parsed_days.append(parsed)
 
     confidences = [day["confidence"] for day in parsed_days if day["sections"]]
     overall_confidence = round(sum(confidences) / len(confidences), 2) if confidences else 0.0
@@ -312,6 +647,7 @@ def build_fort_compiler_context(day_text_map, max_exercises_per_section=4):
         "FORT COMPILER DIRECTIVES (PROGRAM-AGNOSTIC):",
         f"Overall parser confidence: {overall_confidence:.2f}",
         "Use detected section order and listed exercise anchors as hard conversion constraints for Fort days.",
+        "Use the normalized template blocks below as deterministic shape constraints.",
     ]
 
     for parsed in parsed_days:
@@ -324,13 +660,16 @@ def build_fort_compiler_context(day_text_map, max_exercises_per_section=4):
             lines.append("- No reliable sections detected; fall back to raw text for this day.")
             continue
 
-        for section in parsed["sections"]:
-            exercises = section["exercises"][:max_exercises_per_section]
-            exercise_text = "; ".join(exercises) if exercises else "no anchors extracted"
+        for section in parsed["compiled_sections"]:
+            exercise_names = [entry["exercise"] for entry in section.get("exercises", [])]
+            exercise_text = "; ".join(exercise_names) if exercise_names else "no anchors extracted"
             lines.append(
-                f"- [{section['block_hint']}-block] {section['section_label']} | "
+                f"- [{section['block_letter']}-block] {section['section_label']} | "
                 f"header: {section['raw_header']} | anchors: {exercise_text}"
             )
+
+        lines.append("- Normalized template:")
+        lines.append(parsed["compiled_template"])
 
         for warning in parsed["warnings"]:
             lines.append(f"- Warning: {warning}")
