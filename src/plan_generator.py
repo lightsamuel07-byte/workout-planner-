@@ -13,7 +13,7 @@ from src.progression_rules import (
     format_directives_for_prompt,
 )
 from src.plan_validator import validate_plan
-from src.fort_compiler import validate_fort_fidelity
+from src.fort_compiler import repair_plan_fort_anchors, validate_fort_fidelity
 
 
 class PlanGenerator:
@@ -135,15 +135,23 @@ class PlanGenerator:
             plan = self._apply_exercise_swaps_to_text(plan)
             plan = self._enforce_even_dumbbell_loads(plan)
             plan, locked_applied = apply_locked_directives_to_plan(plan, progression_directives)
+            exercise_aliases = self._load_exercise_aliases()
+            total_anchor_insertions = 0
 
             # Deterministic range collapse and deterministic repairs happen before any correction call.
             plan, range_violations, range_collapsed = self._validate_no_ranges(plan, attempt=2)
             plan = self._repair_plan_deterministically(plan, progression_directives)
+            plan, anchor_repair = repair_plan_fort_anchors(
+                plan,
+                fort_compiler_meta,
+                exercise_aliases=exercise_aliases,
+            )
+            total_anchor_insertions += anchor_repair.get("inserted", 0)
             validation = validate_plan(plan, progression_directives)
             fort_fidelity = validate_fort_fidelity(
                 plan,
                 fort_compiler_meta,
-                exercise_aliases=self._load_exercise_aliases(),
+                exercise_aliases=exercise_aliases,
             )
 
             unresolved_violations = validation["violations"] + fort_fidelity["violations"]
@@ -166,12 +174,18 @@ class PlanGenerator:
                 plan = message2.content[0].text
                 plan = self._apply_exercise_swaps_to_text(plan)
                 plan = self._repair_plan_deterministically(plan, progression_directives)
+                plan, anchor_repair = repair_plan_fort_anchors(
+                    plan,
+                    fort_compiler_meta,
+                    exercise_aliases=exercise_aliases,
+                )
+                total_anchor_insertions += anchor_repair.get("inserted", 0)
 
                 validation = validate_plan(plan, progression_directives)
                 fort_fidelity = validate_fort_fidelity(
                     plan,
                     fort_compiler_meta,
-                    exercise_aliases=self._load_exercise_aliases(),
+                    exercise_aliases=exercise_aliases,
                 )
                 unresolved_violations = validation["violations"] + fort_fidelity["violations"]
                 correction_attempts += 1
@@ -179,6 +193,7 @@ class PlanGenerator:
             validation_summary = (
                 f"{validation['summary']} {fort_fidelity['summary']} "
                 f"Locked directives applied: {locked_applied}. "
+                f"Fort anchors auto-inserted: {total_anchor_insertions}. "
                 f"Correction attempts: {correction_attempts}. "
                 f"Unresolved violations: {len(unresolved_violations)}."
             )
@@ -191,6 +206,7 @@ class PlanGenerator:
                 validation_summary=validation_summary,
                 fort_fidelity_summary=fort_fidelity["summary"],
                 unresolved_violations=unresolved_violations,
+                anchor_insertions=total_anchor_insertions,
             )
 
             print("✓ Workout plan generated successfully!\n")
@@ -386,6 +402,7 @@ PREAMBLE:
         validation_summary=None,
         fort_fidelity_summary=None,
         unresolved_violations=None,
+        anchor_insertions=0,
     ):
         """Generate short explanation file (5-15 bullets)."""
         bullets = []
@@ -421,6 +438,9 @@ PREAMBLE:
             bullets.append(validation_summary)
         elif fort_fidelity_summary:
             bullets.append(fort_fidelity_summary)
+
+        if anchor_insertions:
+            bullets.append(f"Auto-inserted {anchor_insertions} missing Fort anchor exercises before final validation")
 
         unresolved_count = len(unresolved_violations or [])
         if unresolved_count:

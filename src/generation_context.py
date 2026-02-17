@@ -22,26 +22,82 @@ def _truncate(text, limit=90):
     return text[: limit - 1].rstrip() + "…"
 
 
-def _extract_target_exercises(prior_supplemental, max_exercises):
-    """Collect unique prior-week supplemental exercise names."""
-    if not prior_supplemental:
-        return []
+def _add_target(ordered, seen, name, source):
+    display_name = (name or "").strip()
+    if not display_name:
+        return False
+    normalized = normalize_exercise_name(display_name)
+    if not normalized or normalized in seen:
+        return False
+    seen.add(normalized)
+    ordered.append({"name": display_name, "normalized": normalized, "source": source})
+    return True
 
+
+def _extract_target_exercises(prior_supplemental, max_exercises, fort_compiler_meta=None):
+    """Collect unique target exercise names from Fort anchors + prior supplemental days."""
     ordered = []
     seen = set()
+
+    day_specs = (fort_compiler_meta or {}).get("days") or []
+    for day_spec in day_specs:
+        for section in day_spec.get("compiled_sections", []):
+            for exercise in section.get("exercises", []):
+                if _add_target(ordered, seen, exercise.get("exercise"), source="fort_anchor"):
+                    if len(ordered) >= max_exercises:
+                        return ordered
+
+    if not prior_supplemental:
+        return ordered
+
     for day in ["Tuesday", "Thursday", "Saturday"]:
         for ex in prior_supplemental.get(day, []):
-            name = (ex.get("exercise") or "").strip()
-            if not name:
-                continue
-            normalized = normalize_exercise_name(name)
-            if normalized in seen:
-                continue
-            seen.add(normalized)
-            ordered.append((name, normalized))
-            if len(ordered) >= max_exercises:
-                return ordered
+            if _add_target(ordered, seen, ex.get("exercise"), source="prior_supplemental"):
+                if len(ordered) >= max_exercises:
+                    return ordered
     return ordered
+
+
+def _fetch_recent_focus_exercises(conn, exclude_normalized=None, limit=6):
+    """Fallback pool of recent frequently logged exercises with log text."""
+    exclude = set(exclude_normalized or set())
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute(
+        """
+        SELECT
+            e.name,
+            e.normalized_name,
+            COUNT(*) AS log_count,
+            MAX(ws.session_date) AS last_date
+        FROM exercise_logs el
+        JOIN exercises e ON e.id = el.exercise_id
+        JOIN workout_sessions ws ON ws.id = el.session_id
+        WHERE COALESCE(TRIM(el.log_text), '') <> ''
+        GROUP BY e.id
+        ORDER BY
+            CASE WHEN MAX(ws.session_date) IS NULL THEN 1 ELSE 0 END,
+            MAX(ws.session_date) DESC,
+            log_count DESC
+        LIMIT ?
+        """,
+        (max(limit * 2, limit),),
+    ).fetchall()
+
+    selected = []
+    for row in rows:
+        normalized = (row["normalized_name"] or "").strip()
+        if not normalized or normalized in exclude:
+            continue
+        selected.append(
+            {
+                "name": (row["name"] or "").strip(),
+                "normalized": normalized,
+                "source": "db_recent",
+            }
+        )
+        if len(selected) >= limit:
+            return selected
+    return selected
 
 
 def _fetch_recent_logs_for_exercise(conn, normalized_name, logs_per_exercise):
@@ -100,6 +156,7 @@ def _fetch_global_summary(conn):
 def build_db_generation_context(
     db_path,
     prior_supplemental=None,
+    fort_compiler_meta=None,
     max_exercises=10,
     logs_per_exercise=2,
 ):
@@ -118,7 +175,18 @@ def build_db_generation_context(
         if not summary:
             return None
 
-        targets = _extract_target_exercises(prior_supplemental, max_exercises=max_exercises)
+        targets = _extract_target_exercises(
+            prior_supplemental,
+            max_exercises=max_exercises,
+            fort_compiler_meta=fort_compiler_meta,
+        )
+        if len(targets) < max_exercises:
+            fallback = _fetch_recent_focus_exercises(
+                conn,
+                exclude_normalized={target["normalized"] for target in targets},
+                limit=max_exercises - len(targets),
+            )
+            targets.extend(fallback)
         if not targets:
             return None
 
@@ -128,11 +196,13 @@ def build_db_generation_context(
                 f"- Snapshot: {summary['exercises']} exercises | {summary['sessions']} sessions | "
                 f"{summary['logs']} logs | RPE coverage {summary['rpe_pct']:.1f}%."
             ),
-            "- Recent logs for prior-week supplemental exercises:",
+            "- Target exercise logs (Fort anchors + prior supplemental + recent history):",
         ]
 
         added = 0
-        for display_name, normalized_name in targets:
+        for target in targets:
+            display_name = target["name"]
+            normalized_name = target["normalized"]
             recent_logs = _fetch_recent_logs_for_exercise(
                 conn,
                 normalized_name=normalized_name,

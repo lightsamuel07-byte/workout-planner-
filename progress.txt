@@ -1,4 +1,53 @@
 Progress Snapshot
+Date: 2026-02-17
+
+Current Phase
+- Phase 3 reliability hardening + generation quality loop extension.
+- Fort conversion flow now includes deterministic anchor insertion repair before/after correction prompts.
+
+Built (Complete)
+- Added deterministic Fort anchor repair in `src/fort_compiler.py`:
+  - inserts missing section anchors into generated markdown plan,
+  - reconstructs missing Fort day headers when needed,
+  - preserves canonical block ordering by section block letter.
+- Integrated Fort anchor repair into generation loop in `src/plan_generator.py`:
+  - applied on initial deterministic pass,
+  - re-applied after each correction attempt.
+- Extended SQLite generation context in `src/generation_context.py`:
+  - includes Fort anchor exercises from current week compiler metadata,
+  - includes prior supplemental targets,
+  - falls back to recent logged exercises to avoid sparse context.
+- Updated generation page integration in `pages/generate_plan.py` to pass Fort metadata into DB context builder.
+- Added regression tests:
+  - `tests/test_fort_compiler.py` (anchor insertion + missing-day repair),
+  - `tests/test_generation_context.py` (Fort/prior/fallback context targeting).
+- Added iterative QA utility:
+  - `scripts/run_quality_cycles.py` for repeated test+compile loops and report output.
+- Executed quality loop:
+  - `40/40` cycles passed.
+  - Report: `output/quality_cycles/quality_cycles_20260217_182247.md`
+- Executed post-loop backtest:
+  - `scripts/backtest_generation_quality.py --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --limit 8`
+  - Aggregate score: `95.0`
+
+Validation Run
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (29 tests).
+- `python3 -m compileall app.py pages src tests main.py test_compressed_prompt.py test_format_prompt.py` passed.
+- `python3 scripts/run_quality_cycles.py --cycles 40 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8` passed.
+
+In Progress
+- Awaiting your live generation test on Streamlit Cloud with next Fort inputs.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Run a live generation for the next week and verify `AI Generation Summary` shows `Unresolved violations: 0`.
+2. If any unresolved Fort fidelity issues remain, add targeted deterministic repair for section-order drift (reorder-only pass, no new exercise insertion).
+
+---
+
+Progress Snapshot
 Date: 2026-02-05
 
 Current Phase

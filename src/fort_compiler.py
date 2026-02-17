@@ -461,6 +461,204 @@ def parse_plan_fort_entries(plan_text):
     return entries_by_day
 
 
+def _weekday_rank(day_name):
+    order = {
+        "MONDAY": 1,
+        "TUESDAY": 2,
+        "WEDNESDAY": 3,
+        "THURSDAY": 4,
+        "FRIDAY": 5,
+        "SATURDAY": 6,
+        "SUNDAY": 7,
+    }
+    return order.get((day_name or "").upper(), 99)
+
+
+def _parse_plan_day_segments(plan_text):
+    lines = (plan_text or "").splitlines()
+    prefix_lines = []
+    segments = []
+    current = None
+
+    for line in lines:
+        day_match = PLAN_DAY_RE.match(line)
+        day_name = _extract_day_name(day_match.group(1)) if day_match else None
+        if day_name:
+            if current:
+                segments.append(current)
+            current = {"day": day_name, "lines": [line]}
+            continue
+
+        if current:
+            current["lines"].append(line)
+        else:
+            prefix_lines.append(line)
+
+    if current:
+        segments.append(current)
+
+    return prefix_lines, segments
+
+
+def _parse_day_entries_with_spans(day_lines):
+    entries = []
+    for idx, line in enumerate(day_lines):
+        exercise_match = PLAN_EXERCISE_RE.match(line)
+        if not exercise_match:
+            continue
+
+        block = exercise_match.group(1).strip()
+        block_match = re.match(r"^([A-Z])(\d+)$", block, re.IGNORECASE)
+        block_letter = block_match.group(1).upper() if block_match else ""
+        block_index = int(block_match.group(2)) if block_match else 0
+
+        entries.append(
+            {
+                "start_idx": idx,
+                "end_idx": len(day_lines),
+                "block": block,
+                "block_letter": block_letter,
+                "block_index": block_index,
+                "block_rank": _block_rank(block),
+                "exercise": exercise_match.group(2).strip(),
+            }
+        )
+
+    for idx, entry in enumerate(entries):
+        next_start = entries[idx + 1]["start_idx"] if idx + 1 < len(entries) else len(day_lines)
+        entry["end_idx"] = next_start
+
+    return entries
+
+
+def _repair_default_prescription(section_id, exercise_name):
+    is_main = _is_main_lift_name(exercise_name)
+    exercise_norm = _normalize_exercise_name(exercise_name)
+    is_db = " db " in f" {exercise_norm} " or "dumbbell" in exercise_norm
+
+    if section_id in {"prep_mobility", "conditioning"}:
+        return "1", "60", "0", "None"
+    if is_main:
+        return "1", "1", "20", "180 seconds"
+    if is_db:
+        return "3", "10", "10", "90 seconds"
+    return "3", "10", "0", "90 seconds"
+
+
+def _next_block_label_for_letter(entries, block_letter):
+    indices = [
+        entry.get("block_index", 0)
+        for entry in entries
+        if entry.get("block_letter") == block_letter and entry.get("block_index")
+    ]
+    next_index = (max(indices) + 1) if indices else 1
+    return f"{block_letter}{next_index}"
+
+
+def _find_day_insert_index(day_lines, block_letter):
+    entries = _parse_day_entries_with_spans(day_lines)
+    if not entries:
+        return len(day_lines)
+
+    same_letter = [entry for entry in entries if entry.get("block_letter") == block_letter]
+    if same_letter:
+        return max(entry["end_idx"] for entry in same_letter)
+
+    target_rank = _block_rank(f"{block_letter}1") or 99
+    higher_rank_entries = [
+        entry for entry in entries if entry.get("block_rank") is not None and entry["block_rank"] > target_rank
+    ]
+    if higher_rank_entries:
+        return min(entry["start_idx"] for entry in higher_rank_entries)
+
+    return len(day_lines)
+
+
+def _join_plan_segments(prefix_lines, segments):
+    lines = list(prefix_lines)
+    for segment in segments:
+        if lines and lines[-1].strip():
+            lines.append("")
+        lines.extend(segment["lines"])
+    return "\n".join(lines).rstrip() + "\n"
+
+
+def repair_plan_fort_anchors(plan_text, fort_metadata, exercise_aliases=None):
+    """
+    Deterministically insert missing Fort anchors into generated markdown plans.
+
+    Returns:
+      (patched_plan_text, repair_summary_dict)
+    """
+    if not plan_text:
+        return plan_text, {"inserted": 0, "insertions": [], "summary": "Fort anchor repair skipped: empty plan."}
+
+    day_specs = (fort_metadata or {}).get("days") or []
+    if not day_specs:
+        return plan_text, {"inserted": 0, "insertions": [], "summary": "Fort anchor repair skipped: no metadata."}
+
+    alias_map = _build_alias_map(exercise_aliases or {})
+    prefix_lines, segments = _parse_plan_day_segments(plan_text)
+    segments_by_day = {segment["day"]: segment for segment in segments}
+    insertions = []
+
+    for day_spec in day_specs:
+        day_name = (day_spec.get("day") or "").upper()
+        compiled_sections = day_spec.get("compiled_sections") or []
+        if not day_name or not compiled_sections:
+            continue
+
+        segment = segments_by_day.get(day_name)
+        if not segment:
+            segment = {"day": day_name, "lines": [f"## {day_name}"]}
+            segments.append(segment)
+            segments_by_day[day_name] = segment
+
+        day_lines = segment["lines"]
+
+        for section in compiled_sections:
+            block_letter = (section.get("block_letter") or "Z").upper()
+            for expected_entry in section.get("exercises", []):
+                expected_name = expected_entry.get("exercise") or ""
+                if not expected_name:
+                    continue
+
+                entries = _parse_day_entries_with_spans(day_lines)
+                already_present = any(
+                    _matches_expected_exercise(expected_name, entry["exercise"], alias_map)
+                    for entry in entries
+                )
+                if already_present:
+                    continue
+
+                block_label = _next_block_label_for_letter(entries, block_letter)
+                sets, reps, load, rest = _repair_default_prescription(section["section_id"], expected_name)
+                insert_idx = _find_day_insert_index(day_lines, block_letter)
+                entry_lines = [
+                    f"### {block_label}. {expected_name}",
+                    f"- {sets} x {reps} @ {load} kg",
+                    f"- **Rest:** {rest}",
+                    "- **Notes:** Added by deterministic Fort anchor repair. Replace prescription with exact Fort values if needed.",
+                ]
+                day_lines[insert_idx:insert_idx] = entry_lines
+                insertions.append(
+                    {
+                        "day": day_name,
+                        "section_id": section["section_id"],
+                        "exercise": expected_name,
+                        "block": block_label,
+                    }
+                )
+
+    if not insertions:
+        return plan_text, {"inserted": 0, "insertions": [], "summary": "Fort anchor repair: no missing anchors found."}
+
+    segments.sort(key=lambda segment: _weekday_rank(segment.get("day")))
+    patched = _join_plan_segments(prefix_lines, segments)
+    summary = f"Fort anchor repair: inserted {len(insertions)} missing anchor(s)."
+    return patched, {"inserted": len(insertions), "insertions": insertions, "summary": summary}
+
+
 def validate_fort_fidelity(plan_text, fort_metadata, exercise_aliases=None):
     """
     Validate Fort day conversion fidelity against parsed compiler metadata.

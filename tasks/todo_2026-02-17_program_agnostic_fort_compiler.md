@@ -43,3 +43,24 @@
 - Next steps:
   - Generate a live non-cluster week and confirm unresolved violations in `AI Generation Summary` stay at 0 for Fort fidelity.
   - If drift persists in live output, add deterministic insertion repair for missing anchors before model correction.
+
+## Extension Pass (2026-02-17, continued)
+- [x] Added deterministic Fort anchor insertion repair so missing Mon/Wed/Fri anchors are inserted before model correction.
+- [x] Integrated anchor repair into generation flow on initial pass and correction passes.
+- [x] Expanded DB generation context target selection:
+  - include Fort anchor exercises from parsed compiler metadata,
+  - include prior-week supplemental targets,
+  - fallback to recent logged exercises if target list is sparse.
+- [x] Added regression tests for:
+  - Fort anchor insertion and missing-day reconstruction,
+  - DB context selection behavior with Fort anchors and fallback.
+- [x] Added repeatable quality-cycle runner (`scripts/run_quality_cycles.py`) and executed 40 cycles.
+- [x] Ran post-loop backtest against `/Users/samuellight/Downloads/Workouts.xlsx`.
+
+### Extension Validation
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` (29 tests, all pass)
+- `python3 -m compileall app.py pages src tests main.py test_compressed_prompt.py test_format_prompt.py` (pass)
+- `python3 scripts/backtest_generation_quality.py --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --limit 8`
+  - Aggregate score: `95.0`
+- `python3 scripts/run_quality_cycles.py --cycles 40 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+  - Completed: `40/40`, Passed: `True`

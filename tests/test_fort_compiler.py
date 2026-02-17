@@ -4,6 +4,7 @@ from src.fort_compiler import (
     build_fort_compiler_context,
     find_first_section_index,
     parse_fort_day,
+    repair_plan_fort_anchors,
     validate_fort_fidelity,
 )
 
@@ -170,6 +171,48 @@ class FortCompilerTests(unittest.TestCase):
             exercise_aliases={"ROWERG": "Rower"},
         )
         codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertNotIn("fort_missing_anchor", codes)
+
+    def test_repair_plan_fort_anchors_inserts_missing_anchor(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": MINIMAL_SAMPLE, "Wednesday": "", "Friday": ""}
+        )
+        generated_plan = """## MONDAY
+### A1. Push Ups
+- 1 x 20 @ 0 kg
+- **Rest:** None
+- **Notes:** Bodyweight breakpoint set.
+### B1. Back Squat
+- 4 x 8 @ 80 kg
+- **Rest:** 120 seconds
+- **Notes:** Main lift.
+"""
+        repaired, repair_summary = repair_plan_fort_anchors(generated_plan, metadata)
+        self.assertGreaterEqual(repair_summary["inserted"], 1)
+        self.assertIn("ROWERG", repaired.upper())
+        self.assertRegex(repaired, r"-\s*\d+\s*x\s*[\d:]+\s*@\s*[\d.]+\s*kg")
+
+        fidelity = validate_fort_fidelity(repaired, metadata)
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertNotIn("fort_missing_anchor", codes)
+
+    def test_repair_plan_fort_anchors_adds_missing_day(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": MINIMAL_SAMPLE, "Wednesday": MINIMAL_SAMPLE, "Friday": ""}
+        )
+        generated_plan = """## MONDAY
+### A1. Push Ups
+- 1 x 20 @ 0 kg
+- **Rest:** None
+- **Notes:** Bodyweight breakpoint set.
+"""
+        repaired, repair_summary = repair_plan_fort_anchors(generated_plan, metadata)
+        self.assertGreaterEqual(repair_summary["inserted"], 1)
+        self.assertIn("## WEDNESDAY", repaired)
+
+        fidelity = validate_fort_fidelity(repaired, metadata)
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertNotIn("fort_day_missing", codes)
         self.assertNotIn("fort_missing_anchor", codes)
 
 

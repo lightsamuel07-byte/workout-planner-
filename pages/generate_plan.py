@@ -424,6 +424,7 @@ USER PREFERENCES:
                         db_context = build_db_generation_context(
                             db_path=db_path,
                             prior_supplemental=prior_supplemental,
+                            fort_compiler_meta=fort_compiler_meta,
                             max_exercises=10,
                             logs_per_exercise=2,
                         )
