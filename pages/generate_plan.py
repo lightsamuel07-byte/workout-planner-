@@ -10,6 +10,7 @@ import shutil
 import re
 from src.ui_utils import render_page_header, action_button
 from src.design_system import get_colors
+from src.fort_compiler import build_fort_compiler_context, find_first_section_index
 
 # Add src to path
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', 'src'))
@@ -44,18 +45,8 @@ def strip_fort_preamble(workout_text):
     if not nonempty:
         return workout_text
 
-    # Keep the header (date + gameday) but drop long narrative blocks.
-    # Start from the first actual training section if we can find one.
-    section_re = re.compile(
-        r'^\s*(PREP|PRIMARY|SECONDARY|AUXILIARY|CLUSTER|MYO|T\.H\.A\.W\.|THAW)\b',
-        flags=re.IGNORECASE,
-    )
-
-    section_start = None
-    for i, line in enumerate(lines[:250]):
-        if section_re.search(line):
-            section_start = i
-            break
+    # Keep the header but drop long narrative blocks starting from first detected section.
+    section_start = find_first_section_index(lines)
 
     if section_start is None:
         return workout_text
@@ -80,16 +71,7 @@ def extract_fort_preamble(workout_text):
     if not nonempty:
         return None
 
-    section_re = re.compile(
-        r'^\s*(PREP|PRIMARY|SECONDARY|AUXILIARY|CLUSTER|MYO|T\.H\.A\.W\.|THAW)\b',
-        flags=re.IGNORECASE,
-    )
-
-    section_start = None
-    for i, line in enumerate(lines[:250]):
-        if section_re.search(line):
-            section_start = i
-            break
+    section_start = find_first_section_index(lines)
 
     if section_start is None:
         return None
@@ -375,6 +357,22 @@ def show():
                 wednesday_header = f"Wednesday ({wednesday_title})" if wednesday_title else "Wednesday"
                 friday_header = f"Friday ({friday_title})" if friday_title else "Friday"
 
+                fort_compiler_context = None
+                fort_compiler_meta = None
+                try:
+                    fort_compiler_context, fort_compiler_meta = build_fort_compiler_context(
+                        {
+                            "Monday": monday_workout,
+                            "Wednesday": wednesday_workout,
+                            "Friday": friday_workout,
+                        }
+                    )
+                    confidence = (fort_compiler_meta or {}).get("overall_confidence", 0.0)
+                    if confidence > 0:
+                        st.caption(f"Fort parser confidence: {confidence:.2f}")
+                except Exception as parser_exc:
+                    st.warning(f"Fort parser fallback to raw text: {parser_exc}")
+                    fort_compiler_context = None
 
                 # Use cleaned Fort text for prompt efficiency while preserving key training sections.
                 monday_for_prompt = monday_workout_clean or monday_workout
@@ -456,6 +454,7 @@ USER PREFERENCES:
                     formatted_workouts,
                     preferences,
                     fort_week_constraints=fort_week_constraints,
+                    fort_compiler_context=fort_compiler_context,
                     db_context=db_context,
                     prior_supplemental=prior_supplemental,
                 )

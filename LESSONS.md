@@ -1,6 +1,6 @@
 # LESSONS
 
-Last updated: 2026-02-15
+Last updated: 2026-02-17
 
 ## Core Lessons to Preserve
 
@@ -34,6 +34,10 @@ Last updated: 2026-02-15
    - Any top-level API calls in those files can hang audits and CI checks.
    - Run network/manual flows only inside `main()` guarded by `if __name__ == "__main__":`.
 
+8. Fort parsing cannot assume cluster-only programming:
+   - Fort program structures vary by cycle (`Ignition/Cauldron/Breakpoint`, etc.).
+   - Section detection and preamble stripping must be program-agnostic and alias-driven.
+
 ## Session Corrections (2026-02-05)
 
 - Correction received: canonical docs did not exist, and work needed to continue in doc-locked mode.
@@ -51,3 +55,8 @@ Last updated: 2026-02-15
 - New rule: generation flow must use an explicit request flag and stale-state recovery (timeout reset) so spinner/start state is reliable after reruns.
 - Correction received: biceps rotation validator flagged false repeats when notes referenced other-day grip sequence text.
 - New rule: grip detection must prioritize explicit per-exercise grip declarations and treat mixed note signals as ambiguous (not a repeat violation).
+
+## Session Corrections (2026-02-17)
+
+- Correction received: Fort day inputs are not always cluster-based; older programs use different section naming and flow.
+- New rule: generation context must use a deterministic, program-agnostic Fort parser/compiler with section alias mapping, rather than hard-coded cluster section assumptions.

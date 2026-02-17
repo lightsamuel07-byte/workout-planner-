@@ -16,6 +16,7 @@ from sheets_reader import SheetsReader
 from sheets_writer import SheetsWriter
 from input_handler import InputHandler
 from plan_generator import PlanGenerator
+from fort_compiler import build_fort_compiler_context
 
 
 def load_config():
@@ -150,6 +151,13 @@ def main():
     print("=" * 60)
 
     formatted_trainer_workouts = input_handler.format_for_ai()
+    fort_compiler_context = None
+    try:
+        fort_compiler_context, fort_compiler_meta = build_fort_compiler_context(input_handler.trainer_workouts)
+        print(f"Fort parser confidence: {fort_compiler_meta.get('overall_confidence', 0.0):.2f}")
+    except Exception as parser_exc:
+        print(f"Fort parser fallback to raw text: {parser_exc}")
+        fort_compiler_context = None
 
     # Add context about new program vs continuing program
     program_context = ""
@@ -162,7 +170,8 @@ def main():
     plan, explanation, validation_summary = plan_generator.generate_plan(
         workout_history=formatted_history,
         trainer_workouts=formatted_trainer_workouts + program_context,
-        preferences=""  # Already included in formatted_trainer_workouts
+        preferences="",  # Already included in formatted_trainer_workouts
+        fort_compiler_context=fort_compiler_context,
     )
 
     if not plan:

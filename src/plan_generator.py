@@ -75,6 +75,7 @@ class PlanGenerator:
         trainer_workouts,
         preferences,
         fort_week_constraints=None,
+        fort_compiler_context=None,
         db_context=None,
         prior_supplemental=None,
     ):
@@ -100,6 +101,7 @@ class PlanGenerator:
             trainer_workouts,
             preferences,
             fort_week_constraints=fort_week_constraints,
+            fort_compiler_context=fort_compiler_context,
             db_context=db_context,
             progression_directives_block=directives_block,
         )
@@ -433,6 +435,7 @@ PLAN:
         trainer_workouts,
         preferences,
         fort_week_constraints=None,
+        fort_compiler_context=None,
         db_context=None,
         progression_directives_block=None,
     ):
@@ -454,6 +457,10 @@ PLAN:
         if fort_week_constraints:
             fort_constraints_block = f"\nFORT WEEK CONSTRAINTS:\n{fort_week_constraints}\n"
 
+        fort_compiler_block = ""
+        if fort_compiler_context:
+            fort_compiler_block = f"\n{fort_compiler_context}\n\n---\n"
+
         db_context_block = ""
         if db_context:
             db_context_block = f"\n{db_context}\n\n---\n"
@@ -472,6 +479,8 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 
 ---
 
+{fort_compiler_block}
+
 {workout_history}
 
 ---
@@ -482,9 +491,11 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 
 FORT WORKOUT CONVERSION (CRITICAL):
 The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the exercise format:
-  * Extract ALL exercises from these sections: PREP (mobility/warmup), CLUSTER WARM-UP (progressive warmup sets), primary cluster work (singles/doubles), MYO REP finishers (accessories), THAW (conditioning circuits)
+  * If "FORT COMPILER DIRECTIVES" are present, treat section order and listed exercise anchors as hard constraints.
+  * Extract ALL exercises from detected sections, including non-cluster programs (examples: PREP/IGNITION/WARM-UP, POWER, BUILD-UP, WORKING SET/BREAKPOINT/CLUSTER work, BACK OFFS, AUXILIARY/MYO, THAW/REDEMPTION).
+  * Keep day section order aligned with detected Fort sections and include each anchor exercise at least once.
   * Convert each to the ### A1. [Exercise Name] format with Sets, Reps, Load, Rest, Notes (coaching details in Notes field only)
-  * Keep original block labels intact (A1-A4=PREP, B1-B5=warmup, C1/D1=main clusters, E1-E3=accessories, F1=THAW)
+  * Keep logical block labeling by intent (A=prep, B=build/power, C/D=main work and back-off, E=auxiliary, F=conditioning)
   * Calculate actual kg loads from percentages if specified (1RMs listed below)
   * Put technique cues, intensity targets, and adjustments in the Notes field (NOT separate RPE/Form/Energy/Adjustments fields)
 

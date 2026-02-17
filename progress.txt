@@ -296,3 +296,46 @@ Blocked
 Next
 1. Generate a fresh plan and verify validation summary drops prior false-positive biceps violations.
 2. If summary still reports unresolved violations, inspect exact code(s) and patch deterministically.
+
+---
+
+Progress Snapshot
+Date: 2026-02-17
+
+Current Phase
+- Phase 3 reliability hardening: program-agnostic Fort parsing/compiler integration.
+
+Built (Complete)
+- Added `src/fort_compiler.py`:
+  - deterministic section alias mapping across variable Fort styles (cluster and non-cluster),
+  - section detection + exercise anchor extraction,
+  - parser confidence scoring and warnings,
+  - deterministic `FORT COMPILER DIRECTIVES` context builder.
+- Updated `pages/generate_plan.py`:
+  - preamble stripping now starts at parser-detected first section (not cluster-only regex),
+  - generation flow now builds and injects Fort compiler context,
+  - parser confidence surfaced in UI caption.
+- Updated `src/plan_generator.py`:
+  - accepts `fort_compiler_context` input,
+  - prompt now enforces parser section order/exercise anchors and supports non-cluster conversion rules.
+- Updated `main.py`:
+  - CLI parity for Fort compiler context injection.
+- Added regression tests in `tests/test_fort_compiler.py` for:
+  - non-cluster (Ignition/Cauldron/Redemption) parsing,
+  - Breakpoint-style parsing,
+  - first-section detection and compiler context output.
+
+Validation Run
+- `python3 -m unittest tests/test_fort_compiler.py -v` passed.
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (23 tests).
+- `python3 -m compileall src/fort_compiler.py src/plan_generator.py pages/generate_plan.py main.py tests/test_fort_compiler.py` passed.
+
+In Progress
+- Awaiting user live generation run with non-cluster Fort inputs to verify section/exercise anchor retention.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Run a live generation using a non-cluster Fort day set and inspect Mon/Wed/Fri conversion fidelity.
+2. If anchor drift remains, add deterministic post-generation Fort-day anchor validator.
