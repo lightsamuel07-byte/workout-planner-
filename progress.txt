@@ -1,4 +1,43 @@
 Progress Snapshot
+Date: 2026-02-18
+
+Current Phase
+- Phase 3 reliability hardening: long-run quality cycle stress testing.
+
+Built (Complete)
+- Ran two separate 400-cycle validation passes via `scripts/run_quality_cycles.py`.
+- Hardened cycle runner for safer long unattended loops:
+  - added per-step command timeouts (`--step-timeout-sec`),
+  - added periodic progress checkpoints (`--print-every`),
+  - added timeout annotations to markdown/json report outputs.
+
+Validation Run
+- First stress pass:
+  - `python3 scripts/run_quality_cycles.py --cycles 400 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+  - Completed: `400/400`, Passed: `True`
+- Hardened-runner smoke:
+  - `python3 scripts/run_quality_cycles.py --cycles 3 --print-every 1 --step-timeout-sec 120`
+  - Completed: `3/3`, Passed: `True`
+- Second stress pass (hardened runner):
+  - `python3 scripts/run_quality_cycles.py --cycles 400 --print-every 100 --step-timeout-sec 180 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+  - Completed: `400/400`, Passed: `True`
+  - Timeout events: `0`
+  - Cycle duration: min `0.361s`, avg `0.384s`, max `0.495s`
+- Backtest result (post-loop): Aggregate score `95.0`
+
+In Progress
+- Awaiting next live-generation run from Streamlit Cloud to evaluate production behavior against stress-test baseline.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Trigger a live plan generation and confirm `AI Generation Summary` remains stable (`Unresolved violations: 0` target).
+2. If generation drifts in live runs, use the new cycle runner timeout/reporting to isolate the first failing cycle with artifact capture.
+
+---
+
+Progress Snapshot
 Date: 2026-02-17
 
 Current Phase

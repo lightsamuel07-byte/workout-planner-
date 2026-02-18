@@ -16,22 +16,32 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 REPORT_DIR = os.path.join(ROOT_DIR, "output", "quality_cycles")
 
 
-def run_command(cmd, cwd):
+def run_command(cmd, cwd, timeout_sec):
     start = time.time()
-    completed = subprocess.run(
-        cmd,
-        cwd=cwd,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-        text=True,
-        check=False,
-    )
+    timed_out = False
+    try:
+        completed = subprocess.run(
+            cmd,
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            check=False,
+            timeout=timeout_sec,
+        )
+        returncode = completed.returncode
+        output = completed.stdout
+    except subprocess.TimeoutExpired as exc:
+        timed_out = True
+        returncode = 124
+        output = (exc.stdout or "") + f"\nCommand timed out after {timeout_sec} seconds.\n"
     duration = round(time.time() - start, 3)
     return {
         "cmd": cmd,
-        "returncode": completed.returncode,
+        "returncode": returncode,
         "duration_sec": duration,
-        "output": completed.stdout,
+        "timed_out": timed_out,
+        "output": output,
     }
 
 
@@ -57,6 +67,18 @@ def parse_args():
         type=int,
         default=8,
         help="Limit passed to backtest script when --xlsx-path is provided.",
+    )
+    parser.add_argument(
+        "--step-timeout-sec",
+        type=int,
+        default=300,
+        help="Timeout per validation command in each cycle.",
+    )
+    parser.add_argument(
+        "--print-every",
+        type=int,
+        default=25,
+        help="Print cycle progress every N cycles.",
     )
     return parser.parse_args()
 
@@ -85,8 +107,9 @@ def write_reports(report):
         status = "PASS" if cycle["passed"] else "FAIL"
         lines.append(f"- Cycle {cycle['cycle']}: {status} ({cycle['duration_sec']}s)")
         for step in cycle["steps"]:
+            timeout_suffix = " (timeout)" if step.get("timed_out") else ""
             lines.append(
-                f"  - `{ ' '.join(step['cmd']) }` -> rc={step['returncode']} ({step['duration_sec']}s)"
+                f"  - `{ ' '.join(step['cmd']) }` -> rc={step['returncode']}{timeout_suffix} ({step['duration_sec']}s)"
             )
             if step["returncode"] != 0:
                 output_lines = (step.get("output") or "").strip().splitlines()
@@ -98,10 +121,11 @@ def write_reports(report):
 
     if report.get("post_backtest"):
         backtest = report["post_backtest"]
+        timeout_suffix = " (timeout)" if backtest.get("timed_out") else ""
         lines.append("")
         lines.append("## Post-Loop Backtest")
         lines.append(
-            f"- `{ ' '.join(backtest['cmd']) }` -> rc={backtest['returncode']} ({backtest['duration_sec']}s)"
+            f"- `{ ' '.join(backtest['cmd']) }` -> rc={backtest['returncode']}{timeout_suffix} ({backtest['duration_sec']}s)"
         )
         if backtest["output"]:
             lines.append("```text")
@@ -118,6 +142,8 @@ def main():
     args = parse_args()
     cycles = max(1, int(args.cycles))
     commands = build_cycle_commands()
+    step_timeout_sec = max(30, int(args.step_timeout_sec))
+    print_every = max(1, int(args.print_every))
 
     report = {
         "generated_at": datetime.now().isoformat(),
@@ -133,7 +159,7 @@ def main():
         cycle_passed = True
 
         for command in commands:
-            result = run_command(command, cwd=ROOT_DIR)
+            result = run_command(command, cwd=ROOT_DIR, timeout_sec=step_timeout_sec)
             cycle_steps.append(result)
             if result["returncode"] != 0:
                 cycle_passed = False
@@ -148,6 +174,12 @@ def main():
             }
         )
         report["completed_cycles"] = cycle_index
+        if cycle_index % print_every == 0 or not cycle_passed:
+            print(
+                f"[cycle {cycle_index}/{cycles}] "
+                f"{'PASS' if cycle_passed else 'FAIL'} "
+                f"({report['cycles'][-1]['duration_sec']}s)"
+            )
 
         if not cycle_passed:
             report["passed"] = False
@@ -164,7 +196,11 @@ def main():
             "--limit",
             str(max(0, int(args.backtest_limit))),
         ]
-        report["post_backtest"] = run_command(backtest_cmd, cwd=ROOT_DIR)
+        report["post_backtest"] = run_command(
+            backtest_cmd,
+            cwd=ROOT_DIR,
+            timeout_sec=max(step_timeout_sec, 600),
+        )
 
     json_path, md_path = write_reports(report)
     print(

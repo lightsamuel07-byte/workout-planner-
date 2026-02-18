@@ -64,3 +64,24 @@
   - Aggregate score: `95.0`
 - `python3 scripts/run_quality_cycles.py --cycles 40 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
   - Completed: `40/40`, Passed: `True`
+
+## Cycle Stress Pass (2026-02-18)
+- [x] Executed `400` quality cycles with backtest and collected report artifacts.
+- [x] Hardened `scripts/run_quality_cycles.py` with:
+  - per-step timeout support (`--step-timeout-sec`),
+  - periodic progress output (`--print-every`),
+  - timeout annotation in markdown report.
+- [x] Re-ran full 400-cycle stress pass using hardened runner.
+
+### Stress Validation
+- First 400-cycle run:
+  - `python3 scripts/run_quality_cycles.py --cycles 400 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+  - Completed: `400/400`, Passed: `True`
+- Hardened runner verification:
+  - `python3 scripts/run_quality_cycles.py --cycles 3 --print-every 1 --step-timeout-sec 120`
+  - Completed: `3/3`, Passed: `True`
+- Second 400-cycle run with hardened runner:
+  - `python3 scripts/run_quality_cycles.py --cycles 400 --print-every 100 --step-timeout-sec 180 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+  - Completed: `400/400`, Passed: `True`
+  - Timeouts: `0`
+  - Cycle duration stats: min `0.361s`, avg `0.384s`, max `0.495s`
