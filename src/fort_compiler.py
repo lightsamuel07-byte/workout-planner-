@@ -445,6 +445,7 @@ def parse_plan_fort_entries(plan_text):
                 "exercise": exercise,
                 "load": None,
                 "reps": None,
+                "notes": "",
             }
             entries_by_day.setdefault(current_day, []).append(current_entry)
             continue
@@ -457,6 +458,11 @@ def parse_plan_fort_entries(plan_text):
             _sets, reps, load = prescription_match.groups()
             current_entry["reps"] = reps
             current_entry["load"] = float(load)
+            continue
+
+        notes_line = line.strip()
+        if notes_line.lower().startswith("- **notes:**"):
+            current_entry["notes"] = notes_line
 
     return entries_by_day
 
@@ -761,6 +767,20 @@ def validate_fort_fidelity(plan_text, fort_metadata, exercise_aliases=None):
                                     "exercise": matched_entry["exercise"],
                                 }
                             )
+
+                notes_text = (matched_entry.get("notes") or "").lower()
+                if "added by deterministic fort anchor repair" in notes_text:
+                    violations.append(
+                        {
+                            "code": "fort_placeholder_prescription",
+                            "message": (
+                                f"Fort anchor '{matched_entry['exercise']}' on {day_name} "
+                                "still has deterministic placeholder notes."
+                            ),
+                            "day": day_name,
+                            "exercise": matched_entry["exercise"],
+                        }
+                    )
 
             ranks = [entry["block_rank"] for entry in section_matches if entry.get("block_rank") is not None]
             if ranks:

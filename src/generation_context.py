@@ -34,6 +34,15 @@ def _add_target(ordered, seen, name, source):
     return True
 
 
+def _source_label(source):
+    labels = {
+        "fort_anchor": "FORT",
+        "prior_supplemental": "PRIOR",
+        "db_recent": "HISTORY",
+    }
+    return labels.get(source, "HISTORY")
+
+
 def _extract_target_exercises(prior_supplemental, max_exercises, fort_compiler_meta=None):
     """Collect unique target exercise names from Fort anchors + prior supplemental days."""
     ordered = []
@@ -159,6 +168,7 @@ def build_db_generation_context(
     fort_compiler_meta=None,
     max_exercises=10,
     logs_per_exercise=2,
+    max_chars=2200,
 ):
     """
     Build token-efficient longitudinal context from SQLite history.
@@ -199,6 +209,11 @@ def build_db_generation_context(
             "- Target exercise logs (Fort anchors + prior supplemental + recent history):",
         ]
 
+        def _fits_within_budget(candidate_lines):
+            if not max_chars or max_chars <= 0:
+                return True
+            return len("\n".join(candidate_lines)) <= max_chars
+
         added = 0
         for target in targets:
             display_name = target["name"]
@@ -219,15 +234,25 @@ def build_db_generation_context(
                     log_text = f"{log_text} | RPE {row['parsed_rpe']:.1f}"
                 compact_entries.append(f"{day_or_date}: {log_text}")
 
-            lines.append(f"  - {display_name} -> " + " || ".join(compact_entries))
+            candidate_line = f"  - {display_name} -> " + " || ".join(compact_entries)
+            source_tag = _source_label(target.get("source"))
+            candidate_line = f"  - [{source_tag}] {display_name} -> " + " || ".join(compact_entries)
+            if not _fits_within_budget(lines + [candidate_line]):
+                lines.append("- Context truncated to stay within prompt budget.")
+                break
+
+            lines.append(candidate_line)
             added += 1
 
         if added == 0:
-            return None
+            lines.append("- Context omitted: prompt budget too small for target exercise log lines.")
+            return "\n".join(lines)
 
-        lines.append(
+        tail_line = (
             "- Use this for longer-term trend awareness; selected prior-week sheet remains primary for immediate progression."
         )
+        if _fits_within_budget(lines + [tail_line]):
+            lines.append(tail_line)
         return "\n".join(lines)
     finally:
         conn.close()

@@ -195,6 +195,7 @@ class FortCompilerTests(unittest.TestCase):
         fidelity = validate_fort_fidelity(repaired, metadata)
         codes = {violation["code"] for violation in fidelity["violations"]}
         self.assertNotIn("fort_missing_anchor", codes)
+        self.assertIn("fort_placeholder_prescription", codes)
 
     def test_repair_plan_fort_anchors_adds_missing_day(self):
         _context, metadata = build_fort_compiler_context(
@@ -214,6 +215,7 @@ class FortCompilerTests(unittest.TestCase):
         codes = {violation["code"] for violation in fidelity["violations"]}
         self.assertNotIn("fort_day_missing", codes)
         self.assertNotIn("fort_missing_anchor", codes)
+        self.assertIn("fort_placeholder_prescription", codes)
 
 
 if __name__ == "__main__":

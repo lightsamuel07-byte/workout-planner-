@@ -106,6 +106,8 @@ class GenerationContextTests(unittest.TestCase):
             self.assertIn("LONGITUDINAL DB CONTEXT", context)
             self.assertIn("BACK SQUAT", context)
             self.assertIn("Cable Lateral Raise", context)
+            self.assertIn("[FORT]", context)
+            self.assertIn("[PRIOR]", context)
 
     def test_db_context_falls_back_to_recent_history_without_targets(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -138,6 +140,42 @@ class GenerationContextTests(unittest.TestCase):
 
             self.assertIsNotNone(context)
             self.assertIn("Seated DB Shoulder Press", context)
+            self.assertIn("[HISTORY]", context)
+
+    def test_db_context_honors_max_chars_budget(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            db_path = os.path.join(tmpdir, "history.db")
+            db = WorkoutDB(db_path)
+            db.init_schema()
+            try:
+                for idx in range(1, 8):
+                    self._seed_log(
+                        db,
+                        sheet_name="Weekly Plan (2/2/2026)",
+                        day_label="TUESDAY",
+                        day_name="TUESDAY",
+                        session_date=f"2026-02-{idx:02d}",
+                        source_row=idx + 10,
+                        exercise_name=f"Exercise {idx}",
+                        log_text="long log entry " * 10,
+                        parsed_rpe=8.0,
+                    )
+                db.conn.commit()
+            finally:
+                db.close()
+
+            context = build_db_generation_context(
+                db_path=db_path,
+                prior_supplemental=None,
+                fort_compiler_meta=None,
+                max_exercises=7,
+                logs_per_exercise=2,
+                max_chars=350,
+            )
+
+            self.assertIsNotNone(context)
+            self.assertLessEqual(len(context), 450)
+            self.assertIn("Context truncated to stay within prompt budget.", context)
 
 
 if __name__ == "__main__":

@@ -427,6 +427,7 @@ USER PREFERENCES:
                             fort_compiler_meta=fort_compiler_meta,
                             max_exercises=10,
                             logs_per_exercise=2,
+                            max_chars=(config.get('database', {}) or {}).get('context_max_chars', 2200),
                         )
 
                         st.info(f"Loaded workout history from: **{sheet_to_read}**")

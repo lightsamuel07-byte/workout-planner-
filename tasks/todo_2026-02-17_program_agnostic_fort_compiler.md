@@ -85,3 +85,22 @@
   - Completed: `400/400`, Passed: `True`
   - Timeouts: `0`
   - Cycle duration stats: min `0.361s`, avg `0.384s`, max `0.495s`
+
+## Improvement Loop Pass (2026-02-18, follow-up)
+- [x] Cycle 1 improvement: Fort placeholder-prescription detection
+  - Added `fort_placeholder_prescription` violation in Fort fidelity validator when deterministic anchor placeholders remain.
+  - This forces correction loop to replace placeholder content before final output when possible.
+- [x] Cycle 2 improvement: DB context token-budget guard
+  - Added `max_chars` budget control to `build_db_generation_context(...)`.
+  - Added truncation marker and safe fallback when budget is too small for target entries.
+- [x] Cycle 3 improvement: DB context source tagging
+  - Added source tags per line: `[FORT]`, `[PRIOR]`, `[HISTORY]` to improve model interpretation priority.
+- [x] Extended tests:
+  - Updated Fort compiler tests for placeholder detection behavior.
+  - Added DB context budget + source-tag assertions.
+- [x] Regression + stress validation:
+  - `python3 -m unittest discover -s tests -p "test_*.py" -v` (30 tests, all pass)
+  - `python3 -m compileall pages src tests main.py` (pass)
+  - `python3 scripts/run_quality_cycles.py --cycles 100 --print-every 25 --step-timeout-sec 180 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+    - Completed: `100/100`, Passed: `True`
+    - Backtest aggregate score: `95.0`

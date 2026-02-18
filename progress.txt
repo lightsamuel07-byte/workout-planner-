@@ -2,6 +2,45 @@ Progress Snapshot
 Date: 2026-02-18
 
 Current Phase
+- Phase 3 reliability hardening: improvement-loop follow-up (generation quality + context efficiency).
+
+Built (Complete)
+- Generation fidelity hardening:
+  - Fort validator now flags deterministic placeholder anchors with code `fort_placeholder_prescription`.
+  - This keeps placeholder repairs from silently shipping as final output.
+- DB generation context hardening:
+  - Added character-budget control (`max_chars`) to constrain prompt payload growth.
+  - Added explicit truncation message and safe fallback when budget is too small.
+  - Added source tags to context lines: `[FORT]`, `[PRIOR]`, `[HISTORY]`.
+- Streamlit integration:
+  - `pages/generate_plan.py` now passes DB context budget from config (`database.context_max_chars`, default 2200).
+- Tests expanded and updated:
+  - `tests/test_fort_compiler.py` for placeholder-prescription signal.
+  - `tests/test_generation_context.py` for budget and source-tag behavior.
+
+Validation Run
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (30 tests).
+- `python3 -m compileall pages src tests main.py` passed.
+- `python3 scripts/run_quality_cycles.py --cycles 100 --print-every 25 --step-timeout-sec 180 --xlsx-path "/Users/samuellight/Downloads/Workouts.xlsx" --backtest-limit 8`
+  - Completed: `100/100`, Passed: `True`
+  - Backtest aggregate score: `95.0`
+
+In Progress
+- Awaiting live-generation output check from Streamlit Cloud with newest Fort inputs to verify placeholder violations resolve in-model without residual unresolved count.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Run live generation and inspect `AI Generation Summary` for `fort_placeholder_prescription` residuals.
+2. If residual placeholder violations persist, add deterministic section-specific prescription hydration using parsed Fort set/rep fields.
+
+---
+
+Progress Snapshot
+Date: 2026-02-18
+
+Current Phase
 - Phase 3 reliability hardening: long-run quality cycle stress testing.
 
 Built (Complete)
