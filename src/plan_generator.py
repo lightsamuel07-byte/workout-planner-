@@ -497,6 +497,7 @@ Hard requirements:
 - Keep no-range rule in prescription lines.
 - Keep dumbbell parity rule (even DB loads, except main barbell lifts).
 - Respect explicit keep/stay-here progression constraints from prior logs.
+- Never emit section labels or instructional lines as exercises (examples: "Targeted Warm-Up", "1RM Test", "Back-offs", "TIPS", "Rest 2 minutes", "Right into").
 
 Return the full corrected plan in the same markdown format.
 
@@ -573,6 +574,7 @@ The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You M
   * Keep logical block labeling by intent (A=prep, B=build/power, C/D=main work and back-off, E=auxiliary, F=conditioning)
   * Calculate actual kg loads from percentages if specified (1RMs listed below)
   * Put technique cues, intensity targets, and adjustments in the Notes field (NOT separate RPE/Form/Energy/Adjustments fields)
+  * Never output section headers or instructional text as exercises. Examples forbidden as exercise names: "Targeted Warm-Up", "1RM Test", "Back-offs", "TIPS", "Rest 2 minutes", "Right into".
 
 {trainer_workouts}
 

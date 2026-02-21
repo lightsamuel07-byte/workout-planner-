@@ -103,6 +103,7 @@ SECTION_RULES = [
 ]
 
 METADATA_EXACT = {
+    "TIPS",
     "TIPS HISTORY",
     "HISTORY",
     "COMPLETE",
@@ -132,6 +133,19 @@ PLAN_PRESCRIPTION_RE = re.compile(
     r"^\s*-\s*(\d+)\s*x\s*([\d:]+)\s*@\s*([\d]+(?:\.\d+)?)\s*kg\b",
     re.IGNORECASE,
 )
+
+NON_EXERCISE_PATTERNS = [
+    re.compile(r"^TIPS?\b", re.IGNORECASE),
+    re.compile(r"^REST\b", re.IGNORECASE),
+    re.compile(r"^RIGHT\s+INTO\b", re.IGNORECASE),
+    re.compile(r"^START\s+WITH\b", re.IGNORECASE),
+    re.compile(r"^THIS\s+IS\b", re.IGNORECASE),
+    re.compile(r"^YOU\s+ARE\b", re.IGNORECASE),
+    re.compile(r"^OPTIONAL\b", re.IGNORECASE),
+    re.compile(r"^REMINDER\b", re.IGNORECASE),
+    re.compile(r"^NUMBER\s+OF\s+REPS\b", re.IGNORECASE),
+    re.compile(r"^WRITE\s+NOTES\b", re.IGNORECASE),
+]
 
 
 def _normalize_space(value):
@@ -202,7 +216,11 @@ def _is_exercise_candidate(value):
         return False
     if _is_metadata_line(normalized):
         return False
+    if any(pattern.search(normalized) for pattern in NON_EXERCISE_PATTERNS):
+        return False
     if _is_narrative_line(normalized):
+        return False
+    if normalized.endswith(":") and len(normalized.split()) <= 6:
         return False
     if len(normalized) > 80:
         return False
@@ -462,6 +480,12 @@ def _matches_expected_exercise(expected_name, actual_name, alias_map):
     candidates = set(expected_keys)
     for expected_key in expected_keys:
         candidates.update(alias_map.get(expected_key, set()))
+        # Allow source alias prefixes to match variant anchors:
+        # e.g., "Bulgarian Split Squat" alias should match
+        # "Bulgarian Split Squat (Contralateral)" expected anchors.
+        for alias_source, alias_targets in alias_map.items():
+            if alias_source and alias_source in expected_key:
+                candidates.update(alias_targets)
 
     for candidate in candidates:
         for actual_key in actual_keys:

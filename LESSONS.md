@@ -1,6 +1,6 @@
 # LESSONS
 
-Last updated: 2026-02-17
+Last updated: 2026-02-21
 
 ## Core Lessons to Preserve
 
@@ -62,3 +62,10 @@ Last updated: 2026-02-17
 - New rule: generation context must use a deterministic, program-agnostic Fort parser/compiler with section alias mapping, rather than hard-coded cluster section assumptions.
 - Correction received: user expected overnight-depth scope, not a fast foundation slice.
 - New rule: when tackling large feature requests, explicitly separate foundation slice vs full-scope deliverables upfront and continue through full scope when requested.
+
+## Session Corrections (2026-02-21)
+
+- Correction received: test-week generation still emitted section labels/instruction lines as exercises after initial parser hardening.
+- New rule: Fort parser must explicitly filter instruction-like lines (`TIPS`, `Rest ...`, `Right into...`, etc.) from exercise anchors, even when they are short.
+- Correction received: split-squat alias matching can become overbroad if canonicalization strips too many modifiers.
+- New rule: alias canonicalization should be minimal and deterministic; use targeted variant/prefix expansion for expected anchors instead of aggressive token stripping.

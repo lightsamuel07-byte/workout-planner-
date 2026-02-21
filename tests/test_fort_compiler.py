@@ -108,6 +108,28 @@ DB SPLIT SQUAT
 SLIDER ROLLOUTS
 """
 
+TEST_WEEK_NOISE_SAMPLE = """
+Monday 2.23.26
+Testing Day #1
+PREP
+AIR SQUAT
+JUMP SQUAT
+COMPLETE
+1RM TEST
+BACK SQUAT
+BACK OFF SETS
+BACK SQUAT
+GARAGE - 2K BIKEERG
+TIPS
+Rest 2 minutes.
+Right into...
+Rest 3 minutes.
+2k BikeErg for time.
+AUXILIARY/RECOVERY
+SINGLE ARM DB ROW
+DB RDL (GLUTE OPTIMIZED)
+"""
+
 
 class FortCompilerTests(unittest.TestCase):
     def test_find_first_section_index_skips_narrative_lines(self):
@@ -267,6 +289,18 @@ class FortCompilerTests(unittest.TestCase):
         self.assertIn("GARAGE - 2K BIKEERG", all_exercises)
         self.assertNotIn("1RM TEST", all_exercises)
         self.assertNotIn("BACK OFF SETS", all_exercises)
+
+    def test_parse_fort_day_filters_instruction_lines_from_anchors(self):
+        parsed = parse_fort_day("Monday", TEST_WEEK_NOISE_SAMPLE)
+        all_exercises = {
+            exercise
+            for section in parsed["sections"]
+            for exercise in section["exercises"]
+        }
+        self.assertIn("GARAGE - 2K BIKEERG", all_exercises)
+        self.assertNotIn("TIPS", all_exercises)
+        self.assertNotIn("Rest 2 minutes.", all_exercises)
+        self.assertNotIn("Right into...", all_exercises)
 
     def test_validate_fort_fidelity_handles_split_squat_swap_alias(self):
         _context, metadata = build_fort_compiler_context(
