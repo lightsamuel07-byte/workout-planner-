@@ -303,6 +303,51 @@ class FortCompilerTests(unittest.TestCase):
         self.assertNotIn("fort_missing_anchor", codes)
         self.assertIn("fort_placeholder_prescription", codes)
 
+    def test_repair_plan_fort_anchors_rebuilds_day_and_drops_noise_rows(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": TEST_WEEK_SAMPLE, "Wednesday": "", "Friday": ""}
+        )
+        generated_plan = """## MONDAY
+### F1. Targeted Warm-Up
+- 1 x 1 @ 0 kg
+- **Rest:** None
+- **Notes:** Noise row.
+### G1. AIR SQUAT
+- 2 x 1:00 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Primer.
+### G2. JUMP SQUAT
+- 2 x 5 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Primer.
+### H1. BACK SQUAT
+- 1 x 10 @ 26 kg
+- **Rest:** 180 seconds
+- **Notes:** Build to test.
+### J1. GARAGE - 2K BIKEERG
+- 2 x 0:20 @ 0 kg
+- **Rest:** None
+- **Notes:** Conditioning benchmark.
+### J2. TIPS
+- 1 x 1 @ 0 kg
+- **Rest:** None
+- **Notes:** Noise row.
+### K1. SINGLE ARM DB ROW
+- 3 x 8 @ 28 kg
+- **Rest:** 90 seconds
+- **Notes:** Time permitting.
+### K2. DB RDL (GLUTE OPTIMIZED)
+- 3 x 8 @ 26 kg
+- **Rest:** 90 seconds
+- **Notes:** Time permitting.
+"""
+        repaired, repair_summary = repair_plan_fort_anchors(generated_plan, metadata)
+        self.assertGreaterEqual(repair_summary["dropped"], 1)
+        self.assertNotIn("### F1. Targeted Warm-Up", repaired)
+        self.assertNotIn("### J2. TIPS", repaired)
+        self.assertIn("### A1. AIR SQUAT", repaired)
+        self.assertIn("### F1. GARAGE - 2K BIKEERG", repaired)
+
     def test_parse_fort_day_handles_test_week_headers(self):
         parsed = parse_fort_day("Monday", TEST_WEEK_SAMPLE)
         section_ids = [section["section_id"] for section in parsed["sections"]]

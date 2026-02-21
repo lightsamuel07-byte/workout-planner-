@@ -69,3 +69,5 @@ Last updated: 2026-02-21
 - New rule: Fort parser must explicitly filter instruction-like lines (`TIPS`, `Rest ...`, `Right into...`, etc.) from exercise anchors, even when they are short.
 - Correction received: split-squat alias matching can become overbroad if canonicalization strips too many modifiers.
 - New rule: alias canonicalization should be minimal and deterministic; use targeted variant/prefix expansion for expected anchors instead of aggressive token stripping.
+- Correction received: even with better parsing, Fort-day outputs can still include section/instruction rows as exercises if we only do insert-only repair.
+- New rule: deterministic Fort repair must rebuild Fort days from canonical parsed anchors (ordered replace), not just append missing anchors.

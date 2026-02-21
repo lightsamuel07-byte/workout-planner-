@@ -9,6 +9,10 @@ Built (Complete)
   - blocked long all-caps narrative lines from section matching in `src/fort_compiler.py`,
   - stripped `COMPLETE` prefixes from section headers before classification (`COMPLETE GARAGE ...` normalization),
   - expanded instruction-noise filtering (`TIPS`, `Rest ...`, `Right into...`, `Hip Circle is optional`) so these lines do not become anchors.
+- Fort-day structure enforcement:
+  - upgraded deterministic Fort repair to rebuild Fort days in canonical section/anchor order,
+  - normalizes Fort exercise blocks to strict markdown schema and drops non-anchor/noise rows on Fort days,
+  - fills only truly missing anchors with deterministic placeholders.
 - Improved Fort fidelity alias behavior:
   - expected variant anchors can match explicit swap alias targets (e.g., Bulgarian split squat variant suffixes),
   - retained anti-overbroad matching guard.
@@ -17,8 +21,8 @@ Built (Complete)
 - Expanded parser regression tests in `tests/test_fort_compiler.py` for all above cases.
 
 Validation Run
-- `python3 -m unittest tests/test_fort_compiler.py -v` passed (15 tests).
-- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (37 tests).
+- `python3 -m unittest tests/test_fort_compiler.py -v` passed (16 tests).
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (38 tests).
 - `python3 -m compileall pages src tests main.py` passed.
 - Targeted smoke parsing confirmed clean anchor extraction for test-week snippets (no instruction noise rows).
 

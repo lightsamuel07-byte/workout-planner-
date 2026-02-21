@@ -64,3 +64,19 @@ Harden Fort parsing and generation safeguards so one-week test blocks (1RM/condi
   - `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (37 tests).
   - `python3 -m compileall pages src tests main.py` passed.
   - smoke parsing for test-week snippets confirms no `TIPS`/`Rest`/`Right into` anchors and no `COMPLETE ...` anchor prefixes.
+
+### Follow-up Hardening (structure enforcement)
+- Implemented in `src/fort_compiler.py`:
+  - upgraded `repair_plan_fort_anchors(...)` from insert-only behavior to deterministic Fort-day rebuild:
+    - rebuilds each Fort day in parsed section/anchor order,
+    - normalizes each kept exercise to strict 4-line markdown block (`###`, prescription, `Rest`, `Notes`),
+    - drops non-anchor exercise blocks/noise rows on Fort days,
+    - fills missing anchors with deterministic placeholders.
+  - exposed richer repair summary stats (`inserted`, `dropped`, `rebuilt_days`).
+- Added tests in `tests/test_fort_compiler.py`:
+  - `test_repair_plan_fort_anchors_rebuilds_day_and_drops_noise_rows`
+  - expanded parsing tests for priority narrative and `COMPLETE ...` header normalization.
+- Verification:
+  - `python3 -m unittest tests/test_fort_compiler.py -v` passed (16 tests).
+  - `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (38 tests).
+  - `python3 -m compileall pages src tests main.py` passed.
