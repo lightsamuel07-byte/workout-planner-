@@ -310,6 +310,51 @@ class FortCompilerTests(unittest.TestCase):
         codes = {violation["code"] for violation in fidelity["violations"]}
         self.assertNotIn("fort_missing_anchor", codes)
 
+    def test_validate_fort_fidelity_split_squat_alias_not_overbroad(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": "", "Wednesday": TEST_WEEK_SPLIT_SQUAT_SAMPLE, "Friday": ""}
+        )
+        generated_plan = """## WEDNESDAY
+### A1. Close Grip Push Up
+- 2 x 10 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Primer.
+### A2. Plyo Push-Up
+- 2 x 5 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Primer.
+### C1. Bench Press
+- 1 x 1 @ 90 kg
+- **Rest:** 180 seconds
+- **Notes:** 1RM test.
+### D1. Bench Press
+- 2 x 5 @ 70 kg
+- **Rest:** 120 seconds
+- **Notes:** Back-off sets.
+### F1. 2K Row Test
+- 1 x 1 @ 0 kg
+- **Rest:** None
+- **Notes:** Conditioning test.
+### G1. Leg Extension
+- 3 x 10 @ 45 kg
+- **Rest:** 90 seconds
+- **Notes:** Not a valid split squat swap target for generic split squat.
+### G2. Slider Rollouts
+- 3 x 8 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Core.
+"""
+        fidelity = validate_fort_fidelity(
+            generated_plan,
+            metadata,
+            exercise_aliases={
+                "Split Squat": "Heel-Elevated Goblet Squat",
+                "Forward Split Squat": "Leg Extension",
+            },
+        )
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertIn("fort_missing_anchor", codes)
+
 
 if __name__ == "__main__":
     unittest.main()

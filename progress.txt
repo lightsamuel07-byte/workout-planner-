@@ -14,13 +14,16 @@ Built (Complete)
   - Added conditioning-header anchor seeding so benchmark headers (e.g., `GARAGE - 2K BIKEERG`) are preserved as exercise anchors.
   - Expanded alias matching for Fort fidelity with canonicalized alias keys:
     - swap directives like `Split Squat -> Heel-Elevated Goblet Squat` now satisfy anchors such as `DB SPLIT SQUAT` during fidelity checks.
+  - Tightened alias canonicalization to prevent overbroad split-squat swap matching:
+    - generic split-squat anchors no longer incorrectly accept unrelated variant-only swap targets (e.g., `Forward Split Squat -> Leg Extension`).
 - Added Fort hardening regression tests in `tests/test_fort_compiler.py`:
   - test-week section parsing/anchor extraction
   - split-squat swap alias fidelity behavior
+  - split-squat alias overbreadth guard behavior
 
 Validation Run
-- `python3 -m unittest tests/test_fort_compiler.py -v` passed (10 tests).
-- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (32 tests).
+- `python3 -m unittest tests/test_fort_compiler.py -v` passed (11 tests).
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (33 tests).
 - `python3 -m compileall pages src tests main.py` passed.
 - Targeted parser smoke check against provided `2/23`, `2/25`, `2/27` Fort test-week text:
   - extracted expected prep/strength/backoff/conditioning/aux sections,

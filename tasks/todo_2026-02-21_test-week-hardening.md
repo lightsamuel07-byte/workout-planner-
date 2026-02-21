@@ -29,12 +29,14 @@ Harden Fort parsing and generation safeguards so one-week test blocks (1RM/condi
     - `MAX PULL UP TEST` / `MAX PUSH-UP TEST` -> `strength_work`
   - seeded conditioning section headers as anchors when header includes modality benchmark text (e.g., `GARAGE - 2K BIKEERG`), preserving test targets in compiled anchors.
   - expanded alias map construction/matching with canonicalized alias keys so swap rules like `Split Squat -> Heel-Elevated Goblet Squat` match Fort anchors such as `DB SPLIT SQUAT`.
+  - tightened alias canonicalization to avoid overbroad matching across split-squat variants (prevents unrelated swap targets from being treated as valid Fort anchors).
 - Added tests in `tests/test_fort_compiler.py`:
   - `test_parse_fort_day_handles_test_week_headers`
   - `test_validate_fort_fidelity_handles_split_squat_swap_alias`
+  - `test_validate_fort_fidelity_split_squat_alias_not_overbroad`
 - Verification:
-  - `python3 -m unittest tests/test_fort_compiler.py -v` passed (10 tests).
-  - `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (32 tests).
+  - `python3 -m unittest tests/test_fort_compiler.py -v` passed (11 tests).
+  - `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (33 tests).
   - `python3 -m compileall pages src tests main.py` passed.
   - targeted parser smoke check against provided 2/23, 2/25, 2/27 input confirms:
     - `1RM TEST` not captured as exercise anchor,

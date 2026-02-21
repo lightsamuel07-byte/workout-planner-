@@ -434,11 +434,8 @@ def _canonical_alias_name(value):
     if not normalized:
         return ""
 
-    # Remove common equipment/modifier tokens that should not block swap matching.
+    # Remove equipment tokens that should not block swap matching.
     normalized = re.sub(r"\b(dumbbell|db)\b", " ", normalized)
-    normalized = re.sub(r"\b(single arm|single|arm)\b", " ", normalized)
-    normalized = re.sub(r"\b(rear foot elevated|rear foot|rear|foot elevated)\b", " ", normalized)
-    normalized = re.sub(r"\b(bulgarian|contralateral|ipsilateral|forward)\b", " ", normalized)
     normalized = re.sub(r"\s+", " ", normalized).strip()
     return normalized
 
@@ -452,10 +449,6 @@ def _alias_keys(value):
     canonical = _canonical_alias_name(normalized)
     if canonical:
         keys.add(canonical)
-
-    # Ensure split squat families resolve to the same alias bucket.
-    if "split squat" in normalized or "split squat" in canonical:
-        keys.add("split squat")
 
     return {key for key in keys if key}
 
