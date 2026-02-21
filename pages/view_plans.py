@@ -71,11 +71,11 @@ def parse_plan_content(plan_path):
     # Split by days
     days = {}
     # Capture just the day name (e.g., "MONDAY", "TUESDAY") without the extra text
-    day_pattern = r'## ([A-Z]+DAY)'
+    day_pattern = r'^##\s+([A-Z]+DAY)\b'
 
-    matches = list(re.finditer(day_pattern, content))
+    matches = list(re.finditer(day_pattern, content, re.IGNORECASE | re.MULTILINE))
     for i, match in enumerate(matches):
-        day_name = match.group(1).strip()
+        day_name = match.group(1).strip().upper()
         start = match.end()
         end = matches[i + 1].start() if i + 1 < len(matches) else len(content)
         day_content = content[start:end].strip()

@@ -102,7 +102,7 @@ def show():
         volume_data = analytics.get_weekly_volume(weeks=8)
 
         if volume_data:
-            weeks = sorted(volume_data.keys())
+            weeks = list(volume_data.keys())
 
             volume_df = pd.DataFrame({
                 'Week': list(range(1, len(weeks) + 1)),

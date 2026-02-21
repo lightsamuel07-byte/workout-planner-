@@ -6,6 +6,7 @@ import os
 import pickle
 import json
 import re
+from datetime import datetime
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -21,6 +22,10 @@ except ImportError:
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 RPE_VALUE_RE = re.compile(r"\brpe\s*[:=]?\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE)
+WEEKLY_PLAN_TITLE_PATTERNS = (
+    re.compile(r"^Weekly Plan \((\d{1,2})/(\d{1,2})/(\d{4})\)$"),
+    re.compile(r"^\(Weekly Plan\)\s*(\d{1,2})/(\d{1,2})/(\d{4})$"),
+)
 
 
 class SheetsReader:
@@ -169,6 +174,27 @@ class SheetsReader:
             payload,
             scopes=SCOPES
         )
+
+    def _parse_weekly_plan_sheet_date(self, sheet_title):
+        """
+        Parse exact weekly-plan tab names into a datetime.
+
+        Accepted formats:
+        - Weekly Plan (M/D/YYYY)
+        - (Weekly Plan) M/D/YYYY
+        """
+        normalized_title = (sheet_title or "").strip()
+        for pattern in WEEKLY_PLAN_TITLE_PATTERNS:
+            match = pattern.match(normalized_title)
+            if not match:
+                continue
+
+            month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
+            try:
+                return datetime(year, month, day)
+            except ValueError:
+                return None
+        return None
 
     def read_workout_history(self, num_recent_workouts=7, use_cache=True):
         """
@@ -354,24 +380,12 @@ class SheetsReader:
             sheets = sheet_metadata.get('sheets', [])
             sheet_names = [sheet['properties']['title'] for sheet in sheets]
 
-            # Filter for sheets that match "Weekly Plan (M/D/YYYY)" or "(Weekly Plan) M/D/YYYY" pattern
-            import re
-            from datetime import datetime
-
             weekly_plan_sheets = []
-            # Try both patterns
-            pattern1 = r'Weekly Plan \((\d+)/(\d+)/(\d+)\)'  # New format
-            pattern2 = r'\(Weekly Plan\)\s*(\d+)/(\d+)/(\d+)'  # Old format
 
             for name in sheet_names:
-                match = re.match(pattern1, name) or re.match(pattern2, name)
-                if match:
-                    month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
-                    try:
-                        date = datetime(year, month, day)
-                        weekly_plan_sheets.append((name, date))
-                    except ValueError:
-                        continue
+                parsed_date = self._parse_weekly_plan_sheet_date(name)
+                if parsed_date:
+                    weekly_plan_sheets.append((name, parsed_date))
 
             if not weekly_plan_sheets:
                 return None
@@ -525,23 +539,12 @@ class SheetsReader:
             sheets = sheet_metadata.get('sheets', [])
             sheet_names = [sheet['properties']['title'] for sheet in sheets]
 
-            # Filter for weekly plan sheets
-            import re
-            from datetime import datetime
-
             weekly_plan_sheets = []
-            pattern1 = r'Weekly Plan \((\d+)/(\d+)/(\d+)\)'
-            pattern2 = r'\(Weekly Plan\)\s*(\d+)/(\d+)/(\d+)'
 
             for name in sheet_names:
-                match = re.match(pattern1, name) or re.match(pattern2, name)
-                if match:
-                    month, day, year = int(match.group(1)), int(match.group(2)), int(match.group(3))
-                    try:
-                        date = datetime(year, month, day)
-                        weekly_plan_sheets.append((name, date))
-                    except ValueError:
-                        continue
+                parsed_date = self._parse_weekly_plan_sheet_date(name)
+                if parsed_date:
+                    weekly_plan_sheets.append((name, parsed_date))
 
             # Sort by date
             weekly_plan_sheets.sort(key=lambda x: x[1])

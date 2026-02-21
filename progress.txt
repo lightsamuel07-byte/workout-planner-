@@ -2,6 +2,50 @@ Progress Snapshot
 Date: 2026-02-21
 
 Current Phase
+- Phase 3 reliability hardening + Phase 5 QA hardening: post-scan bug remediation and regression locking.
+
+Built (Complete)
+- Fixed weekly plan sheet filtering in `src/sheets_reader.py`:
+  - added exact-name weekly-plan parsing helper,
+  - excluded archived tabs from both `find_most_recent_weekly_plan()` and `get_all_weekly_plan_sheets()`,
+  - preserved support for both canonical naming formats.
+- Fixed analytics correctness in `src/analytics.py`:
+  - `load_historical_data()` now tags workouts with source `sheet_name`,
+  - `get_main_lift_progression()` now uses ingestion order (no lexicographic date-label sort),
+  - `get_weekly_volume()` now aggregates by week (sheet tab), not by individual day label.
+- Fixed volume chart ordering path in `pages/progress.py`:
+  - removed lexicographic key sorting and preserved chronological order from analytics.
+- Fixed local markdown day-header parsing in `pages/view_plans.py`:
+  - day header detection is now case-insensitive and line-anchored,
+  - supports `## Monday` and `## MONDAY` formats consistently.
+- Added regression coverage in `tests/test_bug_regressions.py` for:
+  - archived-tab exclusion,
+  - most-recent-sheet selection behavior,
+  - progression ordering correctness,
+  - weekly-volume aggregation correctness,
+  - mixed-case day-header parsing.
+
+Validation Run
+- `python3 -m unittest tests/test_bug_regressions.py -v` passed (5 tests).
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (87 tests).
+- `python3 -m compileall app.py pages src tests main.py` passed.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Run an in-app smoke check for Progress and View Plans pages against live Sheets data to confirm UI-level behavior with production tabs.
+2. If desired, add one integration test around `WorkoutAnalytics.load_historical_data()` with mocked reader order to pin chronological assumptions.
+
+---
+
+Progress Snapshot
+Date: 2026-02-21
+
+Current Phase
 - Phase 3 reliability hardening: post-live-output Fort test-week cleanup.
 
 Built (Complete)

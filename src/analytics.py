@@ -41,7 +41,10 @@ class WorkoutAnalytics:
         for sheet_name in recent_sheets:
             self.sheets_reader.sheet_name = sheet_name
             week_data = self.sheets_reader.read_workout_history()
-            historical_workouts.extend(week_data)
+            for workout in week_data:
+                workout_copy = dict(workout)
+                workout_copy['sheet_name'] = sheet_name
+                historical_workouts.append(workout_copy)
 
         self.historical_data = historical_workouts
         return historical_workouts
@@ -63,29 +66,41 @@ class WorkoutAnalytics:
         weekly_max = {}
 
         for workout in self.historical_data:
-            date = workout.get('date', '')
+            date_label = workout.get('date', '')
+            sheet_name = workout.get('sheet_name', '')
+            base_key = f"{sheet_name} | {date_label}" if sheet_name and date_label else (sheet_name or date_label)
+            if not base_key:
+                base_key = f"Session {len(weekly_max) + 1}"
 
+            unique_key = base_key
+            suffix = 2
+            while unique_key in weekly_max:
+                unique_key = f"{base_key} ({suffix})"
+                suffix += 1
+
+            max_load_for_workout = None
             for exercise in workout.get('exercises', []):
                 exercise_name = exercise.get('exercise', '').lower()
+                if lift_name.lower() not in exercise_name:
+                    continue
 
-                # Match lift name (case insensitive, partial match)
-                if lift_name.lower() in exercise_name:
-                    load_str = exercise.get('load', '')
+                load_str = exercise.get('load', '')
+                load_match = re.search(r'([\d\.]+)', load_str)
+                if not load_match:
+                    continue
 
-                    # Parse load (e.g., "96.5 kg" -> 96.5)
-                    load_match = re.search(r'([\d\.]+)', load_str)
-                    if load_match:
-                        load = float(load_match.group(1))
+                load = float(load_match.group(1))
+                if max_load_for_workout is None or load > max_load_for_workout:
+                    max_load_for_workout = load
 
-                        # Track max for this week
-                        if date not in weekly_max or load > weekly_max[date]:
-                            weekly_max[date] = load
+            if max_load_for_workout is not None:
+                weekly_max[unique_key] = max_load_for_workout
 
         # Calculate progression
         if len(weekly_max) >= 2:
-            dates = sorted(weekly_max.keys())
-            starting_load = weekly_max[dates[0]]
-            current_load = weekly_max[dates[-1]]
+            ordered_keys = list(weekly_max.keys())
+            starting_load = weekly_max[ordered_keys[0]]
+            current_load = weekly_max[ordered_keys[-1]]
             
             if starting_load > 0:
                 progression_pct = ((current_load - starting_load) / starting_load) * 100
@@ -118,7 +133,9 @@ class WorkoutAnalytics:
         weekly_volume = defaultdict(float)
 
         for workout in self.historical_data:
-            date = workout.get('date', '')
+            week_key = workout.get('sheet_name') or workout.get('date', '')
+            if not week_key:
+                week_key = "Unknown Week"
 
             for exercise in workout.get('exercises', []):
                 # Parse sets, reps, load
@@ -136,7 +153,7 @@ class WorkoutAnalytics:
                     load = float(load_match.group(1))
 
                     volume = sets * reps * load
-                    weekly_volume[date] += volume
+                    weekly_volume[week_key] += volume
 
         return dict(weekly_volume)
 
