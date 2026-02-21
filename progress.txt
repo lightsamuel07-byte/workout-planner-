@@ -1,4 +1,44 @@
 Progress Snapshot
+Date: 2026-02-21
+
+Current Phase
+- Phase 3 reliability hardening: Fort test-week parser/fidelity compatibility.
+
+Built (Complete)
+- Hardened Fort parser in `src/fort_compiler.py` for one-week testing cycles:
+  - Added section recognition for test-week headers:
+    - `1RM TEST` / `3RM TEST` -> strength work
+    - `TARGETED WARM-UP` -> prep/mobility
+    - `GARAGE ... TEST` and modality benchmark test headers -> conditioning
+    - `MAX PULL UP TEST` / `MAX PUSH-UP TEST` -> strength work
+  - Added conditioning-header anchor seeding so benchmark headers (e.g., `GARAGE - 2K BIKEERG`) are preserved as exercise anchors.
+  - Expanded alias matching for Fort fidelity with canonicalized alias keys:
+    - swap directives like `Split Squat -> Heel-Elevated Goblet Squat` now satisfy anchors such as `DB SPLIT SQUAT` during fidelity checks.
+- Added Fort hardening regression tests in `tests/test_fort_compiler.py`:
+  - test-week section parsing/anchor extraction
+  - split-squat swap alias fidelity behavior
+
+Validation Run
+- `python3 -m unittest tests/test_fort_compiler.py -v` passed (10 tests).
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (32 tests).
+- `python3 -m compileall pages src tests main.py` passed.
+- Targeted parser smoke check against provided `2/23`, `2/25`, `2/27` Fort test-week text:
+  - extracted expected prep/strength/backoff/conditioning/aux sections,
+  - no misclassification of `1RM TEST` as exercise.
+
+In Progress
+- Awaiting live test-week generation run in Streamlit Cloud to confirm end-to-end output quality.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Generate test-week plan with your provided Fort inputs and inspect `AI Generation Summary`.
+2. If unresolved fidelity violations remain, implement deterministic section-specific prescription hydration from parsed Fort set/rep/load rows.
+
+---
+
+Progress Snapshot
 Date: 2026-02-18
 
 Current Phase

@@ -76,6 +76,38 @@ THAW PREP
 ROWERG
 """
 
+TEST_WEEK_SAMPLE = """
+Monday 2.23.26
+Testing Day #1
+PREP
+AIR SQUAT
+JUMP SQUAT
+1RM TEST
+BACK SQUAT
+BACK OFF SETS
+BACK SQUAT
+GARAGE - 2K BIKEERG
+AUXILIARY/RECOVERY
+SINGLE ARM DB ROW
+DB RDL (GLUTE OPTIMIZED)
+"""
+
+TEST_WEEK_SPLIT_SQUAT_SAMPLE = """
+Wednesday 2.25.26
+Testing Day #2
+TARGETED WARM-UP
+CLOSE GRIP PUSH UP
+PLYO PUSH-UP
+1RM TEST
+BENCH PRESS
+BACK OFF SETS
+BENCH PRESS
+GARAGE/UG/UES/WB - 2K ROW TEST
+AUXILIARY/RECOVERY
+DB SPLIT SQUAT
+SLIDER ROLLOUTS
+"""
+
 
 class FortCompilerTests(unittest.TestCase):
     def test_find_first_section_index_skips_narrative_lines(self):
@@ -216,6 +248,67 @@ class FortCompilerTests(unittest.TestCase):
         self.assertNotIn("fort_day_missing", codes)
         self.assertNotIn("fort_missing_anchor", codes)
         self.assertIn("fort_placeholder_prescription", codes)
+
+    def test_parse_fort_day_handles_test_week_headers(self):
+        parsed = parse_fort_day("Monday", TEST_WEEK_SAMPLE)
+        section_ids = [section["section_id"] for section in parsed["sections"]]
+        self.assertIn("prep_mobility", section_ids)
+        self.assertIn("strength_work", section_ids)
+        self.assertIn("strength_backoff", section_ids)
+        self.assertIn("conditioning", section_ids)
+        self.assertIn("auxiliary_hypertrophy", section_ids)
+
+        all_exercises = {
+            exercise
+            for section in parsed["sections"]
+            for exercise in section["exercises"]
+        }
+        self.assertIn("BACK SQUAT", all_exercises)
+        self.assertIn("GARAGE - 2K BIKEERG", all_exercises)
+        self.assertNotIn("1RM TEST", all_exercises)
+        self.assertNotIn("BACK OFF SETS", all_exercises)
+
+    def test_validate_fort_fidelity_handles_split_squat_swap_alias(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": "", "Wednesday": TEST_WEEK_SPLIT_SQUAT_SAMPLE, "Friday": ""}
+        )
+        generated_plan = """## WEDNESDAY
+### A1. Close Grip Push Up
+- 2 x 10 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Primer.
+### A2. Plyo Push-Up
+- 2 x 5 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Primer.
+### C1. Bench Press
+- 1 x 1 @ 90 kg
+- **Rest:** 180 seconds
+- **Notes:** 1RM test.
+### D1. Bench Press
+- 2 x 5 @ 70 kg
+- **Rest:** 120 seconds
+- **Notes:** Back-off sets.
+### F1. 2K Row Test
+- 1 x 1 @ 0 kg
+- **Rest:** None
+- **Notes:** Conditioning test.
+### G1. Heel-Elevated Goblet Squat
+- 3 x 8 @ 24 kg
+- **Rest:** 90 seconds
+- **Notes:** Split squat swap rule applied.
+### G2. Slider Rollouts
+- 3 x 8 @ 0 kg
+- **Rest:** 60 seconds
+- **Notes:** Core.
+"""
+        fidelity = validate_fort_fidelity(
+            generated_plan,
+            metadata,
+            exercise_aliases={"Split Squat": "Heel-Elevated Goblet Squat"},
+        )
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertNotIn("fort_missing_anchor", codes)
 
 
 if __name__ == "__main__":

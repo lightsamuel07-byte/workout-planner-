@@ -15,6 +15,9 @@ SECTION_RULE_DEFS = [
             r"\bREDEMPTION\b",
             r"\bFINISHER\b",
             r"\bCONDITIONING\b",
+            r"\bCONDITIONING\s+TEST\b",
+            r"\bGARAGE\b.*\b(?:ROW|BIKE|BIKEERG|RUN|SKI|ERG|MILE)\b",
+            r"\b(?:\d+\s*K|\d+\s*MILE)\b.*\b(?:ROW|BIKE|BIKEERG|RUN|SKI|ERG)\b.*\bTEST\b",
         ],
     },
     {
@@ -71,6 +74,9 @@ SECTION_RULE_DEFS = [
             r"\bBODYWEIGHT\s+BREAKPOINT\b",
             r"\bBREAKPOINT\b",
             r"\bCAULDRON\b",
+            r"\b(?:1|3)\s*RM\s+TEST\b",
+            r"\bMAX\s+PULL[\s\-]*UP\s+TEST\b",
+            r"\bMAX\s+PUSH[\s\-]*UP\s+TEST\b",
         ],
     },
     {
@@ -81,6 +87,7 @@ SECTION_RULE_DEFS = [
             r"\bIGNITION\b",
             r"\bPREP\b",
             r"\bWARM\s*UP\b",
+            r"\bTARGETED\s+WARM[\s\-]*UP\b",
             r"\bACTIVATION\b",
             r"\bKOT\s+WARM[\s\-]*UP\b",
         ],
@@ -206,6 +213,19 @@ def _is_exercise_candidate(value):
     return True
 
 
+def _should_seed_section_header_as_exercise(section_id, header_line):
+    """
+    Some Fort test-week headers include the benchmark modality itself
+    (e.g., 'GARAGE - 2K BIKEERG') and should be preserved as anchors.
+    """
+    if section_id != "conditioning":
+        return False
+    normalized = _normalize_space(header_line).upper()
+    if "TEST" not in normalized and "GARAGE" not in normalized:
+        return False
+    return bool(re.search(r"\b(ROW|BIKE|BIKEERG|RUN|SKI|ERG|MILE)\b", normalized))
+
+
 def _extract_day_header(lines):
     nonempty = [_normalize_space(line) for line in lines if _normalize_space(line)]
     if not nonempty:
@@ -254,6 +274,8 @@ def parse_fort_day(day_name, workout_text):
                 "raw_header": line,
                 "exercises": [],
             }
+            if _should_seed_section_header_as_exercise(section_rule["section_id"], line):
+                current_section["exercises"].append(line)
             sections.append(current_section)
             continue
 
@@ -395,27 +417,63 @@ def _build_alias_map(exercise_aliases):
         return alias_map
 
     for source, target in exercise_aliases.items():
-        source_norm = _normalize_exercise_name(source)
-        target_norm = _normalize_exercise_name(target)
-        if not source_norm or not target_norm:
+        source_keys = _alias_keys(source)
+        target_keys = _alias_keys(target)
+        if not source_keys or not target_keys:
             continue
-        alias_map.setdefault(source_norm, set()).add(target_norm)
-        alias_map.setdefault(target_norm, set()).add(source_norm)
+        for source_norm in source_keys:
+            for target_norm in target_keys:
+                alias_map.setdefault(source_norm, set()).add(target_norm)
+                alias_map.setdefault(target_norm, set()).add(source_norm)
 
     return alias_map
 
 
+def _canonical_alias_name(value):
+    normalized = _normalize_exercise_name(value)
+    if not normalized:
+        return ""
+
+    # Remove common equipment/modifier tokens that should not block swap matching.
+    normalized = re.sub(r"\b(dumbbell|db)\b", " ", normalized)
+    normalized = re.sub(r"\b(single arm|single|arm)\b", " ", normalized)
+    normalized = re.sub(r"\b(rear foot elevated|rear foot|rear|foot elevated)\b", " ", normalized)
+    normalized = re.sub(r"\b(bulgarian|contralateral|ipsilateral|forward)\b", " ", normalized)
+    normalized = re.sub(r"\s+", " ", normalized).strip()
+    return normalized
+
+
+def _alias_keys(value):
+    normalized = _normalize_exercise_name(value)
+    if not normalized:
+        return set()
+
+    keys = {normalized}
+    canonical = _canonical_alias_name(normalized)
+    if canonical:
+        keys.add(canonical)
+
+    # Ensure split squat families resolve to the same alias bucket.
+    if "split squat" in normalized or "split squat" in canonical:
+        keys.add("split squat")
+
+    return {key for key in keys if key}
+
+
 def _matches_expected_exercise(expected_name, actual_name, alias_map):
-    expected_norm = _normalize_exercise_name(expected_name)
-    actual_norm = _normalize_exercise_name(actual_name)
-    if not expected_norm or not actual_norm:
+    expected_keys = _alias_keys(expected_name)
+    actual_keys = _alias_keys(actual_name)
+    if not expected_keys or not actual_keys:
         return False
 
-    candidates = {expected_norm}
-    candidates.update(alias_map.get(expected_norm, set()))
+    candidates = set(expected_keys)
+    for expected_key in expected_keys:
+        candidates.update(alias_map.get(expected_key, set()))
+
     for candidate in candidates:
-        if candidate == actual_norm or candidate in actual_norm or actual_norm in candidate:
-            return True
+        for actual_key in actual_keys:
+            if candidate == actual_key or candidate in actual_key or actual_key in candidate:
+                return True
     return False
 
 
