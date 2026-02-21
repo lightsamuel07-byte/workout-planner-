@@ -27,6 +27,9 @@ try:
     exercise_history = importlib.import_module('pages.exercise_history')
     workout_logger = importlib.import_module('pages.workout_logger')
     database_status = importlib.import_module('pages.database_status')
+    exercise_encyclopedia = importlib.import_module('pages.exercise_encyclopedia')
+    session_history = importlib.import_module('pages.session_history')
+    progression_tracker = importlib.import_module('pages.progression_tracker')
 
     # Reload modules to pick up code changes (fixes Streamlit Cloud caching)
     importlib.reload(dashboard)
@@ -37,6 +40,9 @@ try:
     importlib.reload(exercise_history)
     importlib.reload(workout_logger)
     importlib.reload(database_status)
+    importlib.reload(exercise_encyclopedia)
+    importlib.reload(session_history)
+    importlib.reload(progression_tracker)
 except ImportError as e:
     st.error(f"Critical error loading pages: {e}")
     st.code(f"Python path: {sys.path}")
@@ -264,6 +270,21 @@ with st.sidebar:
         st.session_state.current_page = 'exercise_history'
         st.rerun()
 
+    if st.button("Encyclopedia", width="stretch", key="nav_encyclopedia",
+                 type="primary" if st.session_state.current_page == 'encyclopedia' else "secondary"):
+        st.session_state.current_page = 'encyclopedia'
+        st.rerun()
+
+    if st.button("Session Browser", width="stretch", key="nav_session_history",
+                 type="primary" if st.session_state.current_page == 'session_history' else "secondary"):
+        st.session_state.current_page = 'session_history'
+        st.rerun()
+
+    if st.button("Progression", width="stretch", key="nav_progression",
+                 type="primary" if st.session_state.current_page == 'progression_tracker' else "secondary"):
+        st.session_state.current_page = 'progression_tracker'
+        st.rerun()
+
     if st.button("DB Status", width="stretch", key="nav_database_status",
                  type="primary" if st.session_state.current_page == 'database_status' else "secondary"):
         st.session_state.current_page = 'database_status'
@@ -379,5 +400,11 @@ elif st.session_state.current_page == 'exercise_history':
     exercise_history.show()
 elif st.session_state.current_page == 'log_workout':
     workout_logger.show()
+elif st.session_state.current_page == 'encyclopedia':
+    exercise_encyclopedia.show()
+elif st.session_state.current_page == 'session_history':
+    session_history.show()
+elif st.session_state.current_page == 'progression_tracker':
+    progression_tracker.show()
 elif st.session_state.current_page == 'database_status':
     database_status.show()

@@ -4,6 +4,8 @@ Validation utilities for generated workout plans.
 
 import re
 
+from src.exercise_normalizer import get_normalizer
+
 
 DAY_RE = re.compile(r"^\s*##\s+([A-Z]+DAY)\b", re.IGNORECASE)
 EXERCISE_RE = re.compile(r"^\s*###\s+[A-Z]\d+\.\s*(.+)$", re.IGNORECASE)
@@ -15,7 +17,7 @@ RANGE_RE = re.compile(r"(\d+)\s*[-–]\s*(\d+)")
 
 
 def _normalize_text(value):
-    return re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).strip()
+    return get_normalizer().canonical_key(value)
 
 
 def _extract_day_name(value):
@@ -81,18 +83,11 @@ def _parse_plan_entries(plan_text):
 
 
 def _is_main_plate_lift(name):
-    value = _normalize_text(name)
-    if _is_db_exercise(name):
-        return False
-    return any(
-        token in value
-        for token in ["back squat", "front squat", "deadlift", "bench press", "chest press"]
-    )
+    return get_normalizer().is_main_plate_lift(name)
 
 
 def _is_db_exercise(name):
-    value = _normalize_text(name)
-    return " db " in f" {value} " or "dumbbell" in value
+    return get_normalizer().is_db_exercise(name)
 
 
 def _identify_triceps_attachment(name):
@@ -274,11 +269,11 @@ def validate_plan(plan_text, progression_directives=None):
         previous_grip = grip
 
     # Enforce hold-lock directives.
+    normalizer = get_normalizer()
     for directive in progression_directives or []:
         if not directive.get("hold_lock"):
             continue
         target_day = _extract_day_name(directive.get("day_name"))
-        target_ex = _normalize_text(directive.get("exercise_name"))
         target_load = directive.get("target_load")
         target_reps = directive.get("target_reps")
         if target_day is None or target_load is None or target_reps is None:
@@ -288,8 +283,7 @@ def validate_plan(plan_text, progression_directives=None):
         for entry in entries:
             if entry["day"] != target_day:
                 continue
-            normalized = entry["normalized_exercise"]
-            if target_ex == normalized or target_ex in normalized or normalized in target_ex:
+            if normalizer.are_same_exercise(directive.get("exercise_name"), entry["exercise"]):
                 match = entry
                 break
 

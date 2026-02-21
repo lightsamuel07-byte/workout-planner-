@@ -5,7 +5,12 @@ Build compact SQLite context for AI workout generation.
 import os
 import sqlite3
 
-from src.workout_db import normalize_exercise_name
+from src.exercise_normalizer import get_normalizer
+
+
+def normalize_exercise_name(name):
+    """Delegate to ExerciseNormalizer for canonical key."""
+    return get_normalizer().canonical_key(name)
 
 
 def _safe_int(value):
@@ -39,6 +44,7 @@ def _source_label(source):
         "fort_anchor": "FORT",
         "prior_supplemental": "PRIOR",
         "db_recent": "HISTORY",
+        "ai_selected": "DB",
     }
     return labels.get(source, "HISTORY")
 
@@ -67,8 +73,8 @@ def _extract_target_exercises(prior_supplemental, max_exercises, fort_compiler_m
     return ordered
 
 
-def _fetch_recent_focus_exercises(conn, exclude_normalized=None, limit=6):
-    """Fallback pool of recent frequently logged exercises with log text."""
+def _fetch_recent_focus_exercises(conn, exclude_normalized=None, limit=8):
+    """Fallback pool of recent frequently logged exercises (with or without log text)."""
     exclude = set(exclude_normalized or set())
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
@@ -81,7 +87,6 @@ def _fetch_recent_focus_exercises(conn, exclude_normalized=None, limit=6):
         FROM exercise_logs el
         JOIN exercises e ON e.id = el.exercise_id
         JOIN workout_sessions ws ON ws.id = el.session_id
-        WHERE COALESCE(TRIM(el.log_text), '') <> ''
         GROUP BY e.id
         ORDER BY
             CASE WHEN MAX(ws.session_date) IS NULL THEN 1 ELSE 0 END,
@@ -110,20 +115,22 @@ def _fetch_recent_focus_exercises(conn, exclude_normalized=None, limit=6):
 
 
 def _fetch_recent_logs_for_exercise(conn, normalized_name, logs_per_exercise):
-    """Get latest logs for one normalized exercise name."""
+    """Get latest logs for one normalized exercise name, including structured prescription data."""
     conn.row_factory = sqlite3.Row
     rows = conn.execute(
         """
         SELECT
             ws.session_date,
             ws.day_label,
+            el.prescribed_sets,
+            el.prescribed_reps,
+            el.prescribed_load,
             el.log_text,
             el.parsed_rpe
         FROM exercise_logs el
         JOIN exercises e ON e.id = el.exercise_id
         JOIN workout_sessions ws ON ws.id = el.session_id
         WHERE e.normalized_name = ?
-          AND COALESCE(TRIM(el.log_text), '') <> ''
         ORDER BY
             CASE WHEN ws.session_date IS NULL THEN 1 ELSE 0 END,
             ws.session_date DESC,
@@ -166,9 +173,9 @@ def build_db_generation_context(
     db_path,
     prior_supplemental=None,
     fort_compiler_meta=None,
-    max_exercises=10,
-    logs_per_exercise=2,
-    max_chars=2200,
+    max_exercises=18,
+    logs_per_exercise=4,
+    max_chars=3800,
 ):
     """
     Build token-efficient longitudinal context from SQLite history.
@@ -200,59 +207,126 @@ def build_db_generation_context(
         if not targets:
             return None
 
-        lines = [
-            "LONGITUDINAL DB CONTEXT (SQLite):",
-            (
-                f"- Snapshot: {summary['exercises']} exercises | {summary['sessions']} sessions | "
-                f"{summary['logs']} logs | RPE coverage {summary['rpe_pct']:.1f}%."
-            ),
-            "- Target exercise logs (Fort anchors + prior supplemental + recent history):",
-        ]
-
-        def _fits_within_budget(candidate_lines):
-            if not max_chars or max_chars <= 0:
-                return True
-            return len("\n".join(candidate_lines)) <= max_chars
-
-        added = 0
-        for target in targets:
-            display_name = target["name"]
-            normalized_name = target["normalized"]
-            recent_logs = _fetch_recent_logs_for_exercise(
-                conn,
-                normalized_name=normalized_name,
-                logs_per_exercise=logs_per_exercise,
-            )
-            if not recent_logs:
-                continue
-
-            compact_entries = []
-            for row in recent_logs:
-                day_or_date = row["session_date"] or row["day_label"] or "Unknown"
-                log_text = _truncate(row["log_text"], limit=85)
-                if row["parsed_rpe"] is not None and "rpe" not in (row["log_text"] or "").lower():
-                    log_text = f"{log_text} | RPE {row['parsed_rpe']:.1f}"
-                compact_entries.append(f"{day_or_date}: {log_text}")
-
-            candidate_line = f"  - {display_name} -> " + " || ".join(compact_entries)
-            source_tag = _source_label(target.get("source"))
-            candidate_line = f"  - [{source_tag}] {display_name} -> " + " || ".join(compact_entries)
-            if not _fits_within_budget(lines + [candidate_line]):
-                lines.append("- Context truncated to stay within prompt budget.")
-                break
-
-            lines.append(candidate_line)
-            added += 1
-
-        if added == 0:
-            lines.append("- Context omitted: prompt budget too small for target exercise log lines.")
-            return "\n".join(lines)
-
-        tail_line = (
-            "- Use this for longer-term trend awareness; selected prior-week sheet remains primary for immediate progression."
-        )
-        if _fits_within_budget(lines + [tail_line]):
-            lines.append(tail_line)
-        return "\n".join(lines)
+        return _build_context_lines(conn, summary, targets, max_chars, logs_per_exercise)
     finally:
         conn.close()
+
+
+def build_targeted_db_context(db_path, exercise_names, logs_per_exercise=4, max_chars=3200):
+    """
+    Build DB context for a specific list of exercise names (from two-pass generation).
+
+    This is called after the AI's exercise-selection pass returns the exercises
+    it plans to use.  Only those exercises get DB history pulled.
+
+    Args:
+        db_path: Path to SQLite database.
+        exercise_names: List of exercise name strings from the AI selection pass.
+        logs_per_exercise: How many recent logs to pull per exercise.
+        max_chars: Token budget for the context block.
+
+    Returns:
+        Compact multiline string or None.
+    """
+    if not db_path or not os.path.exists(db_path) or not exercise_names:
+        return None
+
+    normalizer = get_normalizer()
+    conn = sqlite3.connect(db_path)
+    try:
+        summary = _fetch_global_summary(conn)
+        if not summary:
+            return None
+
+        # Deduplicate and build target list from AI-selected exercise names.
+        seen = set()
+        targets = []
+        for name in exercise_names:
+            name = (name or "").strip()
+            if not name:
+                continue
+            norm = normalizer.canonical_key(name)
+            if not norm or norm in seen:
+                continue
+            seen.add(norm)
+            targets.append({"name": name, "normalized": norm, "source": "ai_selected"})
+
+        if not targets:
+            return None
+
+        return _build_context_lines(conn, summary, targets, max_chars, logs_per_exercise)
+    finally:
+        conn.close()
+
+
+def _build_context_lines(conn, summary, targets, max_chars, logs_per_exercise):
+    """Shared logic for building compact context lines from target exercises."""
+    lines = [
+        "EXERCISE HISTORY FROM DATABASE:",
+        (
+            f"- DB: {summary['exercises']} exercises | {summary['sessions']} sessions | "
+            f"{summary['logs']} logs | RPE coverage {summary['rpe_pct']:.1f}%."
+        ),
+        "- Recent prescription + performance data for selected exercises:",
+    ]
+
+    def _fits_within_budget(candidate_lines):
+        if not max_chars or max_chars <= 0:
+            return True
+        return len("\n".join(candidate_lines)) <= max_chars
+
+    added = 0
+    for target in targets:
+        display_name = target["name"]
+        normalized_name = target["normalized"]
+        recent_logs = _fetch_recent_logs_for_exercise(
+            conn,
+            normalized_name=normalized_name,
+            logs_per_exercise=logs_per_exercise,
+        )
+        if not recent_logs:
+            continue
+
+        compact_entries = []
+        for row in recent_logs:
+            day_or_date = row["session_date"] or row["day_label"] or "Unknown"
+            # Build structured prescription prefix
+            rx_parts = []
+            if row["prescribed_sets"]:
+                rx_parts.append(str(row["prescribed_sets"]).strip())
+            if row["prescribed_reps"]:
+                rx_parts.append(str(row["prescribed_reps"]).strip())
+            if row["prescribed_load"]:
+                rx_parts.append(f"@{str(row['prescribed_load']).strip()}")
+            rx_str = "x".join(rx_parts[:2])
+            if len(rx_parts) >= 3:
+                rx_str = f"{rx_str} {rx_parts[2]}"
+
+            log_text = _truncate(row["log_text"] or "", limit=70)
+            if row["parsed_rpe"] is not None and "rpe" not in (row["log_text"] or "").lower():
+                log_text = f"{log_text} | RPE {row['parsed_rpe']:.1f}" if log_text else f"RPE {row['parsed_rpe']:.1f}"
+
+            entry = f"{day_or_date}: {rx_str}"
+            if log_text:
+                entry = f"{entry} [{log_text}]"
+            compact_entries.append(entry)
+
+        source_tag = _source_label(target.get("source"))
+        candidate_line = f"  - [{source_tag}] {display_name} -> " + " || ".join(compact_entries)
+        if not _fits_within_budget(lines + [candidate_line]):
+            lines.append("- Context truncated to stay within prompt budget.")
+            break
+
+        lines.append(candidate_line)
+        added += 1
+
+    if added == 0:
+        lines.append("- No matching exercise history found in database.")
+        return "\n".join(lines)
+
+    tail_line = (
+        "- Use this for load/rep reference; prior-week sheet remains primary for immediate progression."
+    )
+    if _fits_within_budget(lines + [tail_line]):
+        lines.append(tail_line)
+    return "\n".join(lines)

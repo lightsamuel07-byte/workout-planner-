@@ -103,7 +103,7 @@ class GenerationContextTests(unittest.TestCase):
             )
 
             self.assertIsNotNone(context)
-            self.assertIn("LONGITUDINAL DB CONTEXT", context)
+            self.assertIn("EXERCISE HISTORY FROM DATABASE", context)
             self.assertIn("BACK SQUAT", context)
             self.assertIn("Cable Lateral Raise", context)
             self.assertIn("[FORT]", context)

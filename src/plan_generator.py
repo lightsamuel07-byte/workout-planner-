@@ -3,6 +3,7 @@ AI-powered workout plan generation using Claude API.
 """
 
 import anthropic
+import json
 import os
 import yaml
 import re
@@ -14,6 +15,8 @@ from src.progression_rules import (
 )
 from src.plan_validator import validate_plan
 from src.fort_compiler import repair_plan_fort_anchors, validate_fort_fidelity
+from src.exercise_normalizer import get_normalizer
+from src.generation_context import build_targeted_db_context
 
 
 class PlanGenerator:
@@ -80,6 +83,85 @@ class PlanGenerator:
             swaps_config = yaml.safe_load(f) or {}
         return swaps_config.get('exercise_swaps', {}) or {}
 
+    def _select_supplemental_exercises(
+        self,
+        trainer_workouts,
+        preferences,
+        fort_compiler_context=None,
+        fort_week_constraints=None,
+        progression_directives_block=None,
+    ):
+        """
+        Pass 1: Ask Claude to select exercises for Tue/Thu/Sat.
+
+        Uses a small, cheap prompt (~800 input tokens) and requests a JSON
+        array of exercise names (~200 output tokens).  The result is used
+        to pull targeted DB history before the full generation call.
+
+        Returns:
+            List[str] of exercise names, or empty list on failure.
+        """
+        swaps_block = self._load_exercise_swaps()
+        athlete_config = self._format_athlete_config_compressed()
+
+        fort_block = ""
+        if fort_compiler_context:
+            fort_block = f"\nFORT CONTEXT (Mon/Wed/Fri exercises):\n{fort_compiler_context}\n"
+
+        constraints_block = ""
+        if fort_week_constraints:
+            constraints_block = f"\nFORT WEEK CONSTRAINTS:\n{fort_week_constraints}\n"
+
+        directives_block = ""
+        if progression_directives_block:
+            directives_block = f"\n{progression_directives_block}\n"
+
+        prompt = f"""You are selecting supplemental exercises for Tue/Thu/Sat workout days.
+
+{athlete_config}
+{fort_block}
+{constraints_block}
+{directives_block}
+
+{swaps_block}
+
+{preferences}
+
+TASK: List the exercise names you plan to use for Tuesday, Thursday, and Saturday.
+Include ALL exercises (warm-up, main work, isolation, conditioning).
+Apply exercise swap rules. Respect interference prevention rules.
+
+Return ONLY a JSON array of exercise name strings. No explanation, no markdown.
+Example: ["DB Hammer Curl", "Rope Pressdown", "15 Degree DB Chest Press", ...]
+"""
+
+        summarizer_model = (
+            (self.config.get('claude', {}) or {}).get('summarizer_model')
+            or self.model
+        )
+
+        try:
+            message = self.client.messages.create(
+                model=summarizer_model,
+                max_tokens=400,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            text = (message.content[0].text or "").strip()
+
+            # Parse JSON array from response (handle markdown fencing).
+            if text.startswith("```"):
+                text = re.sub(r"^```\w*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
+                text = text.strip()
+
+            exercises = json.loads(text)
+            if isinstance(exercises, list):
+                return [str(e).strip() for e in exercises if e]
+        except (json.JSONDecodeError, IndexError, Exception) as exc:
+            print(f"  Exercise selection pass failed ({exc}), falling back to full context.")
+
+        return []
+
     def generate_plan(
         self,
         workout_history,
@@ -89,15 +171,22 @@ class PlanGenerator:
         fort_compiler_context=None,
         fort_compiler_meta=None,
         db_context=None,
+        db_path=None,
         prior_supplemental=None,
     ):
         """
         Generate a weekly workout plan using Claude AI.
 
+        Uses two-pass generation when db_path is provided:
+          Pass 1: Claude selects exercises for Tue/Thu/Sat (cheap, ~200 output tokens).
+          DB lookup: Pull history only for selected exercises.
+          Pass 2: Full plan generation with targeted exercise history.
+
         Args:
             workout_history: Formatted string of recent workout history
             trainer_workouts: Formatted string of trainer workouts
             preferences: Formatted string of user preferences
+            db_path: Path to SQLite DB for two-pass targeted context.
 
         Returns:
             Generated workout plan as string
@@ -106,6 +195,26 @@ class PlanGenerator:
 
         progression_directives = build_progression_directives(prior_supplemental)
         directives_block = format_directives_for_prompt(progression_directives)
+
+        # ── Two-pass: exercise selection → targeted DB lookup ───────
+        if db_path and os.path.exists(db_path):
+            selected_exercises = self._select_supplemental_exercises(
+                trainer_workouts=trainer_workouts,
+                preferences=preferences,
+                fort_compiler_context=fort_compiler_context,
+                fort_week_constraints=fort_week_constraints,
+                progression_directives_block=directives_block,
+            )
+            if selected_exercises:
+                targeted_context = build_targeted_db_context(
+                    db_path,
+                    exercise_names=selected_exercises,
+                    logs_per_exercise=4,
+                    max_chars=3200,
+                )
+                if targeted_context:
+                    db_context = targeted_context
+                    print(f"  Two-pass: {len(selected_exercises)} exercises selected, DB context built.")
 
         # Construct the prompt
         prompt = self._build_prompt(
@@ -147,6 +256,7 @@ class PlanGenerator:
                 exercise_aliases=exercise_aliases,
             )
             total_anchor_insertions += anchor_repair.get("inserted", 0)
+            plan = self._canonicalize_exercise_names(plan)
             validation = validate_plan(plan, progression_directives)
             fort_fidelity = validate_fort_fidelity(
                 plan,
@@ -180,6 +290,7 @@ class PlanGenerator:
                     exercise_aliases=exercise_aliases,
                 )
                 total_anchor_insertions += anchor_repair.get("inserted", 0)
+                plan = self._canonicalize_exercise_names(plan)
 
                 validation = validate_plan(plan, progression_directives)
                 fort_fidelity = validate_fort_fidelity(
@@ -458,6 +569,33 @@ PREAMBLE:
         repaired, _ = apply_locked_directives_to_plan(repaired, progression_directives)
         repaired, _, _ = self._validate_no_ranges(repaired, attempt=2)
         return repaired
+
+    def _canonicalize_exercise_names(self, plan_text):
+        """
+        Replace exercise names in the plan with their canonical display forms.
+
+        Parses ### A1. Exercise Name lines and replaces non-canonical names.
+        """
+        if not plan_text:
+            return plan_text
+
+        normalizer = get_normalizer()
+        exercise_header_re = re.compile(r"^(\s*###\s+[A-Z]\d+\.\s*)(.+)$", re.IGNORECASE)
+        lines = plan_text.split("\n")
+
+        for idx, line in enumerate(lines):
+            match = exercise_header_re.match(line)
+            if not match:
+                continue
+
+            prefix = match.group(1)
+            raw_name = match.group(2).strip()
+            canonical = normalizer.canonical_name(raw_name)
+
+            if canonical and canonical != raw_name:
+                lines[idx] = f"{prefix}{canonical}"
+
+        return "\n".join(lines)
 
     def _build_correction_prompt(
         self,

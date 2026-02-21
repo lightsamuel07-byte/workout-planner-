@@ -169,12 +169,14 @@ def main():
         program_context = "\n\nCONTINUING FORT PROGRAM: Maintain the same supplemental workout structure with progressive overload based on prior week's data.\n"
         program_context += f"\n{formatted_prior_supplemental}\n"
 
+    db_path = (config.get('database', {}) or {}).get('path', 'data/workout_history.db')
     plan, explanation, validation_summary = plan_generator.generate_plan(
         workout_history=formatted_history,
         trainer_workouts=formatted_trainer_workouts + program_context,
         preferences="",  # Already included in formatted_trainer_workouts
         fort_compiler_context=fort_compiler_context,
         fort_compiler_meta=fort_compiler_meta,
+        db_path=db_path,
     )
 
     if not plan:

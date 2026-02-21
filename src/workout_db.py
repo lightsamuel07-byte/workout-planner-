@@ -7,11 +7,16 @@ import re
 import sqlite3
 from contextlib import contextmanager
 
+from src.exercise_normalizer import get_normalizer
+
 
 def normalize_exercise_name(name):
-    """Return a stable normalized key for exercise deduplication."""
-    cleaned = re.sub(r'\s+', ' ', (name or '').strip().lower())
-    return cleaned
+    """Return a stable normalized key for exercise deduplication.
+
+    Delegates to ExerciseNormalizer for canonical key computation.
+    Kept as a module-level function for backward compatibility.
+    """
+    return get_normalizer().canonical_key(name)
 
 
 class WorkoutDB:
@@ -86,12 +91,27 @@ class WorkoutDB:
                 UNIQUE(session_id, source_row)
             );
 
+            CREATE TABLE IF NOT EXISTS exercise_aliases (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                raw_name TEXT NOT NULL,
+                canonical_key TEXT NOT NULL,
+                canonical_display TEXT NOT NULL,
+                source TEXT NOT NULL DEFAULT 'auto',
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_exercise_aliases_raw
+                ON exercise_aliases(raw_name);
+            CREATE INDEX IF NOT EXISTS idx_exercise_aliases_canonical
+                ON exercise_aliases(canonical_key);
+
             CREATE INDEX IF NOT EXISTS idx_exercise_logs_session_id ON exercise_logs(session_id);
             CREATE INDEX IF NOT EXISTS idx_exercise_logs_exercise_id ON exercise_logs(exercise_id);
             CREATE INDEX IF NOT EXISTS idx_workout_sessions_date ON workout_sessions(session_date);
             """
         )
         self.conn.commit()
+        self._run_normalizer_migration()
 
     def upsert_exercise(self, exercise_name):
         """Insert or update an exercise and return its id."""
@@ -225,3 +245,91 @@ class WorkoutDB:
             "exercise_logs": int(logs_count),
             "logs_with_rpe": int(with_rpe_count),
         }
+
+    def _run_normalizer_migration(self):
+        """
+        Merge duplicate exercises that now resolve to the same canonical key.
+
+        Re-points exercise_logs to the surviving exercise row and deletes orphans.
+        Safe to run multiple times (idempotent).
+        """
+        normalizer = get_normalizer()
+
+        # Check if migration already ran (version marker)
+        row = self.conn.execute(
+            "SELECT COUNT(*) AS c FROM exercise_aliases"
+        ).fetchone()
+        if row and int(row["c"]) > 0:
+            return  # Already migrated
+
+        rows = self.conn.execute(
+            "SELECT id, name, normalized_name FROM exercises ORDER BY id"
+        ).fetchall()
+        if not rows:
+            return
+
+        # Group exercises by new canonical key
+        canonical_groups = {}  # canonical_key -> [(id, name, old_normalized)]
+        for r in rows:
+            new_key = normalizer.canonical_key(r["name"])
+            canonical_groups.setdefault(new_key, []).append(
+                (int(r["id"]), r["name"], r["normalized_name"])
+            )
+
+        merged_count = 0
+        alias_count = 0
+
+        # Phase 1: register aliases for all exercises
+        for canonical_key, members in canonical_groups.items():
+            for eid, name, old_norm in members:
+                display = normalizer.canonical_name(name)
+                self._register_alias(name, canonical_key, display)
+                alias_count += 1
+
+        # Phase 2: temporarily rename all survivors to avoid UNIQUE collisions
+        # (e.g., "Ab Rollout" old_norm blocks another group's survivor update)
+        for canonical_key, members in canonical_groups.items():
+            survivor_id = members[0][0]
+            survivor_old_norm = members[0][2]
+            if survivor_old_norm != canonical_key:
+                temp_name = f"__migrate__{survivor_id}"
+                self.conn.execute(
+                    "UPDATE exercises SET normalized_name = ? WHERE id = ?",
+                    (temp_name, survivor_id),
+                )
+
+        # Phase 3: delete duplicates (re-point logs first)
+        for canonical_key, members in canonical_groups.items():
+            if len(members) <= 1:
+                continue
+            survivor_id = members[0][0]
+            for eid, name, old_norm in members[1:]:
+                self.conn.execute(
+                    "UPDATE exercise_logs SET exercise_id = ? WHERE exercise_id = ?",
+                    (survivor_id, eid),
+                )
+                self.conn.execute("DELETE FROM exercises WHERE id = ?", (eid,))
+                merged_count += 1
+
+        # Phase 4: set final canonical normalized_name on all survivors
+        for canonical_key, members in canonical_groups.items():
+            survivor_id = members[0][0]
+            display = normalizer.canonical_name(members[0][1])
+            self.conn.execute(
+                "UPDATE exercises SET normalized_name = ?, name = ?, updated_at = datetime('now') WHERE id = ?",
+                (canonical_key, display, survivor_id),
+            )
+
+        self.conn.commit()
+        if merged_count:
+            print(f"  Normalizer migration: merged {merged_count} duplicate exercises, {alias_count} aliases registered.")
+
+    def _register_alias(self, raw_name, canonical_key, canonical_display):
+        """Insert an alias record (ignore if already exists)."""
+        self.conn.execute(
+            """
+            INSERT OR IGNORE INTO exercise_aliases (raw_name, canonical_key, canonical_display, source)
+            VALUES (?, ?, ?, 'auto')
+            """,
+            (raw_name.strip(), canonical_key, canonical_display),
+        )

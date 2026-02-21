@@ -5,6 +5,7 @@ Deterministic progression directives derived from prior-week logs.
 import re
 
 from src.workout_db import normalize_exercise_name
+from src.exercise_normalizer import get_normalizer
 
 
 RPE_VALUE_RE = re.compile(r"\brpe\s*[:=]?\s*(\d+(?:\.\d+)?)\b", re.IGNORECASE)
@@ -200,20 +201,23 @@ def format_load(value):
 
 
 def _normalize_for_match(name):
-    return re.sub(r"[^a-z0-9]+", " ", (name or "").lower()).strip()
+    return get_normalizer().canonical_key(name)
 
 
 def _find_best_directive(day_name, exercise_name, directive_map):
-    key = (_normalize_day_name(day_name), _normalize_for_match(exercise_name))
+    normalizer = get_normalizer()
+    target_day = _normalize_day_name(day_name)
+
+    # Exact canonical key match
+    key = (target_day, normalizer.canonical_key(exercise_name))
     if key in directive_map:
         return directive_map[key]
 
-    target_day = _normalize_day_name(day_name)
-    normalized = _normalize_for_match(exercise_name)
+    # Fuzzy match via normalizer
     for (day_key, exercise_key), directive in directive_map.items():
         if day_key != target_day:
             continue
-        if exercise_key in normalized or normalized in exercise_key:
+        if normalizer.are_same_exercise(exercise_name, directive.get("exercise_name", "")):
             return directive
     return None
 
@@ -232,11 +236,12 @@ def apply_locked_directives_to_plan(plan_text, directives):
     if not locked_directives:
         return plan_text, 0
 
+    normalizer = get_normalizer()
     directive_map = {}
     for directive in locked_directives:
         key = (
             _normalize_day_name(directive.get("day_name")),
-            _normalize_for_match(directive.get("exercise_name")),
+            normalizer.canonical_key(directive.get("exercise_name")),
         )
         directive_map[key] = directive
 

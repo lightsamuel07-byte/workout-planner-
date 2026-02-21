@@ -4,6 +4,8 @@ Program-agnostic Fort workout parsing and deterministic prompt directives.
 
 import re
 
+from src.exercise_normalizer import get_normalizer
+
 
 SECTION_RULE_DEFS = [
     {
@@ -483,6 +485,13 @@ def _alias_keys(value):
 
 
 def _matches_expected_exercise(expected_name, actual_name, alias_map):
+    normalizer = get_normalizer()
+
+    # Primary: use the canonical normalizer
+    if normalizer.are_same_exercise(expected_name, actual_name):
+        return True
+
+    # Fallback: legacy alias map for any swap entries not yet in normalizer
     expected_keys = _alias_keys(expected_name)
     actual_keys = _alias_keys(actual_name)
     if not expected_keys or not actual_keys:
@@ -491,9 +500,6 @@ def _matches_expected_exercise(expected_name, actual_name, alias_map):
     candidates = set(expected_keys)
     for expected_key in expected_keys:
         candidates.update(alias_map.get(expected_key, set()))
-        # Allow source alias prefixes to match variant anchors:
-        # e.g., "Bulgarian Split Squat" alias should match
-        # "Bulgarian Split Squat (Contralateral)" expected anchors.
         for alias_source, alias_targets in alias_map.items():
             if alias_source and alias_source in expected_key:
                 candidates.update(alias_targets)
