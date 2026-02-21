@@ -145,6 +145,7 @@ NON_EXERCISE_PATTERNS = [
     re.compile(r"^REMINDER\b", re.IGNORECASE),
     re.compile(r"^NUMBER\s+OF\s+REPS\b", re.IGNORECASE),
     re.compile(r"^WRITE\s+NOTES\b", re.IGNORECASE),
+    re.compile(r"^HIP\s+CIRCLE\s+IS\s+OPTIONAL\b", re.IGNORECASE),
 ]
 
 
@@ -172,6 +173,11 @@ def _is_narrative_line(value):
 def _match_section_rule(value):
     normalized = _normalize_space(value)
     if not normalized or not _is_mostly_upper(normalized):
+        return None
+    words = normalized.split()
+    if len(words) > 12:
+        return None
+    if normalized.endswith(".") and len(words) > 6:
         return None
 
     for rule in SECTION_RULES:
@@ -282,6 +288,11 @@ def parse_fort_day(day_name, workout_text):
         line = _normalize_space(raw_line)
         if not line:
             continue
+
+        if line.upper().startswith("COMPLETE "):
+            maybe_section = _normalize_space(line[9:])
+            if _match_section_rule(maybe_section):
+                line = maybe_section
 
         section_rule = _match_section_rule(line)
         if section_rule:

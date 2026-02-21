@@ -45,3 +45,22 @@ Harden Fort parsing and generation safeguards so one-week test blocks (1RM/condi
   - targeted parser smoke check against provided 2/23, 2/25, 2/27 input confirms:
     - `1RM TEST` not captured as exercise anchor,
     - strength, back-off, conditioning, and auxiliary sections are extracted with expected anchors.
+
+### Follow-up Hardening (post live output review)
+- Implemented in `src/fort_compiler.py`:
+  - blocked narrative all-caps priority lines from being misclassified as section headers (heading-length/format gating in `_match_section_rule`).
+  - normalized section lines prefixed with `COMPLETE ...` into their canonical header for matching (e.g., `COMPLETE GARAGE - 2K BIKEERG` -> `GARAGE - 2K BIKEERG`).
+  - expanded non-exercise filtering for instruction noise (`Hip Circle is optional`, etc.).
+  - refined alias matching so expected exercise variants can match explicit swap targets without broad canonical overreach.
+- Implemented in `src/plan_generator.py`:
+  - strengthened both generation and correction prompts with explicit forbidden non-exercise rows (`TIPS`, `Rest ...`, `Right into...`, section labels).
+- Added/updated tests in `tests/test_fort_compiler.py`:
+  - `test_parse_fort_day_does_not_treat_priority_narrative_as_section`
+  - `test_parse_fort_day_strips_complete_prefix_from_section_line`
+  - `test_parse_fort_day_filters_instruction_lines_from_anchors`
+  - `test_validate_fort_fidelity_handles_bulgarian_swap_alias_with_variant_suffix`
+- Verification:
+  - `python3 -m unittest tests/test_fort_compiler.py -v` passed (15 tests).
+  - `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (37 tests).
+  - `python3 -m compileall pages src tests main.py` passed.
+  - smoke parsing for test-week snippets confirms no `TIPS`/`Rest`/`Right into` anchors and no `COMPLETE ...` anchor prefixes.

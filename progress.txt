@@ -2,6 +2,42 @@ Progress Snapshot
 Date: 2026-02-21
 
 Current Phase
+- Phase 3 reliability hardening: post-live-output Fort test-week cleanup.
+
+Built (Complete)
+- Addressed live-output parser drift in test-week conversion:
+  - blocked long all-caps narrative lines from section matching in `src/fort_compiler.py`,
+  - stripped `COMPLETE` prefixes from section headers before classification (`COMPLETE GARAGE ...` normalization),
+  - expanded instruction-noise filtering (`TIPS`, `Rest ...`, `Right into...`, `Hip Circle is optional`) so these lines do not become anchors.
+- Improved Fort fidelity alias behavior:
+  - expected variant anchors can match explicit swap alias targets (e.g., Bulgarian split squat variant suffixes),
+  - retained anti-overbroad matching guard.
+- Strengthened generation/correction instructions in `src/plan_generator.py`:
+  - explicitly forbids non-exercise instructional/section text as exercise rows.
+- Expanded parser regression tests in `tests/test_fort_compiler.py` for all above cases.
+
+Validation Run
+- `python3 -m unittest tests/test_fort_compiler.py -v` passed (15 tests).
+- `python3 -m unittest discover -s tests -p "test_*.py" -v` passed (37 tests).
+- `python3 -m compileall pages src tests main.py` passed.
+- Targeted smoke parsing confirmed clean anchor extraction for test-week snippets (no instruction noise rows).
+
+In Progress
+- Awaiting new live generation run after this patch to confirm unresolved violations drop and anchor insertions normalize.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Re-run test-week generation and inspect `AI Generation Summary` and Mon/Wed/Fri rows.
+2. If unresolved violations remain, capture exact violation codes/messages and add code-level deterministic repair for those codes.
+
+---
+
+Progress Snapshot
+Date: 2026-02-21
+
+Current Phase
 - Phase 3 reliability hardening: Fort test-week parser/fidelity compatibility.
 
 Built (Complete)

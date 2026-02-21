@@ -130,6 +130,38 @@ SINGLE ARM DB ROW
 DB RDL (GLUTE OPTIMIZED)
 """
 
+TEST_WEEK_COMPLETE_SECTION_PREFIX_SAMPLE = """
+Monday 2.23.26
+PREP
+AIR SQUAT
+COMPLETE GARAGE - 2K BIKEERG
+"""
+
+TEST_WEEK_PRIORITY_SAMPLE = """
+Monday 2.23.26
+Testing Day #1
+THE PRIORITY IS THE HEAVY SINGLE (OR TRIPLE) AND THE CONDITIONING BENCHMARK. BACK OFF SETS AND AUXILIARY ARE ALL TO BE DONE TIME PERMITTING.
+PREP
+AIR SQUAT
+JUMP SQUAT
+1RM TEST
+BACK SQUAT
+BACK OFF SETS
+BACK SQUAT
+GARAGE - 2K BIKEERG
+AUXILIARY/RECOVERY
+SINGLE ARM DB ROW
+DB RDL (GLUTE OPTIMIZED)
+"""
+
+TEST_WEEK_BULGARIAN_SAMPLE = """
+Friday 2.27.26
+Testing Day #3
+AUXILIARY/RECOVERY
+BULGARIAN SPLIT SQUAT (CONTRALATERAL)
+15° DB BENCH PRESS
+"""
+
 
 class FortCompilerTests(unittest.TestCase):
     def test_find_first_section_index_skips_narrative_lines(self):
@@ -301,6 +333,26 @@ class FortCompilerTests(unittest.TestCase):
         self.assertNotIn("TIPS", all_exercises)
         self.assertNotIn("Rest 2 minutes.", all_exercises)
         self.assertNotIn("Right into...", all_exercises)
+        self.assertNotIn("COMPLETE GARAGE - 2K BIKEERG", all_exercises)
+        self.assertIn("GARAGE - 2K BIKEERG", all_exercises)
+
+    def test_parse_fort_day_strips_complete_prefix_from_section_line(self):
+        parsed = parse_fort_day("Monday", TEST_WEEK_COMPLETE_SECTION_PREFIX_SAMPLE)
+        all_exercises = {
+            exercise
+            for section in parsed["sections"]
+            for exercise in section["exercises"]
+        }
+        self.assertIn("GARAGE - 2K BIKEERG", all_exercises)
+        self.assertNotIn("COMPLETE GARAGE - 2K BIKEERG", all_exercises)
+
+    def test_parse_fort_day_does_not_treat_priority_narrative_as_section(self):
+        parsed = parse_fort_day("Monday", TEST_WEEK_PRIORITY_SAMPLE)
+        section_headers = [section["raw_header"] for section in parsed["sections"]]
+        self.assertNotIn(
+            "THE PRIORITY IS THE HEAVY SINGLE (OR TRIPLE) AND THE CONDITIONING BENCHMARK. BACK OFF SETS AND AUXILIARY ARE ALL TO BE DONE TIME PERMITTING.",
+            section_headers,
+        )
 
     def test_validate_fort_fidelity_handles_split_squat_swap_alias(self):
         _context, metadata = build_fort_compiler_context(
@@ -388,6 +440,28 @@ class FortCompilerTests(unittest.TestCase):
         )
         codes = {violation["code"] for violation in fidelity["violations"]}
         self.assertIn("fort_missing_anchor", codes)
+
+    def test_validate_fort_fidelity_handles_bulgarian_swap_alias_with_variant_suffix(self):
+        _context, metadata = build_fort_compiler_context(
+            {"Monday": "", "Wednesday": "", "Friday": TEST_WEEK_BULGARIAN_SAMPLE}
+        )
+        generated_plan = """## FRIDAY
+### G1. Heel-Elevated Goblet Squat (CONTRALATERAL)
+- 3 x 8 @ 20 kg
+- **Rest:** 90 seconds
+- **Notes:** Split squat swap rule applied.
+### G2. 15° DB Bench Press
+- 3 x 8 @ 26 kg
+- **Rest:** 90 seconds
+- **Notes:** Upper chest.
+"""
+        fidelity = validate_fort_fidelity(
+            generated_plan,
+            metadata,
+            exercise_aliases={"Bulgarian Split Squat": "Heel-Elevated Goblet Squat"},
+        )
+        codes = {violation["code"] for violation in fidelity["violations"]}
+        self.assertNotIn("fort_missing_anchor", codes)
 
 
 if __name__ == "__main__":
