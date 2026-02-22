@@ -1,0 +1,91 @@
+{
+  "generated_at": "2026-02-18T13:29:54.237330",
+  "sheet_count": 8,
+  "aggregate_score": 95.0,
+  "violation_code_counts": {
+    "odd_db_load": 4
+  },
+  "results": [
+    {
+      "sheet_name": "Weekly Plan (292026)",
+      "summary": "Validation: 70 exercises checked, 0 violation(s).",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    },
+    {
+      "sheet_name": "Weekly Plan (2162026)",
+      "summary": "Validation: 70 exercises checked, 0 violation(s).",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    },
+    {
+      "sheet_name": "Weekly Plan (222026)",
+      "summary": "Validation: 70 exercises checked, 4 violation(s).",
+      "violation_count": 4,
+      "score": 60,
+      "violations": [
+        {
+          "code": "odd_db_load",
+          "message": "Odd dumbbell load detected: 13.0 kg",
+          "day": "TUESDAY",
+          "exercise": "Incline DB Curl (Supinated)"
+        },
+        {
+          "code": "odd_db_load",
+          "message": "Odd dumbbell load detected: 21.0 kg",
+          "day": "SATURDAY",
+          "exercise": "Slight Incline DB Press (15-20\u00b0)"
+        },
+        {
+          "code": "odd_db_load",
+          "message": "Odd dumbbell load detected: 11.0 kg",
+          "day": "SATURDAY",
+          "exercise": "DB Lateral Raise"
+        },
+        {
+          "code": "odd_db_load",
+          "message": "Odd dumbbell load detected: 65.0 kg",
+          "day": "SATURDAY",
+          "exercise": "Standing Calf Raise (Smith Machine or DB)"
+        }
+      ]
+    },
+    {
+      "sheet_name": "(Weekly Plan) 1262026",
+      "summary": "Validation: 73 exercises checked, 0 violation(s).",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    },
+    {
+      "sheet_name": "(Weekly Plan) 1182026",
+      "summary": "Validation: no exercises parsed from plan.",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    },
+    {
+      "sheet_name": "(Weekly Plan) 142026",
+      "summary": "Validation: no exercises parsed from plan.",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    },
+    {
+      "sheet_name": "(Weekly Plan) 12282025",
+      "summary": "Validation: 15 exercises checked, 0 violation(s).",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    },
+    {
+      "sheet_name": "(Weekly Plan) 12212025",
+      "summary": "Validation: 13 exercises checked, 0 violation(s).",
+      "violation_count": 0,
+      "score": 100,
+      "violations": []
+    }
+  ]
+}

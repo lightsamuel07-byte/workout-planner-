@@ -1,4 +1,421 @@
 Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite Phase 6/7 hardening: DB rebuild/import parity + UX reliability pass completed.
+
+Built (Complete)
+- Implemented real DB cache rebuild from Google Sheets in native app runtime:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/LiveAppGateway.swift`
+  - `rebuildDatabaseCache()` now scans weekly tabs, parses day workouts, and imports all exercise rows into local DB.
+- Added full-sheet import support for unlogged rows:
+  - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutDatabase.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutSyncService.swift`
+  - `WorkoutSyncSessionInput` now supports `includeEmptyLogs` for rebuild scenarios.
+- Added exercise catalog query for search/autocomplete UX:
+  - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutDatabase.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/LiveAppGateway.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppCoordinator.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppViews.swift`
+- Fixed DB status readiness messaging to use app-config runtime source (not env-only false negatives).
+- Hardened local plan archival naming to avoid filename collisions during repeated runs.
+- Added/updated tests:
+  - `native/SamsWorkoutNative/Tests/WorkoutPersistenceTests/WorkoutPersistenceTests.swift`
+    - include-empty-log import coverage
+    - exercise catalog sorting coverage
+  - `native/SamsWorkoutNative/Tests/WorkoutDesktopAppTests/WorkoutDesktopAppLiveE2ETests.swift`
+    - guarded live test for full history rebuild from Sheets.
+
+Validation Run
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed (`98 tests`, `2 skipped`, `0 failures`).
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests` passed (`2 tests`, `0 failures`).
+  - `testLiveGenerateWriteLogAndSync`: passed (`91.067s`)
+  - `testLiveRebuildImportsPriorHistoryFromSheets`: passed (`5.854s`)
+- `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed; signed app updated.
+
+Live Data Result (after rebuild)
+- Local DB now contains:
+  - `191` exercises
+  - `72` sessions
+  - `842` exercise rows
+  - `667` rows with non-empty logs
+- Example prior exercise present: `Reverse Pec Deck` (`10` rows).
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Optional: add a scoped rebuild mode (e.g., last N weeks) for faster refresh on large sheets.
+2. Optional: add per-sheet import progress in UI during rebuild.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite hardening: live end-to-end generation/write/log path validated after OAuth recovery and Google Sheets URL encoding fix.
+
+Built (Complete)
+- Recovered local OAuth flow by generating a fresh `token.json` (previous refresh token was revoked and returned `invalid_grant`).
+- Fixed Google Sheets range path encoding bug in native integrations:
+  - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/GoogleSheetsClient.swift`
+  - Added a shared range-path encoder that percent-encodes `/` in sheet names for path segments.
+  - Applied to:
+    - `readSheetAtoH(...)`
+    - `clearSheetAtoZ(...)`
+    - `writeRows(...)`
+- Added regression coverage for slash-containing date sheet names:
+  - `native/SamsWorkoutNative/Tests/WorkoutIntegrationsTests/WorkoutIntegrationsTests.swift`
+  - Verifies `%2F` encoding for read, clear, and write request URLs.
+
+Validation Run
+- `python3 test_sheets_connection.py` passed (Google auth + history read).
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --filter WorkoutIntegrationsTests` passed (`17 tests`, `0 failures`).
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed (`95 tests`, `1 skipped`, `0 failures`).
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveGenerateWriteLogAndSync` passed (`1 test`, `0 failures`, `80.185s`).
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Optional: add a one-command OAuth re-consent helper script for faster recovery when Google refresh tokens are revoked.
+2. Optional: run packaged app manual smoke pass (`dist/SamsWorkoutNative.app`) against the same live credentials to confirm UI path parity with test harness.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite post-cutover hardening: OAuth refresh reliability + Anthropic prompt parity uplift completed.
+
+Built (Complete)
+- Added OAuth automatic token refresh support in native integrations:
+  - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/AuthSessionManager.swift`
+  - Reads OAuth token file, checks expiry, refreshes with `refresh_token` flow when needed, and persists updated token/expiry.
+- Wired native app runtime to use refreshed OAuth tokens for all Google Sheets operations:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/LiveAppGateway.swift`
+- Expanded Anthropic generation parity in native runtime:
+  - richer hard-rule prompt (aligned to Python track intent),
+  - progression directives derived from prior supplemental logs,
+  - deterministic repair chain (exercise swaps, even DB loads, hold-lock application, range collapse, Fort anchor repair, canonical names),
+  - correction loop (up to 2 attempts) with validator + Fort fidelity feedback.
+- Added additional persistence read-side context query used for prompt context:
+  - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutDatabase.swift`
+- Added new regression coverage:
+  - OAuth refresh tests in `native/SamsWorkoutNative/Tests/WorkoutIntegrationsTests/WorkoutIntegrationsTests.swift`.
+
+Validation Run
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build` passed.
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed (`93 tests`, `0 failures`).
+- `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed and signed app emitted.
+- Smoke launch check passed:
+  - `open "native/SamsWorkoutNative/dist/SamsWorkoutNative.app"`
+  - running process confirmed: `.../SamsWorkoutNative.app/Contents/MacOS/SamsWorkoutNative`.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Run a live end-to-end session in the packaged app with your real token file + Anthropic key and verify generation/write/log flows against production sheet tabs.
+2. Optional final parity item: implement CLI-equivalent debug utility commands for native track.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite Phase 6/7 completion pass: live runtime wiring + QA hardening + packaged native app launch verification.
+
+Built (Complete)
+- Replaced placeholder runtime with live gateway wiring:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/LiveAppGateway.swift`
+  - Handles Anthropic generation, Fort compiler context/fidelity validation, local plan persistence + archive, Sheets write/archive, logger writes/sync, and GRDB-backed read flows.
+- Extended app model/state + coordinator wiring for live views:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppModels.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppCoordinator.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppViews.swift`
+  - View Plan now loads local-first with Sheets fallback.
+  - Log Workout now loads latest sheet/day, writes canonical logs to Column H, then syncs GRDB.
+  - Progress / Weekly Review / Exercise History / DB Status now surface GRDB-backed metrics.
+- Upgraded native executable entrypoint to real macOS app runtime:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/main.swift`
+  - AppKit window hosting `NativeWorkoutRootView` (no CLI-style placeholder bootstrap).
+- Added persistence read-side query APIs used by native UI:
+  - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutDatabase.swift`
+- Added integrations API coverage for plan tab write/archive and day parsing:
+  - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/GoogleSheetsClient.swift`
+- Added/updated regression tests:
+  - `native/SamsWorkoutNative/Tests/WorkoutIntegrationsTests/WorkoutIntegrationsTests.swift`
+  - `native/SamsWorkoutNative/Tests/WorkoutPersistenceTests/WorkoutPersistenceTests.swift`
+  - `native/SamsWorkoutNative/Tests/WorkoutDesktopAppTests/WorkoutDesktopAppTests.swift` (isolated test config store to avoid host-state leakage).
+- Updated native docs:
+  - `docs/swift_parity_matrix_2026-02-22.md`
+  - `native/SamsWorkoutNative/README.md`
+  - `tasks/todo_2026-02-22_finish-native-cutover.md`
+
+Validation Run
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build` passed.
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed (`91 tests`, `0 failures`).
+- `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed and signed app emitted:
+  - `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`
+- Smoke launch check passed:
+  - `open "native/SamsWorkoutNative/dist/SamsWorkoutNative.app"`
+  - running process confirmed: `.../SamsWorkoutNative.app/Contents/MacOS/SamsWorkoutNative`.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Live-credential verification pass: run Generate/View/Log end-to-end against your real Anthropic + Google token setup from the packaged app.
+2. Optional: add CLI-equivalent debug utility commands for parity matrix final unchecked item.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite finish pass: local app-lock access control + local signed app packaging added on top of Phases 2-5.
+
+Built (Complete)
+- Added local app configuration persistence:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppConfigurationStore.swift`
+- Added local app lock UX/state:
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppModels.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppCoordinator.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppViews.swift`
+- Extended app test coverage for unlock flow:
+  - `native/SamsWorkoutNative/Tests/WorkoutDesktopAppTests/WorkoutDesktopAppTests.swift`
+- Added local signed app packaging script:
+  - `native/SamsWorkoutNative/scripts/build_local_app.sh`
+- Produced signed app artifact:
+  - `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`
+
+Validation Run
+- `cd native/SamsWorkoutNative && swift test` passed (`86 tests`, `0 failures`).
+- `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed and signed app bundle successfully.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Wire remaining live workflow parity items (generate/write/archive, view fallback, logger full flow, analytics pages) from app shell placeholders to production behaviors.
+2. Run Phase 6 QA hardening checklist against real Google Sheets + Anthropic credentials in-app.
+3. Smoke test signed app end-to-end on macOS Tahoe 26.3 and finalize runbook.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite Phases 2-5 execution pass complete (domain, integrations, persistence, and UI shell).
+
+Built (Complete)
+- Phase 2 (`WorkoutCore`) completed:
+  - Added Fort parser/compiler port, fidelity validator, and deterministic anchor repair:
+    - `native/SamsWorkoutNative/Sources/WorkoutCore/FortCompiler.swift`
+  - Added progression rules port:
+    - `native/SamsWorkoutNative/Sources/WorkoutCore/ProgressionRules.swift`
+  - Added parity tests:
+    - `native/SamsWorkoutNative/Tests/WorkoutCoreTests/FortCompilerParityTests.swift`
+    - `native/SamsWorkoutNative/Tests/WorkoutCoreTests/ProgressionRulesParityTests.swift`
+- Phase 3 (`WorkoutIntegrations`) completed:
+  - Added HTTP abstraction + URLSession adapter:
+    - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/HTTPClient.swift`
+  - Added auth/session manager:
+    - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/AuthSessionManager.swift`
+  - Added Google Sheets client (weekly tab parsing, A:H schema enforcement, Column H log batch updates):
+    - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/GoogleSheetsClient.swift`
+  - Added Anthropic messages client:
+    - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/AnthropicClient.swift`
+  - Updated facade wiring:
+    - `native/SamsWorkoutNative/Sources/WorkoutIntegrations/IntegrationsFacade.swift`
+  - Added integration tests:
+    - `native/SamsWorkoutNative/Tests/WorkoutIntegrationsTests/WorkoutIntegrationsTests.swift`
+- Phase 4 (`WorkoutPersistence`) completed:
+  - Added GRDB schema/migration + repositories:
+    - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutDatabase.swift`
+  - Added sync service with day/date inference and RPE coercion:
+    - `native/SamsWorkoutNative/Sources/WorkoutPersistence/WorkoutSyncService.swift`
+  - Added persistence regex helpers:
+    - `native/SamsWorkoutNative/Sources/WorkoutPersistence/RegexUtils.swift`
+  - Updated bootstrap to apply migrations:
+    - `native/SamsWorkoutNative/Sources/WorkoutPersistence/PersistenceBootstrap.swift`
+  - Added persistence tests:
+    - `native/SamsWorkoutNative/Tests/WorkoutPersistenceTests/WorkoutPersistenceTests.swift`
+- Phase 5 (`WorkoutDesktopApp`) completed (SwiftUI shell + page parity views/view models + setup/recovery flow):
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppModels.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppGateway.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppCoordinator.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppViews.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutDesktopApp/main.swift`
+  - Added app tests:
+    - `native/SamsWorkoutNative/Tests/WorkoutDesktopAppTests/WorkoutDesktopAppTests.swift`
+  - Added app test target:
+    - `native/SamsWorkoutNative/Package.swift`
+- Updated phase tracking docs:
+  - `tasks/todo_2026-02-22_phase2-5-execution.md`
+  - `docs/swift_parity_matrix_2026-02-22.md`
+
+Validation Run
+- `cd native/SamsWorkoutNative && swift build` passed.
+- `cd native/SamsWorkoutNative && swift test` passed (`85 tests`, `0 failures`).
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+- Packaging note: SwiftUI view hierarchy is implemented, but the executable entrypoint remains CLI-style in SwiftPM (`main.swift`). Final app launch wiring should be finalized in an Xcode macOS app target for signed `.app` packaging.
+
+Next
+1. Create/attach an Xcode macOS app target that launches `NativeWorkoutRootView` as the true app entrypoint.
+2. Replace in-memory app gateway calls with live integrations + persistence wiring for full runtime parity.
+3. Run Phase 6 QA hardening against end-to-end workflows (generate, view fallback, log + sync, analytics).
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite Phase 2 (Core Domain Port): `ExerciseNormalizer` + `PlanValidator` parity complete in `WorkoutCore`.
+
+Built (Complete)
+- Finalized `WorkoutCore` validator parity implementation:
+  - `native/SamsWorkoutNative/Sources/WorkoutCore/PlanValidator.swift`
+  - `native/SamsWorkoutNative/Sources/WorkoutCore/ExerciseNormalizer.swift` (shared regex helper visibility for module-level reuse).
+- Added Swift parity tests for Python validator behavior:
+  - `native/SamsWorkoutNative/Tests/WorkoutCoreTests/PlanValidatorParityTests.swift`
+  - Coverage includes:
+    - odd dumbbell load violation,
+    - hold-lock violation,
+    - odd DB squat load violation,
+    - no false biceps grip repeat from cross-day note text.
+- Added Phase 2 session plan/review record:
+  - `tasks/todo_2026-02-22_phase2-domain-port.md`
+
+Validation Run
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift build` passed.
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test` passed (`52 tests`, `0 failures`).
+
+In Progress
+- Phase 2 continuation: Fort parser/compiler parity port in `WorkoutCore`.
+
+Blocked
+- No technical blockers.
+- Environment note: global `xcode-select` still needs local admin password, but per-command `DEVELOPER_DIR` override is working.
+
+Next
+1. Port Python Fort parser/compiler logic to Swift (`WorkoutCore`) with deterministic behavior parity.
+2. Add fixture-driven golden tests for Fort parsing/section handling.
+3. Update parity matrix with Fort parser/compiler completion status.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite Phase 1 foundation validated; ready to start Phase 2 core logic port.
+
+Built (Complete)
+- Verified full Xcode installation availability at `/Applications/Xcode.app`.
+- Validated native toolchain commands by using `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer`.
+- Resolved SwiftPM stalled state by running:
+  - `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift package reset`
+- Re-ran native tests successfully:
+  - `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test -v`
+  - Result: `4 tests`, `0 failures`.
+- Updated native workspace operational notes:
+  - `native/SamsWorkoutNative/README.md`
+
+Validation Run
+- `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild -version` -> `Xcode 26.2 (17C52)`
+- `cd native/SamsWorkoutNative && DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test -v` passed.
+
+In Progress
+- None.
+
+Blocked
+- Global developer directory switch still requires local admin password (root).
+- Workaround is active and validated via per-command `DEVELOPER_DIR` override.
+
+Next
+1. Start Phase 2 domain port in `WorkoutCore`:
+   - exercise normalization
+   - plan validation
+2. Add golden fixtures and Swift parity tests against known Python behavior.
+3. Begin Fort parser/compiler port once validator parity is stable.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite kickoff (Phase 0 completed, Phase 1 foundation started).
+
+Built (Complete)
+- Created timestamped native-track canonical docs (no overwrite):
+  - `TECH_STACK_2026-02-22_1018_swift-native.md`
+  - `BACKEND_STRUCTURE_2026-02-22_1018_swift-native.md`
+  - `FRONTEND_GUIDELINES_2026-02-22_1018_swift-native.md`
+  - `IMPLEMENTATION_PLAN_2026-02-22_1018_swift-native.md`
+- Added migration parity matrix:
+  - `docs/swift_parity_matrix_2026-02-22.md`
+- Created formal rewrite session plan:
+  - `tasks/todo_2026-02-22_swift-rewrite.md`
+- Scaffolded native workspace:
+  - `native/SamsWorkoutNative`
+  - Swift package modules: `WorkoutCore`, `WorkoutIntegrations`, `WorkoutPersistence`, `WorkoutDesktopApp`
+  - Test targets scaffolded for each module group.
+- Added native workspace README and environment unblock guidance:
+  - `native/SamsWorkoutNative/README.md`
+
+Validation Run
+- `cd native/SamsWorkoutNative && swift package describe` passed.
+- `cd native/SamsWorkoutNative && swift build` passed.
+- `cd native/SamsWorkoutNative && swift test` failed in current environment:
+  - error: `no such module 'XCTest'`.
+
+In Progress
+- Phase 1 continuation pending full Xcode toolchain activation.
+
+Blocked
+- Native test execution blocked by developer directory/toolchain configuration.
+- Observed environment state:
+  - `xcodebuild` unavailable with active developer dir set to Command Line Tools.
+
+Next
+1. Activate full Xcode developer directory:
+   - `sudo xcode-select -s /Applications/Xcode.app/Contents/Developer`
+2. Open Xcode once to complete first-run setup/license, then rerun:
+   - `cd native/SamsWorkoutNative && swift test`
+3. Start Phase 2 core logic port with golden fixtures (`exercise_normalizer` then `plan_validator`).
+
+---
+
+Progress Snapshot
 Date: 2026-02-21
 
 Current Phase

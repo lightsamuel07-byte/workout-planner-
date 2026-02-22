@@ -71,3 +71,12 @@ Last updated: 2026-02-21
 - New rule: alias canonicalization should be minimal and deterministic; use targeted variant/prefix expansion for expected anchors instead of aggressive token stripping.
 - Correction received: even with better parsing, Fort-day outputs can still include section/instruction rows as exercises if we only do insert-only repair.
 - New rule: deterministic Fort repair must rebuild Fort days from canonical parsed anchors (ordered replace), not just append missing anchors.
+
+## Session Corrections (2026-02-22)
+
+- Correction received: DB Status exposed a "Rebuild DB Cache" action that did not run any importer and left users with sparse history.
+- New rule: any user-facing recovery/maintenance action button must execute the underlying workflow end-to-end (never placeholder status-only handlers).
+- Correction received: DB mode text reported Anthropic readiness from environment only, conflicting with app-config-based runtime behavior.
+- New rule: status surfaces must derive from the same configuration source used by runtime execution paths.
+- Correction received: repeated live runs can collide when archive names rely on deterministic timestamps.
+- New rule: all archival writes must guarantee unique output names (suffix fallback when collision occurs).

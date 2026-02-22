@@ -1,28 +1,29 @@
-# Session Plan - Apple-Style UX Polish (2026-02-06)
+# Session Plan - Bug Scan (2026-02-21)
 
 ## Checklist
 - [x] Confirm this session plan with the user before any code changes.
-- [x] Add Apple-style callout + divider utilities in `assets/styles.css` (no left-border accents, subtle background/border, dark-mode tokens).
-- [x] Normalize remaining accent-heavy callouts to the new classes:
-  - `app.py` sidebar connection status
-  - `pages/generate_plan.py` usage tips + warning blocks
-  - `pages/progress.py` info card
-  - `pages/workout_logger.py` empty/troubleshooting + save-status banners
-  - `pages/view_plans.py` notes blocks
-  - `pages/weekly_review.py` day/status callouts
-- [x] Remove remaining accent underlines in plan exercise headers (use neutral border-light) and reduce shouty uppercase where safe.
-- [x] Update `src/design_system.py` helper(s) only if needed to avoid inline duplication; keep token usage consistent.
-- [x] Create a new timestamped design-system snapshot documenting any new callout tokens or component rules (do not overwrite `DESIGN_SYSTEM.md`).
-- [x] Run validation: `python3 -m compileall app.py pages src`, `python3 -m unittest discover -s tests -p "test_*.py" -v`, `python3 -m streamlit run app.py --server.headless true --server.port 85xx`.
-- [x] Update `progress.txt` with work completed and next steps; fill Review section here.
-- [x] Commit and push to git.
+- [x] Baseline check: inspect git status and identify changed files that may affect bug risk.
+- [x] Run full automated verification suite:
+  - [x] `python3 -m unittest discover -s tests -p "test_*.py" -v`
+  - [x] `python3 -m compileall app.py pages src tests main.py`
+- [x] Run targeted high-risk validations from current progress focus:
+  - [x] Fort parser/compiler tests (`tests/test_fort_compiler.py`) via full suite coverage
+  - [x] Generation-context and validator tests (`tests/test_generation_context.py`, `tests/test_plan_validator.py`) via full suite coverage
+- [x] Perform static bug scan for obvious correctness issues:
+  - [x] fragile exception handling
+  - [x] stale session-state paths
+  - [x] schema assumptions (`A:H`, weekly sheet naming)
+- [x] Produce findings-first report with severity and file/line references.
+- [x] If no bugs found, explicitly state no findings and residual risks/testing gaps.
 
 ## Review (fill in at end of session)
 - Findings:
-  - Replaced left-border callouts with Apple-style neutral callouts across key pages.
-  - Normalized plan header accents to neutral dividers; reduced uppercase emphasis in exercise headers.
-  - Added callout CSS variables for light/dark themes and updated Streamlit message styling to match.
+- Confirmed 4 concrete bugs:
+  - archived weekly tabs are incorrectly included in weekly sheet selection due unanchored regex.
+  - weekly volume metric is computed per-day (not per-week), causing wrong dashboard value.
+  - main-lift progression sorts by raw date label string, producing wrong "current" load.
+  - local markdown plan parser only recognizes uppercase day headers and fails on `## Monday`.
 - Decisions:
-  - Documented new callout utilities in a timestamped design-system snapshot.
+- No production code edits were applied in this scan-only pass.
 - Next steps:
-  - Capture updated screenshots for visual verification.
+- Apply targeted fixes for the 4 findings and add regression tests for regex anchoring, analytics date handling, weekly aggregation, and day-header parsing.
