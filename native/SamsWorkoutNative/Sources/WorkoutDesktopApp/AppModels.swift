@@ -18,6 +18,20 @@ enum DataSourceLabel: String {
     case localCache = "Local DB Cache"
 }
 
+enum StatusSeverity: String, Equatable {
+    case info
+    case success
+    case warning
+    case error
+}
+
+struct StatusBanner: Equatable {
+    let text: String
+    let severity: StatusSeverity
+
+    static let empty = StatusBanner(text: "", severity: .info)
+}
+
 struct SetupState: Equatable {
     var anthropicAPIKey: String = ""
     var spreadsheetID: String = ""
@@ -29,11 +43,20 @@ struct SetupState: Equatable {
         if anthropicAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             errors.append("Anthropic API key is required.")
         }
-        if spreadsheetID.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+        let trimmedSheet = spreadsheetID.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedSheet.isEmpty {
             errors.append("Google Spreadsheet ID is required.")
+        } else if trimmedSheet.range(of: #"^[A-Za-z0-9_-]{20,}$"#, options: .regularExpression) == nil {
+            errors.append("Google Spreadsheet ID format looks invalid. Expected a long alphanumeric string from the Sheets URL.")
         }
         return errors
     }
+}
+
+struct SetupChecklistItem: Equatable, Identifiable {
+    let id: String
+    let title: String
+    let isComplete: Bool
 }
 
 struct PlanGenerationInput: Equatable {
@@ -46,6 +69,46 @@ struct PlanGenerationInput: Equatable {
             !wednesday.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
             !friday.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
+}
+
+struct GenerationReadinessReport: Equatable {
+    let missingDays: [String]
+    let missingHeaders: [String]
+    let lowSignalDays: [String]
+    let duplicatedDayPairs: [String]
+
+    var issues: [String] {
+        var rows: [String] = []
+        if !missingDays.isEmpty {
+            rows.append("Missing day input: \(missingDays.joined(separator: ", ")).")
+        }
+        if !missingHeaders.isEmpty {
+            rows.append("Missing explicit day header in: \(missingHeaders.joined(separator: ", ")).")
+        }
+        if !lowSignalDays.isEmpty {
+            rows.append("Too little signal (<3 non-empty lines): \(lowSignalDays.joined(separator: ", ")).")
+        }
+        rows.append(contentsOf: duplicatedDayPairs)
+        return rows
+    }
+
+    var isReady: Bool {
+        issues.isEmpty
+    }
+
+    var summary: String {
+        if isReady {
+            return "Readiness checks passed."
+        }
+        return issues.joined(separator: " ")
+    }
+
+    static let empty = GenerationReadinessReport(
+        missingDays: [],
+        missingHeaders: [],
+        lowSignalDays: [],
+        duplicatedDayPairs: []
+    )
 }
 
 struct DayPlanSummary: Equatable, Identifiable {
@@ -181,6 +244,20 @@ struct LoggerSessionState: Equatable {
     )
 }
 
+struct LoggerBlockProgress: Equatable, Identifiable {
+    let id: String
+    let block: String
+    let completed: Int
+    let total: Int
+
+    var completionPercent: Double {
+        if total == 0 {
+            return 0
+        }
+        return (Double(completed) / Double(total)) * 100
+    }
+}
+
 struct ProgressSummary: Equatable {
     var completionRateText: String
     var weeklyVolumeText: String
@@ -192,6 +269,114 @@ struct ProgressSummary: Equatable {
         weeklyVolumeText: "Weekly volume: n/a",
         recentLoggedText: "Recent logs: 0",
         sourceText: "Source: Local DB cache"
+    )
+}
+
+enum WeeklyReviewSortMode: String, CaseIterable, Identifiable {
+    case newest = "Newest"
+    case highestCompletion = "Highest Completion"
+    case lowestCompletion = "Lowest Completion"
+    case mostSessions = "Most Sessions"
+
+    var id: String { rawValue }
+}
+
+struct PlanDayStats: Equatable {
+    let exerciseCount: Int
+    let blockCount: Int
+    let estimatedVolumeKG: Double
+
+    static let empty = PlanDayStats(exerciseCount: 0, blockCount: 0, estimatedVolumeKG: 0)
+}
+
+struct ExerciseHistorySummary: Equatable {
+    let entryCount: Int
+    let latestLoad: Double
+    let maxLoad: Double
+    let loadDelta: Double
+    let latestDateISO: String
+
+    static let empty = ExerciseHistorySummary(
+        entryCount: 0,
+        latestLoad: 0,
+        maxLoad: 0,
+        loadDelta: 0,
+        latestDateISO: ""
+    )
+}
+
+struct TopExerciseSummary: Equatable, Identifiable {
+    let id: UUID
+    let exerciseName: String
+    let loggedCount: Int
+    let sessionCount: Int
+
+    init(id: UUID = UUID(), exerciseName: String, loggedCount: Int, sessionCount: Int) {
+        self.id = id
+        self.exerciseName = exerciseName
+        self.loggedCount = loggedCount
+        self.sessionCount = sessionCount
+    }
+}
+
+struct RecentSessionSummary: Equatable, Identifiable {
+    let id: UUID
+    let sheetName: String
+    let dayLabel: String
+    let sessionDateISO: String
+    let loggedRows: Int
+    let totalRows: Int
+
+    init(
+        id: UUID = UUID(),
+        sheetName: String,
+        dayLabel: String,
+        sessionDateISO: String,
+        loggedRows: Int,
+        totalRows: Int
+    ) {
+        self.id = id
+        self.sheetName = sheetName
+        self.dayLabel = dayLabel
+        self.sessionDateISO = sessionDateISO
+        self.loggedRows = loggedRows
+        self.totalRows = totalRows
+    }
+}
+
+struct WeekdayCompletionSummary: Equatable, Identifiable {
+    let id: UUID
+    let dayName: String
+    let loggedRows: Int
+    let totalRows: Int
+
+    init(id: UUID = UUID(), dayName: String, loggedRows: Int, totalRows: Int) {
+        self.id = id
+        self.dayName = dayName
+        self.loggedRows = loggedRows
+        self.totalRows = totalRows
+    }
+}
+
+struct DBHealthSnapshot: Equatable {
+    let exerciseCount: Int
+    let sessionCount: Int
+    let logCount: Int
+    let nonEmptyLogCount: Int
+    let latestSessionDateISO: String
+    let topExercises: [TopExerciseSummary]
+    let recentSessions: [RecentSessionSummary]
+    let weekdayCompletion: [WeekdayCompletionSummary]
+
+    static let empty = DBHealthSnapshot(
+        exerciseCount: 0,
+        sessionCount: 0,
+        logCount: 0,
+        nonEmptyLogCount: 0,
+        latestSessionDateISO: "",
+        topExercises: [],
+        recentSessions: [],
+        weekdayCompletion: []
     )
 }
 

@@ -34,7 +34,16 @@ public struct PlanEntry: Equatable, Sendable {
     }
 }
 
-public struct PlanViolation: Equatable, Sendable {
+/// Common interface for plan and fidelity violations, enabling typed collections
+/// instead of `[Any]` type erasure in the correction loop.
+public protocol ViolationDescribing: Sendable {
+    var code: String { get }
+    var message: String { get }
+    var day: String { get }
+    var exercise: String { get }
+}
+
+public struct PlanViolation: Equatable, Sendable, ViolationDescribing {
     public let code: String
     public let message: String
     public let day: String

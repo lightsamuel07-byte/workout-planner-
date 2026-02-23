@@ -92,7 +92,7 @@ public struct FortCompilerMetadata: Equatable, Sendable {
     }
 }
 
-public struct FortFidelityViolation: Equatable, Sendable {
+public struct FortFidelityViolation: Equatable, Sendable, ViolationDescribing {
     public let code: String
     public let message: String
     public let day: String

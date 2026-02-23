@@ -3,13 +3,36 @@ import WorkoutCore
 import WorkoutIntegrations
 import WorkoutPersistence
 
+final class ThreadSafeBox<T>: @unchecked Sendable {
+    private var value: T
+    private let lock = NSLock()
+
+    init(_ value: T) {
+        self.value = value
+    }
+
+    func get() -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return value
+    }
+
+    func set(_ newValue: T) {
+        lock.lock()
+        defer { lock.unlock() }
+        value = newValue
+    }
+}
+
 enum LiveGatewayError: LocalizedError {
     case setupIncomplete
     case missingSpreadsheetID
+    case invalidSpreadsheetID
     case missingAuthToken
     case noWeeklyPlanSheets
     case noPlanData
     case noWorkoutForToday
+    case dbSyncFailedAfterSheetsWrite(underlyingError: String)
 
     var errorDescription: String? {
         switch self {
@@ -17,6 +40,8 @@ enum LiveGatewayError: LocalizedError {
             return "Setup is incomplete. Add Anthropic API key and Spreadsheet ID first."
         case .missingSpreadsheetID:
             return "Google Spreadsheet ID is required."
+        case .invalidSpreadsheetID:
+            return "Google Spreadsheet ID format is invalid. Expected a 44-character alphanumeric string."
         case .missingAuthToken:
             return "Google auth token is missing. Set a token path in setup and re-auth."
         case .noWeeklyPlanSheets:
@@ -25,29 +50,41 @@ enum LiveGatewayError: LocalizedError {
             return "No plan data was found in local files or Google Sheets."
         case .noWorkoutForToday:
             return "No workout found for today in the latest weekly sheet."
+        case .dbSyncFailedAfterSheetsWrite(let underlyingError):
+            return "Sheets updated but local DB sync failed: \(underlyingError). Try Rebuild DB Cache to re-sync."
         }
     }
 }
 
 struct LiveAppGateway: NativeAppGateway {
+    enum PlanWriteMode {
+        case normal
+        case localOnly
+    }
+
     private let integrations: IntegrationsFacade
     private let configStore: AppConfigurationStore
     private let bootstrap: PersistenceBootstrap
     private let fileManager: FileManager
     private let nowProvider: () -> Date
+    private let planWriteMode: PlanWriteMode
+    private let cachedDatabase: ThreadSafeBox<WorkoutDatabase?>
 
     init(
         integrations: IntegrationsFacade = IntegrationsFacade(),
         configStore: AppConfigurationStore = FileAppConfigurationStore(),
         bootstrap: PersistenceBootstrap = PersistenceBootstrap(),
         fileManager: FileManager = .default,
-        nowProvider: @escaping () -> Date = Date.init
+        nowProvider: @escaping () -> Date = Date.init,
+        planWriteMode: PlanWriteMode = .normal
     ) {
         self.integrations = integrations
         self.configStore = configStore
         self.bootstrap = bootstrap
         self.fileManager = fileManager
         self.nowProvider = nowProvider
+        self.planWriteMode = planWriteMode
+        self.cachedDatabase = ThreadSafeBox(nil)
     }
 
     func initialRoute() -> AppRoute {
@@ -101,7 +138,7 @@ struct LiveAppGateway: NativeAppGateway {
 
         let anthropic = integrations.makeAnthropicClient(
             apiKey: config.anthropicAPIKey,
-            model: "claude-sonnet-4-5",
+            model: "claude-sonnet-4-6",
             maxTokens: 4096
         )
 
@@ -125,7 +162,7 @@ struct LiveAppGateway: NativeAppGateway {
             exerciseAliases: aliases
         )
 
-        var unresolved: [Any] = validation.violations.map { $0 as Any } + fidelity.violations.map { $0 as Any }
+        var unresolved: [any ViolationDescribing] = validation.violations + fidelity.violations
         var correctionAttempts = 0
         while !unresolved.isEmpty, correctionAttempts < 2 {
             let correctionPrompt = buildCorrectionPrompt(
@@ -156,7 +193,7 @@ struct LiveAppGateway: NativeAppGateway {
                 metadata: fortMetadata,
                 exerciseAliases: aliases
             )
-            unresolved = validation.violations.map { $0 as Any } + fidelity.violations.map { $0 as Any }
+            unresolved = validation.violations + fidelity.violations
             correctionAttempts += 1
         }
 
@@ -169,7 +206,8 @@ struct LiveAppGateway: NativeAppGateway {
         Unresolved violations: \(unresolved.count).
         """
 
-        let sheetName = weeklySheetName(referenceDate: nowProvider())
+        let sheetDateGuard = sanitizedSheetReferenceDate(nowProvider())
+        let sheetName = weeklySheetName(referenceDate: sheetDateGuard.date)
         let localFile = try savePlanLocally(
             planText: plan,
             sheetName: sheetName,
@@ -184,23 +222,29 @@ struct LiveAppGateway: NativeAppGateway {
         )
 
         var sheetStatus = "Google Sheets write skipped (auth token unavailable)."
-        if let sheetsClient = try? await makeSheetsClient(config: config) {
-            do {
-                try await sheetsClient.writeWeeklyPlanRows(
-                    sheetName: sheetName,
-                    rows: rows,
-                    archiveExisting: true
-                )
-                sheetStatus = "Google Sheets updated successfully."
-            } catch {
-                sheetStatus = "Google Sheets write failed: \(error.localizedDescription)"
+        switch planWriteMode {
+        case .normal:
+            if let sheetsClient = try? await makeSheetsClient(config: config) {
+                do {
+                    try await sheetsClient.writeWeeklyPlanRows(
+                        sheetName: sheetName,
+                        rows: rows,
+                        archiveExisting: true
+                    )
+                    sheetStatus = "Google Sheets updated successfully."
+                } catch {
+                    sheetStatus = "Google Sheets write failed: \(error.localizedDescription)"
+                }
             }
+        case .localOnly:
+            sheetStatus = "Google Sheets write skipped (local-only mode)."
         }
 
         return """
         Generated \(sheetName).
         Local file: \(localFile.lastPathComponent)
         \(sheetStatus)
+        Date guard: \(sheetDateGuard.wasSanitized ? "Applied (far-future/past date replaced with current week)." : "Not needed.")
         Validation: \(validationSummary)
         Fort fidelity: \(fidelity.summary)
         """
@@ -251,13 +295,15 @@ struct LiveAppGateway: NativeAppGateway {
             throw LiveGatewayError.noWeeklyPlanSheets
         }
 
+        // Build into a temporary DB, then swap atomically to prevent partial rebuilds.
         let dbPath = try workoutDatabasePath()
-        if fileManager.fileExists(atPath: dbPath) {
-            try fileManager.removeItem(atPath: dbPath)
+        let tempPath = dbPath + ".rebuild_tmp"
+        if fileManager.fileExists(atPath: tempPath) {
+            try fileManager.removeItem(atPath: tempPath)
         }
 
-        let database = try openDatabase()
-        let syncService = WorkoutSyncService(database: database)
+        let tempDatabase = try bootstrap.makeWorkoutDatabase(at: tempPath)
+        let syncService = WorkoutSyncService(database: tempDatabase)
 
         var daySessionsImported = 0
         var exerciseRowsImported = 0
@@ -307,7 +353,15 @@ struct LiveAppGateway: NativeAppGateway {
             }
         }
 
-        let summary = try database.countSummary()
+        let summary = try tempDatabase.countSummary()
+
+        // Atomic swap: invalidate cached DB, replace old file with completed temp DB.
+        invalidateDBCache()
+        if fileManager.fileExists(atPath: dbPath) {
+            try fileManager.removeItem(atPath: dbPath)
+        }
+        try fileManager.moveItem(atPath: tempPath, toPath: dbPath)
+
         return DBRebuildReport(
             weeklySheetsScanned: weeklySheets.count,
             daySessionsImported: daySessionsImported,
@@ -327,21 +381,21 @@ struct LiveAppGateway: NativeAppGateway {
         let config = try requireSheetsSetup()
         let sheetsClient = try await makeSheetsClient(config: config)
         let sheetNames = try await sheetsClient.fetchSheetNames()
-        guard let mostRecent = GoogleSheetsClient.mostRecentWeeklyPlanSheet(sheetNames) else {
+        guard let preferredSheet = preferredWeeklyPlanSheetName(sheetNames) else {
             throw LiveGatewayError.noWeeklyPlanSheets
         }
 
-        let values = try await sheetsClient.readSheetAtoH(sheetName: mostRecent)
+        let values = try await sheetsClient.readSheetAtoH(sheetName: preferredSheet)
         let days = sheetDaysToPlanDays(values: values, source: .googleSheets)
         guard !days.isEmpty else {
             throw LiveGatewayError.noPlanData
         }
 
         return PlanSnapshot(
-            title: mostRecent,
+            title: normalizedPlanTitle(preferredSheet),
             source: .googleSheets,
             days: days,
-            summary: "Loaded from Google Sheets fallback."
+            summary: normalizedPlanSummary("Loaded from Google Sheets fallback.")
         )
     }
 
@@ -349,18 +403,18 @@ struct LiveAppGateway: NativeAppGateway {
         let config = try requireSheetsSetup()
         let sheetsClient = try await makeSheetsClient(config: config)
         let sheetNames = try await sheetsClient.fetchSheetNames()
-        guard let mostRecent = GoogleSheetsClient.mostRecentWeeklyPlanSheet(sheetNames) else {
+        guard let preferredSheet = preferredWeeklyPlanSheetName(sheetNames) else {
             throw LiveGatewayError.noWeeklyPlanSheets
         }
 
-        let values = try await sheetsClient.readSheetAtoH(sheetName: mostRecent)
+        let values = try await sheetsClient.readSheetAtoH(sheetName: preferredSheet)
         let workouts = GoogleSheetsClient.parseDayWorkouts(values: values)
         guard !workouts.isEmpty else {
             throw LiveGatewayError.noPlanData
         }
 
         let todayName = dayName(for: nowProvider())
-        let selected = workouts.first(where: { $0.dayName.caseInsensitiveCompare(todayName) == .orderedSame }) ?? workouts.first
+        let selected = Self.selectLoggerWorkout(workouts: workouts, todayName: todayName)
         guard let selected else {
             throw LiveGatewayError.noWorkoutForToday
         }
@@ -384,7 +438,7 @@ struct LiveAppGateway: NativeAppGateway {
         }
 
         return LoggerSessionState(
-            sheetName: mostRecent,
+            sheetName: preferredSheet,
             dayLabel: selected.dayLabel,
             source: .googleSheets,
             drafts: drafts
@@ -434,16 +488,22 @@ struct LiveAppGateway: NativeAppGateway {
         }
 
         let fallbackDayName = GoogleSheetsClient.dayNameFromLabel(session.dayLabel) ?? dayName(for: nowProvider())
-        let syncService = try makeSyncService()
-        return try syncService.sync(
-            input: WorkoutSyncSessionInput(
-                sheetName: session.sheetName,
-                dayLabel: session.dayLabel,
-                fallbackDayName: fallbackDayName,
-                fallbackDateISO: isoDate(nowProvider()),
-                entries: syncEntries
+        do {
+            let syncService = try makeSyncService()
+            return try syncService.sync(
+                input: WorkoutSyncSessionInput(
+                    sheetName: session.sheetName,
+                    dayLabel: session.dayLabel,
+                    fallbackDayName: fallbackDayName,
+                    fallbackDateISO: isoDate(nowProvider()),
+                    entries: syncEntries
+                )
             )
-        )
+        } catch {
+            // Sheets write succeeded but DB sync failed. Surface the inconsistency
+            // rather than silently losing the local cache update.
+            throw LiveGatewayError.dbSyncFailedAfterSheetsWrite(underlyingError: error.localizedDescription)
+        }
     }
 
     func loadProgressSummary() -> ProgressSummary {
@@ -486,6 +546,68 @@ struct LiveAppGateway: NativeAppGateway {
             )
         }
     }
+
+    func loadTopExercises(limit: Int = 5) -> [TopExerciseSummary] {
+        guard let database = try? openDatabase(),
+              let summaries = try? database.fetchTopExerciseSummaries(limit: limit)
+        else {
+            return []
+        }
+
+        return summaries.map { row in
+            TopExerciseSummary(
+                exerciseName: row.exerciseName,
+                loggedCount: row.loggedCount,
+                sessionCount: row.sessionCount
+            )
+        }
+    }
+
+    func loadRecentSessions(limit: Int = 8) -> [RecentSessionSummary] {
+        guard let database = try? openDatabase(),
+              let summaries = try? database.fetchRecentSessionSummaries(limit: limit)
+        else {
+            return []
+        }
+
+        return summaries.map { row in
+            RecentSessionSummary(
+                sheetName: row.sheetName,
+                dayLabel: row.dayLabel,
+                sessionDateISO: row.sessionDateISO,
+                loggedRows: row.loggedRows,
+                totalRows: row.totalRows
+            )
+        }
+    }
+
+    func loadDBHealthSnapshot() -> DBHealthSnapshot {
+        guard let database = try? openDatabase(),
+              let health = try? database.fetchDBHealthSnapshot()
+        else {
+            return .empty
+        }
+
+        let weekdayCompletionRows = (try? database.fetchCompletionByWeekday()) ?? []
+        let weekdayCompletion = weekdayCompletionRows.map { row in
+            WeekdayCompletionSummary(
+                dayName: row.dayName,
+                loggedRows: row.loggedRows,
+                totalRows: row.totalRows
+            )
+        }
+
+        return DBHealthSnapshot(
+            exerciseCount: health.exerciseCount,
+            sessionCount: health.sessionCount,
+            logCount: health.logCount,
+            nonEmptyLogCount: health.nonEmptyLogCount,
+            latestSessionDateISO: health.latestSessionDateISO,
+            topExercises: loadTopExercises(limit: 5),
+            recentSessions: loadRecentSessions(limit: 8),
+            weekdayCompletion: weekdayCompletion
+        )
+    }
 }
 
 private extension LiveAppGateway {
@@ -516,6 +638,9 @@ private extension LiveAppGateway {
         if key.isEmpty || sheet.isEmpty {
             throw LiveGatewayError.setupIncomplete
         }
+        if !Self.isValidSpreadsheetID(sheet) {
+            throw LiveGatewayError.invalidSpreadsheetID
+        }
         return config
     }
 
@@ -525,7 +650,16 @@ private extension LiveAppGateway {
         if sheet.isEmpty {
             throw LiveGatewayError.missingSpreadsheetID
         }
+        if !Self.isValidSpreadsheetID(sheet) {
+            throw LiveGatewayError.invalidSpreadsheetID
+        }
         return config
+    }
+
+    static func isValidSpreadsheetID(_ value: String) -> Bool {
+        // Google Spreadsheet IDs are typically 44 characters of alphanumeric, hyphens, and underscores.
+        let pattern = #"^[A-Za-z0-9_-]{20,}$"#
+        return value.range(of: pattern, options: .regularExpression) != nil
     }
 
     func modeStatusText(config: NativeAppConfiguration) -> String {
@@ -570,7 +704,16 @@ private extension LiveAppGateway {
     }
 
     func openDatabase() throws -> WorkoutDatabase {
-        try bootstrap.makeWorkoutDatabase(at: workoutDatabasePath())
+        if let existing = cachedDatabase.get() {
+            return existing
+        }
+        let db = try bootstrap.makeWorkoutDatabase(at: workoutDatabasePath())
+        cachedDatabase.set(db)
+        return db
+    }
+
+    func invalidateDBCache() {
+        cachedDatabase.set(nil)
     }
 
     func makeSyncService() throws -> WorkoutSyncService {
@@ -633,11 +776,25 @@ private extension LiveAppGateway {
         return token
     }
 
+    func sanitizedSheetReferenceDate(_ referenceDate: Date) -> (date: Date, wasSanitized: Bool) {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let now = nowProvider()
+        let currentYear = calendar.component(.year, from: now)
+        let referenceYear = calendar.component(.year, from: referenceDate)
+        let yearDelta = abs(referenceYear - currentYear)
+        if yearDelta > 2 {
+            return (now, true)
+        }
+        return (referenceDate, false)
+    }
+
     func weeklySheetName(referenceDate: Date) -> String {
+        let safeReference = sanitizedSheetReferenceDate(referenceDate).date
         let calendar = Calendar(identifier: .gregorian)
-        let weekday = calendar.component(.weekday, from: referenceDate)
+        let weekday = calendar.component(.weekday, from: safeReference)
         let mondayOffset = (weekday + 5) % 7
-        let monday = calendar.date(byAdding: .day, value: -mondayOffset, to: referenceDate) ?? referenceDate
+        let monday = calendar.date(byAdding: .day, value: -mondayOffset, to: safeReference) ?? safeReference
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -707,18 +864,12 @@ private extension LiveAppGateway {
 
     func buildCorrectionPrompt(
         plan: String,
-        unresolvedViolations: [Any],
+        unresolvedViolations: [any ViolationDescribing],
         fortCompilerContext: String,
         fortFidelitySummary: String
     ) -> String {
         let rendered = unresolvedViolations.prefix(20).map { violation -> String in
-            if let planViolation = violation as? PlanViolation {
-                return "- \(planViolation.code) | \(planViolation.day) | \(planViolation.exercise) | \(planViolation.message)"
-            }
-            if let fidelityViolation = violation as? FortFidelityViolation {
-                return "- \(fidelityViolation.code) | \(fidelityViolation.day) | \(fidelityViolation.exercise) | \(fidelityViolation.message)"
-            }
-            return "- unknown_violation"
+            "- \(violation.code) | \(violation.day) | \(violation.exercise) | \(violation.message)"
         }.joined(separator: "\n")
 
         return """
@@ -753,11 +904,11 @@ private extension LiveAppGateway {
         }
 
         let sheetNames = try await sheetsClient.fetchSheetNames()
-        guard let mostRecent = GoogleSheetsClient.mostRecentWeeklyPlanSheet(sheetNames) else {
+        guard let preferredSheet = preferredWeeklyPlanSheetName(sheetNames) else {
             return [:]
         }
 
-        let values = try await sheetsClient.readSheetAtoH(sheetName: mostRecent)
+        let values = try await sheetsClient.readSheetAtoH(sheetName: preferredSheet)
         let supplemental = GoogleSheetsClient.parseSupplementalWorkouts(values: values)
         var output: [String: [PriorSupplementalExercise]] = [:]
         for day in ["Tuesday", "Thursday", "Saturday"] {
@@ -1078,22 +1229,46 @@ private extension LiveAppGateway {
             let name = url.lastPathComponent.lowercased()
             return name.hasPrefix("workout_plan_") && name.hasSuffix(".md") && !name.contains("_summary")
         }
+
+        let datedCandidates = planFiles.compactMap { url -> (URL, Date)? in
+            guard let date = Self.parseLocalPlanDate(from: url.lastPathComponent) else {
+                return nil
+            }
+            return (url, date)
+        }
+
+        if let preferredLocal = Self.preferredCandidate(
+            datedCandidates,
+            referenceDate: nowProvider(),
+            nearWindowDays: 35,
+            fallbackToMostRecent: false
+        )?.0 {
+            let text = try String(contentsOf: preferredLocal, encoding: .utf8)
+            let days = markdownDaysToPlanDays(planText: text, source: .localCache)
+            return PlanSnapshot(
+                title: normalizedPlanTitle(preferredLocal.lastPathComponent),
+                source: .localCache,
+                days: days,
+                summary: normalizedPlanSummary("Loaded from local markdown artifact.")
+            )
+        }
+
         let sorted = planFiles.sorted { lhs, rhs in
             let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
             return lhsDate > rhsDate
         }
-        guard let latest = sorted.first else {
+        guard datedCandidates.isEmpty, let latest = sorted.first else {
             throw LiveGatewayError.noPlanData
         }
 
         let text = try String(contentsOf: latest, encoding: .utf8)
         let days = markdownDaysToPlanDays(planText: text, source: .localCache)
         return PlanSnapshot(
-            title: latest.lastPathComponent,
+            title: normalizedPlanTitle(latest.lastPathComponent),
             source: .localCache,
             days: days,
-            summary: "Loaded from local markdown artifact."
+            summary: normalizedPlanSummary("Loaded from local markdown artifact.")
         )
     }
 
@@ -1103,6 +1278,91 @@ private extension LiveAppGateway {
             .replacingOccurrences(of: "[^a-z0-9]+", with: "_", options: .regularExpression)
             .trimmingCharacters(in: CharacterSet(charactersIn: "_"))
         return "workout_plan_\(slug).md"
+    }
+
+    func preferredWeeklyPlanSheetName(_ sheetNames: [String]) -> String? {
+        Self.preferredWeeklyPlanSheetName(sheetNames, referenceDate: nowProvider())
+    }
+
+    static func preferredWeeklyPlanSheetName(_ sheetNames: [String], referenceDate: Date) -> String? {
+        let candidates = sheetNames.compactMap { name -> (String, Date)? in
+            guard let date = GoogleSheetsClient.parseWeeklyPlanSheetDate(name) else {
+                return nil
+            }
+            return (name, date)
+        }
+
+        return preferredCandidate(
+            candidates,
+            referenceDate: referenceDate,
+            nearWindowDays: 35,
+            fallbackToMostRecent: true
+        )?.0
+    }
+
+    static func parseLocalPlanDate(from fileName: String) -> Date? {
+        let pattern = #"^workout_plan_weekly_plan_(\d{1,2})_(\d{1,2})_(\d{4})\.md$"#
+        guard let regex = try? NSRegularExpression(pattern: pattern),
+              let match = regex.firstMatch(in: fileName, range: NSRange(fileName.startIndex..<fileName.endIndex, in: fileName)),
+              let monthRange = Range(match.range(at: 1), in: fileName),
+              let dayRange = Range(match.range(at: 2), in: fileName),
+              let yearRange = Range(match.range(at: 3), in: fileName),
+              let month = Int(fileName[monthRange]),
+              let day = Int(fileName[dayRange]),
+              let year = Int(fileName[yearRange])
+        else {
+            return nil
+        }
+
+        var components = DateComponents()
+        components.calendar = Calendar(identifier: .gregorian)
+        components.timeZone = TimeZone(secondsFromGMT: 0)
+        components.year = year
+        components.month = month
+        components.day = day
+        return components.date
+    }
+
+    static func preferredCandidate<T>(
+        _ candidates: [(T, Date)],
+        referenceDate: Date,
+        nearWindowDays: Int,
+        fallbackToMostRecent: Bool
+    ) -> (T, Date)? {
+        guard !candidates.isEmpty else {
+            return nil
+        }
+
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0) ?? .current
+        let referenceDay = calendar.startOfDay(for: referenceDate)
+        let maxDistance = TimeInterval(nearWindowDays * 86_400)
+
+        let scored = candidates.map { candidate -> (T, Date, TimeInterval, Bool) in
+            let candidateDay = calendar.startOfDay(for: candidate.1)
+            let distance = abs(candidateDay.timeIntervalSince(referenceDay))
+            let isFutureOrToday = candidateDay >= referenceDay
+            return (candidate.0, candidate.1, distance, isFutureOrToday)
+        }
+
+        let nearby = scored.filter { $0.2 <= maxDistance }
+        if let preferred = nearby.sorted(by: { lhs, rhs in
+            if lhs.2 != rhs.2 {
+                return lhs.2 < rhs.2
+            }
+            if lhs.3 != rhs.3 {
+                return lhs.3 && !rhs.3
+            }
+            return lhs.1 > rhs.1
+        }).first {
+            return (preferred.0, preferred.1)
+        }
+
+        guard fallbackToMostRecent else {
+            return nil
+        }
+
+        return candidates.sorted(by: { $0.1 < $1.1 }).last
     }
 
     func makeSheetRows(planText: String, validationSummary: String, fidelitySummary: String) -> [[String]] {
@@ -1296,12 +1556,28 @@ private extension LiveAppGateway {
                 rpe = part.replacingOccurrences(of: "RPE", with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespaces)
             } else if lower.hasPrefix("notes:") {
                 notes = part.replacingOccurrences(of: "Notes:", with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespaces)
+            } else if lower.hasPrefix("note:") {
+                notes = part.replacingOccurrences(of: "Note:", with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespaces)
             } else if performance.isEmpty {
                 performance = part
             }
         }
 
         return (performance, rpe, notes)
+    }
+
+    static func selectLoggerWorkout(workouts: [SheetDayWorkout], todayName: String) -> SheetDayWorkout? {
+        if let todayNonEmpty = workouts.first(where: {
+            $0.dayName.caseInsensitiveCompare(todayName) == .orderedSame && !$0.exercises.isEmpty
+        }) {
+            return todayNonEmpty
+        }
+
+        if let firstNonEmpty = workouts.first(where: { !$0.exercises.isEmpty }) {
+            return firstNonEmpty
+        }
+
+        return workouts.first(where: { $0.dayName.caseInsensitiveCompare(todayName) == .orderedSame }) ?? workouts.first
     }
 
     func dayName(for date: Date) -> String {
@@ -1354,5 +1630,54 @@ private extension LiveAppGateway {
             }
         }
         return captures
+    }
+
+    func normalizedPlanTitle(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func normalizedPlanSummary(_ raw: String) -> String {
+        normalizedPlanTitle(raw)
+    }
+}
+
+extension LiveAppGateway {
+    static func testPreferredWeeklyPlanSheetName(_ sheetNames: [String], referenceDate: Date) -> String? {
+        preferredWeeklyPlanSheetName(sheetNames, referenceDate: referenceDate)
+    }
+
+    static func testPreferredCandidate(
+        _ candidates: [(String, Date)],
+        referenceDate: Date,
+        nearWindowDays: Int,
+        fallbackToMostRecent: Bool
+    ) -> (String, Date)? {
+        preferredCandidate(
+            candidates,
+            referenceDate: referenceDate,
+            nearWindowDays: nearWindowDays,
+            fallbackToMostRecent: fallbackToMostRecent
+        )
+    }
+
+    static func testParseLocalPlanDate(from fileName: String) -> Date? {
+        parseLocalPlanDate(from: fileName)
+    }
+
+    static func testParseExistingLog(_ raw: String) -> (String, String, String) {
+        let parsed = parseExistingLog(raw)
+        return (parsed.performance, parsed.rpe, parsed.notes)
+    }
+
+    static func testSelectLoggerWorkout(_ workouts: [SheetDayWorkout], todayName: String) -> SheetDayWorkout? {
+        selectLoggerWorkout(workouts: workouts, todayName: todayName)
+    }
+
+    static func testSanitizedSheetReferenceDate(referenceDate: Date, nowDate: Date) -> (Date, Bool) {
+        let gateway = LiveAppGateway(nowProvider: { nowDate }, planWriteMode: .localOnly)
+        let result = gateway.sanitizedSheetReferenceDate(referenceDate)
+        return (result.date, result.wasSanitized)
     }
 }

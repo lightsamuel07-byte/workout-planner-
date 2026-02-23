@@ -324,7 +324,7 @@ final class WorkoutIntegrationsTests: XCTestCase {
         let mock = MockHTTPClient()
         let responseJSON = """
         {
-          "model": "claude-sonnet-4-5",
+          "model": "claude-sonnet-4-6",
           "stop_reason": "end_turn",
           "content": [
             {"type": "text", "text": "## MONDAY\\n### A1. Back Squat"}
@@ -336,14 +336,14 @@ final class WorkoutIntegrationsTests: XCTestCase {
 
         let client = AnthropicClient(
             apiKey: "api_test",
-            model: "claude-sonnet-4-5",
+            model: "claude-sonnet-4-6",
             maxTokens: 2048,
             httpClient: mock
         )
 
         let result = try await client.generatePlan(systemPrompt: "system", userPrompt: "user")
         XCTAssertTrue(result.text.contains("## MONDAY"))
-        XCTAssertEqual(result.model, "claude-sonnet-4-5")
+        XCTAssertEqual(result.model, "claude-sonnet-4-6")
 
         let request = await mock.latestRequest()
         XCTAssertEqual(request?.method, "POST")

@@ -92,6 +92,30 @@ public struct AuthSessionManager: Sendable {
         httpClient: HTTPClient = URLSessionHTTPClient()
     ) async throws -> String {
         let fileURL = URL(fileURLWithPath: tokenFilePath)
+        let fileDescriptor = open(tokenFilePath, O_RDWR)
+        guard fileDescriptor >= 0 else {
+            // Fall back to non-locking read if we can't open for locking.
+            return try await resolveOAuthAccessTokenUnlocked(
+                fileURL: fileURL, now: now, refreshSkewSeconds: refreshSkewSeconds, httpClient: httpClient
+            )
+        }
+        defer { close(fileDescriptor) }
+
+        // Acquire an exclusive file lock to prevent concurrent token refreshes.
+        flock(fileDescriptor, LOCK_EX)
+        defer { flock(fileDescriptor, LOCK_UN) }
+
+        return try await resolveOAuthAccessTokenUnlocked(
+            fileURL: fileURL, now: now, refreshSkewSeconds: refreshSkewSeconds, httpClient: httpClient
+        )
+    }
+
+    private func resolveOAuthAccessTokenUnlocked(
+        fileURL: URL,
+        now: Date,
+        refreshSkewSeconds: TimeInterval,
+        httpClient: HTTPClient
+    ) async throws -> String {
         let data = try Data(contentsOf: fileURL)
         guard var payload = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw AuthSessionError.invalidTokenFile
