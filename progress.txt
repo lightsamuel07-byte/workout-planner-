@@ -2,6 +2,48 @@ Progress Snapshot
 Date: 2026-02-22
 
 Current Phase
+- Swift Native Rewrite Phase 6/7 hardening continuation: Batch 2 (`25 UX + 25 backend`) shipped and validated.
+
+Built (Complete)
+- Shipped Batch 2 coordinator/model/UI improvements for setup readiness, generation preflight, plan navigation ordering, logger filtering/progress, history empty-state messaging, and DB status readability:
+  - `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppModels.swift`
+  - `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppCoordinator.swift`
+  - `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppViews.swift`
+- Added Batch 2 regression coverage:
+  - `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/Tests/WorkoutDesktopAppTests/WorkoutDesktopAppTests.swift`
+- Fixed in-memory gateway history behavior to return empty history for unknown exercises (aligns empty-state UX and tests):
+  - `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/Sources/WorkoutDesktopApp/AppGateway.swift`
+- Updated Batch 2 execution checklist:
+  - `/Users/samuellight/Desktop/Sam's Workout App/tasks/todo_2026-02-22_batch2_ux25_backend25.md`
+
+Validation Run
+- `cd "/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative" && swift test --filter WorkoutDesktopAppTests --disable-index-store` passed.
+- `cd "/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative" && swift test --filter WorkoutPersistenceTests --disable-index-store` passed.
+- `cd "/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative" && swift test --disable-index-store` passed (`125` tests, `3` skipped, `0` failures).
+- `cd "/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative" && RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests --disable-index-store` passed (`3` tests, `0` failures):
+  - `testLiveGenerateWriteLogAndSync`: `55.051s`
+  - `testLiveRebuildImportsPriorHistoryFromSheets`: `5.009s`
+  - `testLiveWeeklySheetNamesContainNo2099Tabs`: `0.330s`
+- `cd "/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative" && ./scripts/build_local_app.sh` passed.
+  - Signed app path: `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/dist/SamsWorkoutNative.app`
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+- Note: one transient SwiftPM race (`runner.swift was modified during the build`) occurred and was resolved by immediate rerun.
+
+Next
+1. Start Batch 3 scope from IMPLEMENTATION_PLAN Phase 6/7 hardening backlog.
+2. Optional: add lightweight UI snapshot coverage for key screens to reduce visual regressions.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
 - Swift Native Rewrite Phase 6/7 hardening: DB rebuild/import parity + UX reliability pass completed.
 
 Built (Complete)
@@ -1061,3 +1103,81 @@ Blocked
 Next
 1. Run a live non-cluster generation and inspect `AI Generation Summary` for Fort fidelity status.
 2. If missing anchors persist, add deterministic insertion repair for unmatched Fort anchors before correction pass.
+
+---
+
+Progress Snapshot
+Date: 2026-02-22
+
+Current Phase
+- Swift Native Rewrite Phase 6 (QA Hardening) + Phase 7 prep: completed 100-item UX/backend quality pass and revalidated live runtime paths.
+
+Built (Complete)
+- Added broad native UX improvements across all parity routes:
+  - setup clarity and readiness card,
+  - status banners with severity,
+  - dashboard metrics and quick navigation,
+  - generation templates/clear/counters/copy-status/progress,
+  - view-plan filtering/toggles/day navigation/copy-day,
+  - logger quick actions, bulk actions, invalid-RPE gating,
+  - richer progress, weekly review filtering/sorting, exercise history summaries,
+  - DB status structured health panels.
+- Added backend hardening and data helpers:
+  - `StatusSeverity`/`StatusBanner` model layer,
+  - coordinator sanitization, route helpers, logger validators, day export, weekly-review sort/filter, per-flow refresh timestamps,
+  - gateway DB health/top/recent loading and plan title/summary normalization,
+  - persistence queries for top exercises, recent sessions, weekday completion, and DB health snapshot,
+  - sync normalization improvements and stronger RPE parsing (`8,5`, `RPE8`) and malformed inline-date guard.
+- Added regression coverage for new behavior:
+  - coordinator UX helpers and parsing behaviors,
+  - persistence health/top/recent/weekday queries,
+  - sync normalization and malformed date fallback,
+  - local log parser support for `note:` marker.
+
+Validation Run
+- `cd native/SamsWorkoutNative && swift test` passed (`111 tests`, `2 skipped`, `0 failures`).
+- `cd native/SamsWorkoutNative && RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveGenerateWriteLogAndSync` passed (`75.696s`).
+- `cd native/SamsWorkoutNative && RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveRebuildImportsPriorHistoryFromSheets` passed (`6.246s`).
+- `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed; signed app rebuilt.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Manual visual sweep of all native screens in packaged app for spacing/contrast polish now that logic-level improvements are complete.
+2. Optional: add SwiftUI snapshot test harness for stable UI regression protection.
+
+Addendum (2026-02-22 16:17)
+- After live E2E generation test (fixed-date 2099), removed recreated 2099 test tabs and local 2099 artifacts again.
+- Re-ran live rebuild import test to repopulate local DB from real weekly tabs only.
+- Verified final state:
+  - Google Sheets: no `2099` tabs.
+  - Local output dir: no 2099 markdown artifacts.
+  - Local DB sessions: no 2099 sheet entries.
+
+Addendum (2026-02-22 16:31)
+- Hardened live E2E strategy to avoid creating future-dated weekly tabs:
+  - `testLiveGenerateWriteLogAndSync` now runs with `LiveAppGateway(planWriteMode: .localOnly)` and current-week Monday clock injection.
+  - Added fallback workout selector in logger loading to choose first non-empty day when today has no exercise rows.
+  - Added live guard test that reads real sheet metadata and fails if any `Weekly Plan` tab contains year `2099`.
+- Validation run:
+  - `cd native/SamsWorkoutNative && RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests` passed (`3 tests`, `0 failures`).
+  - `cd native/SamsWorkoutNative && swift test` passed (`113 tests`, `3 skipped`, `0 failures`).
+
+Addendum (2026-02-22 16:45)
+- Shipped Batch 1 from `tasks/todo_2026-02-22_batch1_ux25_backend25.md`:
+  - Added generation preflight/readiness model + coordinator checks (missing days/headers, low-signal input, duplicate day inputs).
+  - Added explicit disabled-reason surfaces for Generate, Logger Save, and DB Rebuild workflows.
+  - Added plan and logger block filtering, logged-only plan filter, plan completion metrics, weekly review summary helpers.
+  - Added runtime weekly-sheet date sanitizer in `LiveAppGateway` to prevent far-future/past sheet names (includes `2099` guard behavior in generation path).
+  - Added UI refinements across Setup, Dashboard, Generate, View Plan, Log Workout, Weekly Review, Exercise History, and DB Status pages.
+  - Added coordinator and gateway regression tests for readiness/filter helpers and sanitized sheet date behavior.
+- Validation run:
+  - `cd native/SamsWorkoutNative && swift test --filter WorkoutDesktopAppTests` passed.
+  - `cd native/SamsWorkoutNative && swift test --filter WorkoutPersistenceTests` passed.
+  - `cd native/SamsWorkoutNative && swift test` passed (`120 tests`, `3 skipped`, `0 failures`).
+  - `cd native/SamsWorkoutNative && RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests` passed (`3 tests`, `0 failures`).
+  - `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed; local signed app rebuilt.

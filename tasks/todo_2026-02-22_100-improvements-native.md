@@ -1,0 +1,127 @@
+# Session Plan - 100 Improvements (2026-02-22)
+
+## Scope
+- 50 UX improvements (native macOS app)
+- 50 backend improvements (native modules + reliability)
+- Full automated test pass + live integration smoke pass
+
+## UX Improvements (50)
+- [x] UX-01: Add clear setup guidance copy above credential fields.
+- [x] UX-02: Add setup field labels (not placeholders-only) for API key, sheet ID, auth hint, password.
+- [x] UX-03: Add setup inline validation summary card.
+- [x] UX-04: Add setup save feedback severity styling.
+- [x] UX-05: Add unlock keyboard submit behavior.
+- [x] UX-06: Add unlock guidance for forgotten password workflow.
+- [x] UX-07: Add dashboard plan title display.
+- [x] UX-08: Add dashboard data source badge.
+- [x] UX-09: Add dashboard total day count metric.
+- [x] UX-10: Add dashboard total exercise count metric.
+- [x] UX-11: Add dashboard selected-day quick preview.
+- [x] UX-12: Add dashboard quick-nav action buttons to major routes.
+- [x] UX-13: Add dashboard last-refresh timestamp display.
+- [x] UX-14: Add generation page template-fill buttons for Mon/Wed/Fri.
+- [x] UX-15: Add generation clear-all button.
+- [x] UX-16: Add generation per-day character counters.
+- [x] UX-17: Add generation status severity card (success/warn/error/info).
+- [x] UX-18: Add generation “copy status” action.
+- [x] UX-19: Add generation progress indicator while running.
+- [x] UX-20: Add generation hint about canonical Fort input structure.
+- [x] UX-21: Add view-plan plan title and summary subtitle.
+- [x] UX-22: Add view-plan day exercise count metric.
+- [x] UX-23: Add view-plan estimated volume metric.
+- [x] UX-24: Add view-plan search filter by exercise/block/notes.
+- [x] UX-25: Add view-plan search empty-state hint.
+- [x] UX-26: Add view-plan show/hide notes toggle.
+- [x] UX-27: Add view-plan show/hide existing log toggle.
+- [x] UX-28: Add view-plan previous/next day controls.
+- [x] UX-29: Add view-plan copy-day-text action.
+- [x] UX-30: Add logger completion progress metric.
+- [x] UX-31: Add logger per-row quick “Done” action.
+- [x] UX-32: Add logger per-row quick “Skip” action.
+- [x] UX-33: Add logger per-row clear-entry action.
+- [x] UX-34: Add logger bulk “Mark all Done” action.
+- [x] UX-35: Add logger bulk “Clear all edits” action.
+- [x] UX-36: Add logger unsaved-changes indicator.
+- [x] UX-37: Add logger invalid-RPE warning banner.
+- [x] UX-38: Add logger filter to show only incomplete rows.
+- [x] UX-39: Add logger save button disabled state for invalid entries.
+- [x] UX-40: Add progress page metric cards (instead of plain text stack).
+- [x] UX-41: Add progress page freshness timestamp.
+- [x] UX-42: Add weekly review search box by sheet name.
+- [x] UX-43: Add weekly review sort mode picker.
+- [x] UX-44: Add weekly review completion badge coloring.
+- [x] UX-45: Add weekly review totals footer.
+- [x] UX-46: Add exercise history trend summary (latest/max/load delta).
+- [x] UX-47: Add exercise history quick-suggestion chips.
+- [x] UX-48: Add exercise history no-result recovery CTA.
+- [x] UX-49: Add DB status health badge and rebuild timestamp.
+- [x] UX-50: Add DB status richer sectioned metrics layout.
+
+## Backend Improvements (50)
+- [x] BE-01: Add typed status severity model for app messaging.
+- [x] BE-02: Add centralized status-message formatter for all major flows.
+- [x] BE-03: Add per-flow timestamps (plan/logger/analytics/db) in coordinator state.
+- [x] BE-04: Add dashboard aggregate metrics builder from plan snapshot.
+- [x] BE-05: Add plan-day estimated volume calculator.
+- [x] BE-06: Add plan-day filter function (query by block/exercise/notes).
+- [x] BE-07: Add plan-day copy-text serializer helper.
+- [x] BE-08: Add logger dirty-state detector.
+- [x] BE-09: Add logger completion counter helper.
+- [x] BE-10: Add logger bulk edit helper: mark all done.
+- [x] BE-11: Add logger bulk edit helper: clear all.
+- [x] BE-12: Add logger per-row quick edit helper.
+- [x] BE-13: Add logger RPE parser that supports comma decimal input.
+- [x] BE-14: Add logger RPE validator with [1,10] bounds enforcement.
+- [x] BE-15: Add save-path sanitization for performance/rpe/notes fields.
+- [x] BE-16: Add generation-input template provider functions.
+- [x] BE-17: Add generation-input reset helper.
+- [x] BE-18: Add generation-input normalized trimming helper before dispatch.
+- [x] BE-19: Add view-plan day-navigation helper methods.
+- [x] BE-20: Add weekly-review filtering and sort helpers.
+- [x] BE-21: Add exercise-history summary builder (latest/max/delta).
+- [x] BE-22: Add DB rebuild completion timestamp persistence in coordinator runtime.
+- [x] BE-23: Add gateway helper for preferred weekly sheet near current date across all flows.
+- [x] BE-24: Add gateway helper to parse local plan date safely from filename.
+- [x] BE-25: Add gateway selection helper to reject far-future local artifacts.
+- [x] BE-26: Add gateway fallback strategy for local plan selection when no dated files exist.
+- [x] BE-27: Add gateway plan snapshot title normalization.
+- [x] BE-28: Add gateway plan snapshot summary normalization.
+- [x] BE-29: Add persistence query for top logged exercises.
+- [x] BE-30: Add persistence query for recent session headers.
+- [x] BE-31: Add persistence query for completion by weekday.
+- [x] BE-32: Add persistence query for latest session date.
+- [x] BE-33: Add persistence query for DB health flags (row totals + non-empty log totals).
+- [x] BE-34: Add persistence utility to parse numeric load with fallback cleanup.
+- [x] BE-35: Add persistence utility to parse set/rep numeric strings defensively.
+- [x] BE-36: Add sync service helper to normalize exercise name whitespace before upsert.
+- [x] BE-37: Add sync service helper to normalize log text whitespace before upsert.
+- [x] BE-38: Add sync service helper to normalize explicit RPE whitespace.
+- [x] BE-39: Add sync service extraction support for compact `RPE8` pattern.
+- [x] BE-40: Add sync service extraction support for lowercase notes marker.
+- [x] BE-41: Add sync service day-label inline-date parse hardening.
+- [x] BE-42: Add sync service fallback date guard for malformed inline date.
+- [x] BE-43: Add coordinator helper for route quick-navigation.
+- [x] BE-44: Add coordinator helper for status copy text source.
+- [x] BE-45: Add coordinator helper for setup preflight readiness status.
+- [x] BE-46: Add tests for gateway near-date weekly-sheet preference.
+- [x] BE-47: Add tests for gateway local plan date parsing and far-future rejection.
+- [x] BE-48: Add tests for coordinator logger helper logic.
+- [x] BE-49: Add tests for persistence top/recent/health queries.
+- [x] BE-50: Add tests for sync-service normalization and RPE parsing edge cases.
+
+## Verification
+- [x] Run: `swift test`
+- [x] Run: `RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveRebuildImportsPriorHistoryFromSheets`
+- [x] Run: `RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveGenerateWriteLogAndSync`
+- [x] Build signed app: `./scripts/build_local_app.sh`
+
+## Review (fill at end)
+- Findings:
+- Added broad UX polish across setup, dashboard, generation, plan viewing, logger workflow, progress, weekly review, exercise history, and DB status.
+- Added backend hardening in coordinator/gateway/persistence/sync layers with new health/top/recent/completion queries and stronger normalization/validation.
+- Regressions:
+- One new regression surfaced during tests (`13/40` inline date was auto-normalized by Calendar); fixed by explicit month/day validity guard before date construction.
+- Open Risks:
+- Live E2E generation test writes to a real weekly tab; runtime remains external-service dependent (Anthropic + Google).
+- Follow-ups:
+- Add snapshot/UI automation for SwiftUI route rendering to complement current logic-heavy unit/integration coverage.

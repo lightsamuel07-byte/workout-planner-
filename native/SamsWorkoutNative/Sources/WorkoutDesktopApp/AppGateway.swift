@@ -17,6 +17,9 @@ protocol NativeAppGateway {
     func saveLoggerSession(_ session: LoggerSessionState) async throws -> WorkoutDBSummary
     func loadProgressSummary() -> ProgressSummary
     func loadWeeklyReviewSummaries() -> [WeeklyReviewSummary]
+    func loadTopExercises(limit: Int) -> [TopExerciseSummary]
+    func loadRecentSessions(limit: Int) -> [RecentSessionSummary]
+    func loadDBHealthSnapshot() -> DBHealthSnapshot
 }
 
 extension NativeAppGateway {
@@ -57,6 +60,20 @@ extension NativeAppGateway {
     func loadWeeklyReviewSummaries() -> [WeeklyReviewSummary] {
         []
     }
+
+    func loadTopExercises(limit: Int = 5) -> [TopExerciseSummary] {
+        let _ = limit
+        return []
+    }
+
+    func loadRecentSessions(limit: Int = 8) -> [RecentSessionSummary] {
+        let _ = limit
+        return []
+    }
+
+    func loadDBHealthSnapshot() -> DBHealthSnapshot {
+        .empty
+    }
 }
 
 struct InMemoryAppGateway: NativeAppGateway {
@@ -83,7 +100,14 @@ struct InMemoryAppGateway: NativeAppGateway {
     }
 
     func loadExerciseHistory(exerciseName: String) -> [ExerciseHistoryPoint] {
-        let normalized = getNormalizer().canonicalName(exerciseName)
+        let normalizer = getNormalizer()
+        let normalized = normalizer.canonicalName(exerciseName)
+        let knownCanonicalNames: Set<String> = Set(
+            loadExerciseCatalog(limit: 200).map { normalizer.canonicalName($0) }
+        )
+        if !knownCanonicalNames.contains(normalized) {
+            return []
+        }
         return [
             ExerciseHistoryPoint(id: UUID(), dateISO: "2026-02-10", load: 24.0, reps: "12", notes: "\(normalized) steady"),
             ExerciseHistoryPoint(id: UUID(), dateISO: "2026-02-17", load: 26.0, reps: "12", notes: "Progression"),
@@ -132,6 +156,40 @@ struct InMemoryAppGateway: NativeAppGateway {
             dayLabel: "Tuesday",
             source: .googleSheets,
             drafts: []
+        )
+    }
+
+    func loadTopExercises(limit: Int = 5) -> [TopExerciseSummary] {
+        let _ = limit
+        return [
+            TopExerciseSummary(exerciseName: "Back Squat", loggedCount: 14, sessionCount: 8),
+            TopExerciseSummary(exerciseName: "Bench Press", loggedCount: 12, sessionCount: 7),
+            TopExerciseSummary(exerciseName: "Reverse Pec Deck", loggedCount: 10, sessionCount: 6),
+        ]
+    }
+
+    func loadRecentSessions(limit: Int = 8) -> [RecentSessionSummary] {
+        let _ = limit
+        return [
+            RecentSessionSummary(sheetName: "Weekly Plan (2/23/2026)", dayLabel: "Monday", sessionDateISO: "2026-02-23", loggedRows: 6, totalRows: 8),
+            RecentSessionSummary(sheetName: "Weekly Plan (2/23/2026)", dayLabel: "Tuesday", sessionDateISO: "2026-02-24", loggedRows: 7, totalRows: 8),
+        ]
+    }
+
+    func loadDBHealthSnapshot() -> DBHealthSnapshot {
+        DBHealthSnapshot(
+            exerciseCount: 98,
+            sessionCount: 72,
+            logCount: 684,
+            nonEmptyLogCount: 241,
+            latestSessionDateISO: "2026-02-24",
+            topExercises: loadTopExercises(limit: 5),
+            recentSessions: loadRecentSessions(limit: 8),
+            weekdayCompletion: [
+                WeekdayCompletionSummary(dayName: "Monday", loggedRows: 62, totalRows: 80),
+                WeekdayCompletionSummary(dayName: "Tuesday", loggedRows: 44, totalRows: 60),
+                WeekdayCompletionSummary(dayName: "Wednesday", loggedRows: 58, totalRows: 76),
+            ]
         )
     }
 }

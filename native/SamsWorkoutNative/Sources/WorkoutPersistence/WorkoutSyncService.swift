@@ -8,6 +8,7 @@ private let sheetDatePatterns: [NSRegularExpression] = [
     persistenceMakeRegex("\\(Weekly Plan\\)\\s*(\\d{1,2})/(\\d{1,2})/(\\d{4})"),
 ]
 private let rpePattern = persistenceMakeRegex("\\brpe\\s*[:=]?\\s*(\\d+(?:\\.\\d+)?)\\b", options: [.caseInsensitive])
+private let compactRPEPattern = persistenceMakeRegex("\\brpe\\s*(\\d+(?:[\\.,]\\d+)?)\\b", options: [.caseInsensitive])
 
 private let dayNameToIndex: [String: Int] = [
     "monday": 0,
@@ -43,18 +44,32 @@ public struct WorkoutSyncService: Sendable {
         )
 
         for entry in input.entries {
-            let exerciseName = entry.exerciseName.trimmingCharacters(in: .whitespacesAndNewlines)
-            let logText = entry.logText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let exerciseName = normalizedWhitespace(entry.exerciseName)
+            let logText = normalizedWhitespace(entry.logText)
             if exerciseName.isEmpty || (!input.includeEmptyLogs && logText.isEmpty) {
                 continue
             }
 
+            let normalizedEntry = WorkoutSyncEntry(
+                sourceRow: entry.sourceRow,
+                exerciseName: exerciseName,
+                block: normalizedWhitespace(entry.block),
+                prescribedSets: normalizedWhitespace(entry.prescribedSets),
+                prescribedReps: normalizedWhitespace(entry.prescribedReps),
+                prescribedLoad: normalizedWhitespace(entry.prescribedLoad),
+                prescribedRest: normalizedWhitespace(entry.prescribedRest),
+                prescribedNotes: normalizedWhitespace(entry.prescribedNotes),
+                logText: logText,
+                explicitRPE: normalizedWhitespace(entry.explicitRPE),
+                parsedNotes: normalizedWhitespace(entry.parsedNotes)
+            )
+
             let exerciseID = try database.upsertExercise(exerciseName)
-            let parsedRPE = coerceRPE(explicitRPE: entry.explicitRPE, logText: logText)
+            let parsedRPE = coerceRPE(explicitRPE: normalizedEntry.explicitRPE, logText: normalizedEntry.logText)
             try database.upsertExerciseLog(
                 sessionID: sessionID,
                 exerciseID: exerciseID,
-                entry: entry,
+                entry: normalizedEntry,
                 parsedRPE: parsedRPE
             )
         }
@@ -159,12 +174,28 @@ public struct WorkoutSyncService: Sendable {
                 year = bestYearForMonthDay(anchorDate: anchorDate, month: month, day: day)
             }
 
+            guard month >= 1, month <= 12, day >= 1, day <= 31 else {
+                if let inferred = inferDateFromAnchor(anchorDate: anchorDate, dayName: dayName) {
+                    return isoDate(inferred)
+                }
+                return fallbackDateISO
+            }
+
             var components = DateComponents()
             components.year = year
             components.month = month
             components.day = day
             components.calendar = Calendar(identifier: .gregorian)
             if let date = components.date {
+                let calendar = Calendar(identifier: .gregorian)
+                let checkMonth = calendar.component(.month, from: date)
+                let checkDay = calendar.component(.day, from: date)
+                guard checkMonth == month, checkDay == day else {
+                    if let inferred = inferDateFromAnchor(anchorDate: anchorDate, dayName: dayName) {
+                        return isoDate(inferred)
+                    }
+                    return fallbackDateISO
+                }
                 return isoDate(date)
             }
         }
@@ -177,20 +208,36 @@ public struct WorkoutSyncService: Sendable {
     }
 
     public func coerceRPE(explicitRPE: String, logText: String) -> Double? {
-        let explicit = explicitRPE.trimmingCharacters(in: .whitespacesAndNewlines)
+        let explicit = explicitRPE
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: ",", with: ".")
         if !explicit.isEmpty, let value = Double(explicit), value >= 1.0, value <= 10.0 {
             return value
         }
 
         if let match = rpePattern.firstMatch(in: logText, options: [], range: persistenceFullRange(of: logText)),
            let range = Range(match.range(at: 1), in: logText),
-           let value = Double(logText[range]),
+           let value = Double(String(logText[range]).replacingOccurrences(of: ",", with: ".")),
+           value >= 1.0,
+           value <= 10.0 {
+            return value
+        }
+
+        if let match = compactRPEPattern.firstMatch(in: logText, options: [], range: persistenceFullRange(of: logText)),
+           let range = Range(match.range(at: 1), in: logText),
+           let value = Double(String(logText[range]).replacingOccurrences(of: ",", with: ".")),
            value >= 1.0,
            value <= 10.0 {
             return value
         }
 
         return nil
+    }
+
+    public func normalizedWhitespace(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func isoDate(_ date: Date) -> String {

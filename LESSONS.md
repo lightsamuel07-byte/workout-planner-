@@ -80,3 +80,5 @@ Last updated: 2026-02-21
 - New rule: status surfaces must derive from the same configuration source used by runtime execution paths.
 - Correction received: repeated live runs can collide when archive names rely on deterministic timestamps.
 - New rule: all archival writes must guarantee unique output names (suffix fallback when collision occurs).
+- Correction received: fixed-date live E2E generation can accidentally create far-future weekly tabs (e.g., year `2099`) in production sheets.
+- New rule: generation sheet naming must include a runtime date sanity guard (clamp far-future/past reference dates to current week) and maintain a live test that fails if `Weekly Plan` tabs with `2099` appear.

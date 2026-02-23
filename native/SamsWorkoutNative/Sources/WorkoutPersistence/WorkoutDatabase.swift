@@ -68,6 +68,74 @@ public struct PersistedProgressSummary: Equatable, Sendable {
     }
 }
 
+public struct PersistedTopExerciseSummary: Equatable, Sendable {
+    public let exerciseName: String
+    public let loggedCount: Int
+    public let sessionCount: Int
+
+    public init(exerciseName: String, loggedCount: Int, sessionCount: Int) {
+        self.exerciseName = exerciseName
+        self.loggedCount = loggedCount
+        self.sessionCount = sessionCount
+    }
+}
+
+public struct PersistedRecentSessionSummary: Equatable, Sendable {
+    public let sheetName: String
+    public let dayLabel: String
+    public let sessionDateISO: String
+    public let loggedRows: Int
+    public let totalRows: Int
+
+    public init(
+        sheetName: String,
+        dayLabel: String,
+        sessionDateISO: String,
+        loggedRows: Int,
+        totalRows: Int
+    ) {
+        self.sheetName = sheetName
+        self.dayLabel = dayLabel
+        self.sessionDateISO = sessionDateISO
+        self.loggedRows = loggedRows
+        self.totalRows = totalRows
+    }
+}
+
+public struct PersistedDBHealthSnapshot: Equatable, Sendable {
+    public let exerciseCount: Int
+    public let sessionCount: Int
+    public let logCount: Int
+    public let nonEmptyLogCount: Int
+    public let latestSessionDateISO: String
+
+    public init(
+        exerciseCount: Int,
+        sessionCount: Int,
+        logCount: Int,
+        nonEmptyLogCount: Int,
+        latestSessionDateISO: String
+    ) {
+        self.exerciseCount = exerciseCount
+        self.sessionCount = sessionCount
+        self.logCount = logCount
+        self.nonEmptyLogCount = nonEmptyLogCount
+        self.latestSessionDateISO = latestSessionDateISO
+    }
+}
+
+public struct PersistedWeekdayCompletion: Equatable, Sendable {
+    public let dayName: String
+    public let loggedRows: Int
+    public let totalRows: Int
+
+    public init(dayName: String, loggedRows: Int, totalRows: Int) {
+        self.dayName = dayName
+        self.loggedRows = loggedRows
+        self.totalRows = totalRows
+    }
+}
+
 public struct PersistedRecentLogContextRow: Equatable, Sendable {
     public let sheetName: String
     public let dayLabel: String
@@ -399,7 +467,7 @@ public struct WorkoutDatabase: Sendable {
 
             return rows.map { row in
                 let loadText: String = row["prescribed_load"]
-                let load = Double(loadText) ?? 0
+                let load = parseNumericScalar(loadText)
                 let parsedNotes: String = row["parsed_notes"]
                 let logText: String = row["log_text"]
                 let notes = parsedNotes.isEmpty ? logText : parsedNotes
@@ -411,6 +479,25 @@ public struct WorkoutDatabase: Sendable {
                 )
             }
         }
+    }
+
+    private func parseNumericScalar(_ raw: String) -> Double {
+        let normalized = raw.replacingOccurrences(of: ",", with: ".")
+        if let value = Double(normalized) {
+            return value
+        }
+
+        guard let regex = try? NSRegularExpression(pattern: #"\d+(?:\.\d+)?"#),
+              let match = regex.firstMatch(
+                in: normalized,
+                range: NSRange(normalized.startIndex..<normalized.endIndex, in: normalized)
+              ),
+              let range = Range(match.range(at: 0), in: normalized)
+        else {
+            return 0
+        }
+
+        return Double(normalized[range]) ?? 0
     }
 
     public func fetchWeeklySummaries(limit: Int = 12) throws -> [PersistedWeeklySummary] {
@@ -514,6 +601,125 @@ public struct WorkoutDatabase: Sendable {
                 recentLoggedRows: recentLoggedRows,
                 averageWeeklyVolume: averageVolume
             )
+        }
+    }
+
+    public func fetchTopExerciseSummaries(limit: Int = 5) throws -> [PersistedTopExerciseSummary] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    e.name AS exercise_name,
+                    SUM(CASE WHEN TRIM(COALESCE(el.log_text, '')) <> '' THEN 1 ELSE 0 END) AS logged_count,
+                    COUNT(DISTINCT el.session_id) AS session_count
+                FROM exercise_logs el
+                JOIN exercises e ON e.id = el.exercise_id
+                GROUP BY e.id
+                ORDER BY logged_count DESC, session_count DESC, LOWER(e.name) ASC
+                LIMIT ?
+                """,
+                arguments: [limit]
+            )
+
+            return rows.map { row in
+                PersistedTopExerciseSummary(
+                    exerciseName: row["exercise_name"],
+                    loggedCount: row["logged_count"],
+                    sessionCount: row["session_count"]
+                )
+            }
+        }
+    }
+
+    public func fetchRecentSessionSummaries(limit: Int = 8) throws -> [PersistedRecentSessionSummary] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    ws.sheet_name AS sheet_name,
+                    ws.day_label AS day_label,
+                    COALESCE(ws.session_date, '') AS session_date,
+                    SUM(CASE WHEN TRIM(COALESCE(el.log_text, '')) <> '' THEN 1 ELSE 0 END) AS logged_rows,
+                    COUNT(el.id) AS total_rows
+                FROM workout_sessions ws
+                LEFT JOIN exercise_logs el ON el.session_id = ws.id
+                GROUP BY ws.id
+                ORDER BY COALESCE(ws.session_date, '') DESC, ws.id DESC
+                LIMIT ?
+                """,
+                arguments: [limit]
+            )
+
+            return rows.map { row in
+                PersistedRecentSessionSummary(
+                    sheetName: row["sheet_name"],
+                    dayLabel: row["day_label"],
+                    sessionDateISO: row["session_date"],
+                    loggedRows: row["logged_rows"],
+                    totalRows: row["total_rows"]
+                )
+            }
+        }
+    }
+
+    public func fetchDBHealthSnapshot() throws -> PersistedDBHealthSnapshot {
+        try dbQueue.read { db in
+            let exercises = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exercises") ?? 0
+            let sessions = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM workout_sessions") ?? 0
+            let logs = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exercise_logs") ?? 0
+            let nonEmpty = try Int.fetchOne(
+                db,
+                sql: "SELECT COUNT(*) FROM exercise_logs WHERE TRIM(COALESCE(log_text, '')) <> ''"
+            ) ?? 0
+            let latestDate = try String.fetchOne(
+                db,
+                sql: "SELECT COALESCE(MAX(session_date), '') FROM workout_sessions"
+            ) ?? ""
+
+            return PersistedDBHealthSnapshot(
+                exerciseCount: exercises,
+                sessionCount: sessions,
+                logCount: logs,
+                nonEmptyLogCount: nonEmpty,
+                latestSessionDateISO: latestDate
+            )
+        }
+    }
+
+    public func fetchCompletionByWeekday() throws -> [PersistedWeekdayCompletion] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    COALESCE(ws.day_name, '') AS day_name,
+                    SUM(CASE WHEN TRIM(COALESCE(el.log_text, '')) <> '' THEN 1 ELSE 0 END) AS logged_rows,
+                    COUNT(el.id) AS total_rows
+                FROM workout_sessions ws
+                LEFT JOIN exercise_logs el ON el.session_id = ws.id
+                GROUP BY ws.day_name
+                ORDER BY CASE LOWER(COALESCE(ws.day_name, ''))
+                    WHEN 'monday' THEN 1
+                    WHEN 'tuesday' THEN 2
+                    WHEN 'wednesday' THEN 3
+                    WHEN 'thursday' THEN 4
+                    WHEN 'friday' THEN 5
+                    WHEN 'saturday' THEN 6
+                    WHEN 'sunday' THEN 7
+                    ELSE 99
+                END ASC
+                """
+            )
+
+            return rows.map { row in
+                PersistedWeekdayCompletion(
+                    dayName: row["day_name"],
+                    loggedRows: row["logged_rows"],
+                    totalRows: row["total_rows"]
+                )
+            }
         }
     }
 

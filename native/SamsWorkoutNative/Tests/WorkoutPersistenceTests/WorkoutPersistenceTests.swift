@@ -181,6 +181,8 @@ final class WorkoutPersistenceTests: XCTestCase {
 
         XCTAssertEqual(service.coerceRPE(explicitRPE: "8.5", logText: "RPE 9"), 8.5)
         XCTAssertEqual(service.coerceRPE(explicitRPE: "", logText: "Done | RPE 7"), 7.0)
+        XCTAssertEqual(service.coerceRPE(explicitRPE: "8,5", logText: "Done"), 8.5)
+        XCTAssertEqual(service.coerceRPE(explicitRPE: "", logText: "Done | RPE8"), 8.0)
         XCTAssertNil(service.coerceRPE(explicitRPE: "", logText: "No RPE"))
     }
 
@@ -268,5 +270,175 @@ final class WorkoutPersistenceTests: XCTestCase {
 
         let catalog = try database.fetchExerciseCatalog(limit: 10)
         XCTAssertEqual(catalog, ["Back Squat", "DB Hammer Curl", "Reverse Pec Deck"])
+    }
+
+    func testSyncServiceNormalizesWhitespaceDuringImport() throws {
+        let path = tempDBPath("normalization")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+        let service = WorkoutSyncService(database: database)
+
+        _ = try service.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: " Tuesday   2/24 ",
+                fallbackDayName: "Tuesday",
+                fallbackDateISO: "2026-02-24",
+                entries: [
+                    WorkoutSyncEntry(
+                        sourceRow: 3,
+                        exerciseName: "  DB    Hammer   Curl ",
+                        block: " B1 ",
+                        prescribedSets: " 3 ",
+                        prescribedReps: " 12 ",
+                        prescribedLoad: " 16 ",
+                        prescribedRest: " 60 seconds ",
+                        prescribedNotes: " strict form ",
+                        logText: "  Done   |   RPE 8  ",
+                        explicitRPE: " 8 ",
+                        parsedNotes: " felt good "
+                    ),
+                ]
+            )
+        )
+
+        let names = try database.fetchExerciseCatalog(limit: 5)
+        XCTAssertEqual(names, ["DB Hammer Curl"])
+
+        let logRow = try database.dbQueue.read { db in
+            try Row.fetchOne(
+                db,
+                sql: """
+                SELECT block, prescribed_sets, prescribed_reps, prescribed_load, prescribed_notes, log_text
+                FROM exercise_logs
+                LIMIT 1
+                """
+            )
+        }
+
+        XCTAssertEqual(logRow?["block"], "B1")
+        XCTAssertEqual(logRow?["prescribed_sets"], "3")
+        XCTAssertEqual(logRow?["prescribed_reps"], "12")
+        XCTAssertEqual(logRow?["prescribed_load"], "16")
+        XCTAssertEqual(logRow?["prescribed_notes"], "strict form")
+        XCTAssertEqual(logRow?["log_text"], "Done | RPE 8")
+    }
+
+    func testDBHealthAndSummaryQueries() throws {
+        let path = tempDBPath("db_health")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+        let service = WorkoutSyncService(database: database)
+
+        _ = try service.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Monday 2/23",
+                fallbackDayName: "Monday",
+                fallbackDateISO: "2026-02-23",
+                entries: [
+                    WorkoutSyncEntry(
+                        sourceRow: 3,
+                        exerciseName: "Back Squat",
+                        block: "A1",
+                        prescribedSets: "5",
+                        prescribedReps: "3",
+                        prescribedLoad: "100",
+                        prescribedRest: "180",
+                        prescribedNotes: "",
+                        logText: "Done | RPE 8",
+                        explicitRPE: "",
+                        parsedNotes: ""
+                    ),
+                    WorkoutSyncEntry(
+                        sourceRow: 4,
+                        exerciseName: "Back Squat",
+                        block: "A2",
+                        prescribedSets: "3",
+                        prescribedReps: "5",
+                        prescribedLoad: "90",
+                        prescribedRest: "120",
+                        prescribedNotes: "",
+                        logText: "",
+                        explicitRPE: "",
+                        parsedNotes: ""
+                    ),
+                ],
+                includeEmptyLogs: true
+            )
+        )
+
+        let top = try database.fetchTopExerciseSummaries(limit: 3)
+        XCTAssertEqual(top.first?.exerciseName, "Back Squat")
+        XCTAssertEqual(top.first?.loggedCount, 1)
+        XCTAssertEqual(top.first?.sessionCount, 1)
+
+        let recent = try database.fetchRecentSessionSummaries(limit: 3)
+        XCTAssertEqual(recent.count, 1)
+        XCTAssertEqual(recent.first?.loggedRows, 1)
+        XCTAssertEqual(recent.first?.totalRows, 2)
+
+        let health = try database.fetchDBHealthSnapshot()
+        XCTAssertEqual(health.exerciseCount, 1)
+        XCTAssertEqual(health.sessionCount, 1)
+        XCTAssertEqual(health.logCount, 2)
+        XCTAssertEqual(health.nonEmptyLogCount, 1)
+        XCTAssertEqual(health.latestSessionDateISO, "2026-02-23")
+
+        let weekday = try database.fetchCompletionByWeekday()
+        XCTAssertEqual(weekday.count, 1)
+        XCTAssertEqual(weekday.first?.dayName, "Monday")
+        XCTAssertEqual(weekday.first?.loggedRows, 1)
+        XCTAssertEqual(weekday.first?.totalRows, 2)
+    }
+
+    func testExerciseHistoryLoadParsesTextWithUnits() throws {
+        let path = tempDBPath("load_parse")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+        let service = WorkoutSyncService(database: database)
+
+        _ = try service.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Wednesday 2/25",
+                fallbackDayName: "Wednesday",
+                fallbackDateISO: "2026-02-25",
+                entries: [
+                    WorkoutSyncEntry(
+                        sourceRow: 3,
+                        exerciseName: "Reverse Pec Deck",
+                        block: "B1",
+                        prescribedSets: "3",
+                        prescribedReps: "15",
+                        prescribedLoad: "38 kg",
+                        prescribedRest: "90",
+                        prescribedNotes: "",
+                        logText: "Done | RPE 8",
+                        explicitRPE: "",
+                        parsedNotes: ""
+                    ),
+                ]
+            )
+        )
+
+        let history = try database.fetchExerciseHistory(exerciseName: "Reverse Pec Deck")
+        XCTAssertEqual(history.first?.load, 38)
+    }
+
+    func testInferSessionDateFallsBackWhenInlineDateMalformed() throws {
+        let path = tempDBPath("malformed_date")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+        let service = WorkoutSyncService(database: database)
+
+        let inferred = service.inferSessionDate(
+            sheetName: "Weekly Plan (2/23/2026)",
+            dayLabel: "Tuesday 13/40",
+            dayName: "Tuesday",
+            fallbackDateISO: "2026-02-24"
+        )
+
+        XCTAssertEqual(inferred, "2026-02-24")
     }
 }
