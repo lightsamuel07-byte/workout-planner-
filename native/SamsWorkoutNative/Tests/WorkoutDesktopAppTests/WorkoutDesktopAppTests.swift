@@ -745,4 +745,28 @@ final class WorkoutDesktopAppTests: XCTestCase {
         coordinator.moveToAdjacentPlanDay(step: -1)
         XCTAssertEqual(coordinator.selectedPlanDay, "Wednesday")
     }
+
+    // MARK: - UX Overhaul Tests
+
+    func testShortDayNameExtractsAbbreviation() {
+        let coordinator = makeCoordinator()
+        XCTAssertEqual(coordinator.shortDayName(for: "MONDAY (FORT GAMEDAY #13)"), "Mon")
+        XCTAssertEqual(coordinator.shortDayName(for: "TUESDAY (SUPPLEMENTAL - ARMS & CARRIES)"), "Tue")
+        XCTAssertEqual(coordinator.shortDayName(for: "Wednesday"), "Wed")
+        XCTAssertEqual(coordinator.shortDayName(for: "SATURDAY (SUPPLEMENTAL - BACK & HYPERTROPHY)"), "Sat")
+        XCTAssertEqual(coordinator.shortDayName(for: "Unknown Label"), "Unknown La")
+    }
+
+    func testDaySubtitleExtractsParenthetical() {
+        let coordinator = makeCoordinator()
+        XCTAssertEqual(coordinator.daySubtitle(for: "MONDAY (FORT GAMEDAY #13)"), "FORT GAMEDAY #13")
+        XCTAssertEqual(coordinator.daySubtitle(for: "TUESDAY (SUPPLEMENTAL - ARMS & CARRIES)"), "SUPPLEMENTAL - ARMS & CARRIES")
+        XCTAssertEqual(coordinator.daySubtitle(for: "Wednesday"), "")
+        XCTAssertEqual(coordinator.daySubtitle(for: "FRIDAY (FORT GAMEDAY #13)"), "FORT GAMEDAY #13")
+    }
+
+    func testSidebarVisibilityDefaultsToAll() {
+        let coordinator = makeCoordinator()
+        XCTAssertEqual(coordinator.sidebarVisibility, .all)
+    }
 }

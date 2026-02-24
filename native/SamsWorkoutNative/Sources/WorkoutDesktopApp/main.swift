@@ -17,6 +17,8 @@ final class WorkoutAppDelegate: NSObject, NSApplicationDelegate {
         )
         window.center()
         window.title = "Sam's Workout App"
+        window.toolbar = NSToolbar()
+        window.toolbarStyle = .unified
         window.contentView = NSHostingView(rootView: rootView)
         window.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
@@ -45,6 +47,18 @@ editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquiv
 editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
 editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
 editMenuItem.submenu = editMenu
+
+let viewMenuItem = NSMenuItem()
+mainMenu.addItem(viewMenuItem)
+let viewMenu = NSMenu(title: "View")
+let sidebarItem = NSMenuItem(
+    title: "Toggle Sidebar",
+    action: #selector(NSSplitViewController.toggleSidebar(_:)),
+    keyEquivalent: "s"
+)
+sidebarItem.keyEquivalentModifierMask = [.control, .command]
+viewMenu.addItem(sidebarItem)
+viewMenuItem.submenu = viewMenu
 
 app.mainMenu = mainMenu
 

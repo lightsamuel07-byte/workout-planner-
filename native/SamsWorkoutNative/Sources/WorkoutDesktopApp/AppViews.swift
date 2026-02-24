@@ -8,15 +8,24 @@ struct NativeWorkoutRootView: View {
         Group {
             if coordinator.isSetupComplete {
                 if coordinator.isUnlocked {
-                    NavigationSplitView {
+                    NavigationSplitView(columnVisibility: $coordinator.sidebarVisibility) {
                         List(AppRoute.allCases, selection: $coordinator.route) { route in
                             Label(route.rawValue, systemImage: icon(for: route))
                                 .tag(route)
                         }
-                        .frame(minWidth: 240)
+                        .listStyle(.sidebar)
+                        .frame(minWidth: 200)
+                        .navigationTitle("Workouts")
                     } detail: {
                         routeView(route: coordinator.route)
-                            .padding(20)
+                    }
+                    .toolbar {
+                        ToolbarItem(placement: .navigation) {
+                            Button(action: { coordinator.toggleSidebar() }) {
+                                Image(systemName: "sidebar.leading")
+                            }
+                            .help("Toggle Sidebar (Cmd+0)")
+                        }
                     }
                 } else {
                     UnlockView(coordinator: coordinator)
@@ -214,9 +223,13 @@ struct KeyboardShortcutOverlay: View {
             Button("") { coordinator.moveToAdjacentPlanDay(step: 1) }
                 .keyboardShortcut(.rightArrow, modifiers: .command)
 
-            // Cmd+R = refresh analytics
+            // Cmd+Shift+R = refresh analytics
             Button("") { coordinator.refreshAnalytics() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])
+
+            // Cmd+0 = toggle sidebar
+            Button("") { coordinator.toggleSidebar() }
+                .keyboardShortcut("0", modifiers: .command)
         }
         .frame(width: 0, height: 0)
         .opacity(0)
@@ -868,137 +881,256 @@ struct GeneratePlanPageView: View {
     }
 }
 
+struct DayPillBar: View {
+    let days: [PlanDayDetail]
+    @Binding var selectedDay: String
+    let shortName: (String) -> String
+    let subtitle: (String) -> String
+
+    var body: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(days) { day in
+                    let isSelected = day.dayLabel == selectedDay
+                    Button {
+                        selectedDay = day.dayLabel
+                    } label: {
+                        VStack(spacing: 2) {
+                            Text(shortName(day.dayLabel))
+                                .font(.system(.callout, design: .rounded, weight: isSelected ? .semibold : .regular))
+                            let sub = subtitle(day.dayLabel)
+                            if !sub.isEmpty {
+                                Text(sub)
+                                    .font(.caption2)
+                                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                                    .lineLimit(1)
+                            }
+                        }
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(isSelected ? Color.accentColor : Color.clear)
+                        .foregroundStyle(isSelected ? .white : .primary)
+                        .clipShape(Capsule())
+                        .overlay(
+                            Capsule()
+                                .stroke(isSelected ? Color.clear : Color.secondary.opacity(0.3), lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, 4)
+        }
+    }
+}
+
+struct ExerciseCardView: View {
+    let exercise: PlanExerciseRow
+    let showNotes: Bool
+    let showLogs: Bool
+
+    private var blockColor: Color {
+        let upper = exercise.block.uppercased()
+        if upper.contains("IGNITION") || upper.contains("PREP") { return .orange }
+        if upper.contains("CLUSTER") || upper.contains("BREAKPOINT") || upper.contains("WORKING") { return .red }
+        if upper.contains("AUXILIARY") { return .blue }
+        if upper.contains("THAW") { return .green }
+        return .secondary
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(exercise.block.uppercased())
+                    .font(.system(.caption2, design: .rounded, weight: .semibold))
+                    .foregroundStyle(blockColor)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(blockColor.opacity(0.12))
+                    .clipShape(Capsule())
+
+                Text(exercise.exercise)
+                    .font(.headline)
+
+                Spacer()
+
+                if !exercise.log.isEmpty {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                        .font(.caption)
+                }
+            }
+
+            HStack(spacing: 16) {
+                Label(exercise.sets, systemImage: "square.stack.3d.up")
+                    .font(.subheadline)
+                Label(exercise.reps, systemImage: "repeat")
+                    .font(.subheadline)
+                Label("\(exercise.load) kg", systemImage: "scalemass")
+                    .font(.subheadline)
+                if !exercise.rest.isEmpty {
+                    Label(exercise.rest, systemImage: "clock")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if showNotes, !exercise.notes.isEmpty {
+                Text(exercise.notes)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .padding(8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.secondary.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
+            }
+
+            if showLogs, !exercise.log.isEmpty {
+                HStack(spacing: 4) {
+                    Image(systemName: "pencil.line")
+                        .font(.caption2)
+                    Text(exercise.log)
+                        .font(.caption)
+                }
+                .foregroundStyle(.green)
+            }
+        }
+        .padding(12)
+        .background(.regularMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
 struct ViewPlanPageView: View {
     @ObservedObject var coordinator: AppCoordinator
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("View Plan")
-                .font(.largeTitle.bold())
-
-            StatusBannerView(banner: coordinator.statusBanner)
-
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("Source: \(coordinator.planSnapshot.source.rawValue)")
-                        .foregroundStyle(.secondary)
-                    if !coordinator.planSnapshot.title.isEmpty {
-                        Text("Plan: \(coordinator.planSnapshot.title)")
-                            .foregroundStyle(.secondary)
-                            .font(.caption)
-                    }
-                }
-                Spacer()
-                Button("Reload") {
-                    Task { await coordinator.refreshPlanSnapshot() }
-                }
-                .buttonStyle(.bordered)
-            }
-
+        Group {
             if coordinator.planSnapshot.days.isEmpty {
-                Text(coordinator.viewPlanError.isEmpty ? "No plan available." : coordinator.viewPlanError)
-                    .foregroundColor(coordinator.viewPlanError.isEmpty ? .secondary : .red)
+                ContentUnavailableView {
+                    Label("No Plan Available", systemImage: "list.bullet.rectangle")
+                } description: {
+                    Text(coordinator.viewPlanError.isEmpty
+                         ? "Generate or load a plan to see exercises here."
+                         : coordinator.viewPlanError)
+                } actions: {
+                    Button("Reload") {
+                        Task { await coordinator.refreshPlanSnapshot() }
+                    }
+                    .buttonStyle(.bordered)
+                }
             } else {
-                Picker("Day", selection: $coordinator.selectedPlanDay) {
-                    ForEach(coordinator.orderedPlanDays) { day in
-                        Text(day.dayLabel).tag(day.dayLabel)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .onChange(of: coordinator.selectedPlanDay) {
-                    if !coordinator.planBlockCatalog.contains(coordinator.planBlockFilter) {
-                        coordinator.planBlockFilter = "All Blocks"
-                    }
-                }
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 16) {
+                        StatusBannerView(banner: coordinator.statusBanner)
 
-                Text(coordinator.selectedPlanDayPositionText)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                        DayPillBar(
+                            days: coordinator.orderedPlanDays,
+                            selectedDay: $coordinator.selectedPlanDay,
+                            shortName: { coordinator.shortDayName(for: $0) },
+                            subtitle: { coordinator.daySubtitle(for: $0) }
+                        )
+                        .onChange(of: coordinator.selectedPlanDay) {
+                            if !coordinator.planBlockCatalog.contains(coordinator.planBlockFilter) {
+                                coordinator.planBlockFilter = "All Blocks"
+                            }
+                        }
 
-                HStack {
-                    Button("Previous") {
-                        coordinator.moveToAdjacentPlanDay(step: -1)
-                    }
-                    .buttonStyle(.bordered)
+                        // Search and filter bar
+                        HStack(spacing: 8) {
+                            TextField("Search exercises, blocks, notes", text: $coordinator.planSearchQuery)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(maxWidth: 300)
 
-                    Button("Next") {
-                        coordinator.moveToAdjacentPlanDay(step: 1)
-                    }
-                    .buttonStyle(.bordered)
+                            Text(coordinator.selectedPlanDayPositionText)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
 
-                    TextField("Search exercises, blocks, notes", text: $coordinator.planSearchQuery)
-                        .textFieldStyle(.roundedBorder)
+                            Spacer()
 
-                    Picker("Block", selection: $coordinator.planBlockFilter) {
-                        ForEach(coordinator.planBlockCatalog, id: \.self) { block in
-                            Text(block).tag(block)
+                            Text("\(coordinator.planVisibleExerciseCount) exercises")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Text(String(format: "%.0f kg", coordinator.planDayStats.estimatedVolumeKG))
+                                .font(.caption.bold())
+                                .foregroundStyle(.secondary)
+                        }
+
+                        // Exercise cards
+                        if coordinator.filteredPlanExercises.isEmpty {
+                            ContentUnavailableView {
+                                Label("No Matches", systemImage: "magnifyingglass")
+                            } description: {
+                                Text("No exercises match the current filters.")
+                            } actions: {
+                                Button("Reset Filters") {
+                                    coordinator.resetPlanFilters()
+                                }
+                                .buttonStyle(.bordered)
+                            }
+                        } else {
+                            LazyVStack(spacing: 10) {
+                                ForEach(coordinator.filteredPlanExercises) { exercise in
+                                    ExerciseCardView(
+                                        exercise: exercise,
+                                        showNotes: coordinator.showPlanNotes,
+                                        showLogs: coordinator.showPlanLogs
+                                    )
+                                }
+                            }
                         }
                     }
-                    .pickerStyle(.menu)
+                    .padding(.horizontal, 20)
+                    .padding(.vertical, 12)
                 }
-
-                HStack {
-                    Toggle("Show Notes", isOn: $coordinator.showPlanNotes)
-                        .toggleStyle(.switch)
-                    Toggle("Show Logs", isOn: $coordinator.showPlanLogs)
-                        .toggleStyle(.switch)
-                    Toggle("Logged Only", isOn: $coordinator.showPlanLoggedOnly)
-                        .toggleStyle(.switch)
-
-                    Spacer()
-
-                    Button("Reset Filters") {
-                        coordinator.resetPlanFilters()
+            }
+        }
+        .navigationTitle("View Plan")
+        .navigationSubtitle(coordinator.planSnapshot.title)
+        .toolbar {
+            ToolbarItem(placement: .automatic) {
+                HStack(spacing: 8) {
+                    Button {
+                        Task { await coordinator.refreshPlanSnapshot() }
+                    } label: {
+                        Label("Reload", systemImage: "arrow.clockwise")
                     }
-                    .buttonStyle(.bordered)
+                    .help("Reload plan from source")
 
-                    Button("Copy Day") {
+                    Button {
                         let text = coordinator.buildSelectedPlanDayExportText()
                         if !text.isEmpty {
                             NSPasteboard.general.clearContents()
                             NSPasteboard.general.setString(text, forType: .string)
                         }
+                    } label: {
+                        Label("Copy Day", systemImage: "doc.on.doc")
                     }
-                    .buttonStyle(.bordered)
-                }
-
-                HStack(spacing: 10) {
-                    MetricCardView(title: "Exercises", value: "\(coordinator.planVisibleExerciseCount)")
-                    MetricCardView(title: "Blocks", value: "\(coordinator.planDayStats.blockCount)")
-                    MetricCardView(title: "Est. Volume", value: String(format: "%.0f kg", coordinator.planDayStats.estimatedVolumeKG))
-                    MetricCardView(title: "Logged Rows", value: "\(coordinator.planDayCompletionCount)")
-                    MetricCardView(title: "Completion", value: String(format: "%.1f%%", coordinator.planDayCompletionPercent))
-                }
-
-                if coordinator.filteredPlanExercises.isEmpty {
-                    Text("No exercises match the current filters. Try Reset Filters.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    List(coordinator.filteredPlanExercises) { exercise in
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text("\(exercise.block) - \(exercise.exercise)")
-                                .font(.headline)
-                            Text("\(exercise.sets) x \(exercise.reps) @ \(exercise.load) kg")
-                            if !exercise.rest.isEmpty {
-                                Text("Rest: \(exercise.rest)")
-                                    .foregroundStyle(.secondary)
-                            }
-                            if coordinator.showPlanNotes, !exercise.notes.isEmpty {
-                                Text("Notes: \(exercise.notes)")
-                                    .foregroundStyle(.secondary)
-                            }
-                            if coordinator.showPlanLogs, !exercise.log.isEmpty {
-                                Text("Log: \(exercise.log)")
-                                    .foregroundStyle(.secondary)
-                                    .font(.caption)
-                            }
-                        }
-                        .padding(.vertical, 4)
-                    }
+                    .help("Copy selected day to clipboard")
                 }
             }
 
-            Spacer()
+            ToolbarItem(placement: .automatic) {
+                Menu {
+                    Toggle("Show Notes", isOn: $coordinator.showPlanNotes)
+                    Toggle("Show Logs", isOn: $coordinator.showPlanLogs)
+                    Toggle("Logged Only", isOn: $coordinator.showPlanLoggedOnly)
+                    Divider()
+                    Picker("Block", selection: $coordinator.planBlockFilter) {
+                        ForEach(coordinator.planBlockCatalog, id: \.self) { block in
+                            Text(block).tag(block)
+                        }
+                    }
+                    Divider()
+                    Button("Reset Filters") {
+                        coordinator.resetPlanFilters()
+                    }
+                } label: {
+                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
+                }
+                .help("Filter exercises")
+            }
         }
     }
 }

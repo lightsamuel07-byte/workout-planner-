@@ -1,9 +1,11 @@
 import Foundation
 import Combine
+import SwiftUI
 
 @MainActor
 final class AppCoordinator: ObservableObject {
     @Published var route: AppRoute
+    @Published var sidebarVisibility: NavigationSplitViewVisibility = .all
     @Published var setupState = SetupState()
     @Published var isSetupComplete = false
     @Published var setupErrors: [String] = []
@@ -1078,6 +1080,39 @@ final class AppCoordinator: ObservableObject {
 
     func quickNavigate(to target: AppRoute) {
         route = target
+    }
+
+    func toggleSidebar() {
+        withAnimation {
+            sidebarVisibility = sidebarVisibility == .detailOnly ? .all : .detailOnly
+        }
+        NSApp.keyWindow?.firstResponder?.tryToPerform(
+            #selector(NSSplitViewController.toggleSidebar(_:)), with: nil
+        )
+    }
+
+    func shortDayName(for dayLabel: String) -> String {
+        let upper = dayLabel.uppercased()
+        let days = [
+            ("MONDAY", "Mon"), ("TUESDAY", "Tue"), ("WEDNESDAY", "Wed"),
+            ("THURSDAY", "Thu"), ("FRIDAY", "Fri"), ("SATURDAY", "Sat"), ("SUNDAY", "Sun"),
+        ]
+        for (full, short) in days where upper.contains(full) {
+            return short
+        }
+        return String(dayLabel.prefix(10))
+    }
+
+    func daySubtitle(for dayLabel: String) -> String {
+        if let openParen = dayLabel.firstIndex(of: "("),
+           let closeParen = dayLabel.lastIndex(of: ")") {
+            let inner = dayLabel[dayLabel.index(after: openParen)..<closeParen]
+            return String(inner).trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        let upper = dayLabel.uppercased()
+        if upper.contains("FORT") { return "Fort" }
+        if upper.contains("SUPPLEMENTAL") { return "Supplemental" }
+        return ""
     }
 
     func applyGenerationTemplate(day: String) {
