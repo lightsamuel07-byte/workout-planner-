@@ -4,11 +4,15 @@ public struct AnthropicGenerationResult: Equatable, Sendable {
     public let text: String
     public let model: String
     public let stopReason: String?
+    public let inputTokens: Int
+    public let outputTokens: Int
 
-    public init(text: String, model: String, stopReason: String?) {
+    public init(text: String, model: String, stopReason: String?, inputTokens: Int = 0, outputTokens: Int = 0) {
         self.text = text
         self.model = model
         self.stopReason = stopReason
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
     }
 }
 
@@ -30,9 +34,15 @@ private struct AnthropicMessagesResponse: Decodable {
         let text: String?
     }
 
+    struct Usage: Decodable {
+        let input_tokens: Int?
+        let output_tokens: Int?
+    }
+
     let model: String
     let stop_reason: String?
     let content: [ContentItem]
+    let usage: Usage?
 }
 
 public enum AnthropicClientError: Error, Equatable {
@@ -90,6 +100,12 @@ public struct AnthropicClient: Sendable {
             throw AnthropicClientError.emptyResponse
         }
 
-        return AnthropicGenerationResult(text: text, model: decoded.model, stopReason: decoded.stop_reason)
+        return AnthropicGenerationResult(
+            text: text,
+            model: decoded.model,
+            stopReason: decoded.stop_reason,
+            inputTokens: decoded.usage?.input_tokens ?? 0,
+            outputTokens: decoded.usage?.output_tokens ?? 0
+        )
     }
 }

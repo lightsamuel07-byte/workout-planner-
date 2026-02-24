@@ -40,6 +40,7 @@ final class WorkoutDesktopAppTests: XCTestCase {
             .weeklyReview,
             .exerciseHistory,
             .settings,
+            .apiTestHarness, // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
             .dbStatus,
         ]
         XCTAssertEqual(Set(AppRoute.allCases), expected)
@@ -589,4 +590,70 @@ final class WorkoutDesktopAppTests: XCTestCase {
     func testOneRepMaxMainLiftsConstant() {
         XCTAssertEqual(NativeAppConfiguration.mainLifts, ["Back Squat", "Bench Press", "Deadlift"])
     }
+
+    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+    func testTestHarnessCanSendRequiresInput() {
+        let coordinator = makeCoordinator()
+        coordinator.setupState.anthropicAPIKey = "key"
+        coordinator.setupState.spreadsheetID = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+        coordinator.completeSetup()
+
+        XCTAssertFalse(coordinator.testHarnessCanSend) // No input
+        coordinator.testHarnessFortInput = "MONDAY\nBack Squat"
+        XCTAssertTrue(coordinator.testHarnessCanSend)
+    }
+
+    func testTestHarnessTemplatePopulatesInput() {
+        let coordinator = makeCoordinator()
+        XCTAssertTrue(coordinator.testHarnessFortInput.isEmpty)
+        coordinator.applyTestHarnessTemplate()
+        XCTAssertTrue(coordinator.testHarnessFortInput.contains("Back Squat"))
+        XCTAssertTrue(coordinator.testHarnessFortInput.contains("MONDAY"))
+    }
+
+    func testTestHarnessClearResetsState() {
+        let coordinator = makeCoordinator()
+        coordinator.testHarnessFortInput = "test input"
+        coordinator.testHarnessShowPayload = true
+        coordinator.clearTestHarnessResult()
+        XCTAssertTrue(coordinator.testHarnessFortInput.isEmpty)
+        XCTAssertFalse(coordinator.testHarnessShowPayload)
+    }
+
+    func testTestHarnessPayloadPreviewContains1RM() {
+        let store = TestConfigStore()
+        let coordinator = AppCoordinator(gateway: InMemoryAppGateway(), configStore: store)
+        let entry = OneRepMaxEntry(valueKG: 140.0, lastUpdated: Date())
+        try! store.save(NativeAppConfiguration(
+            anthropicAPIKey: "key",
+            spreadsheetID: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU",
+            googleAuthHint: "",
+            localAppPassword: "",
+            oneRepMaxes: ["Back Squat": entry]
+        ))
+        coordinator.loadOneRepMaxFields()
+        coordinator.testHarnessFortInput = "MONDAY\nBack Squat"
+        let preview = coordinator.testHarnessPayloadPreview
+        XCTAssertTrue(preview.contains("Back Squat"))
+        XCTAssertTrue(preview.contains("140.0 kg"))
+    }
+
+    func testAPITestHarnessResultModel() {
+        let result = APITestHarnessResult(
+            prompt: "test prompt",
+            rawResponse: "## Monday\n### A1. Back Squat",
+            model: "claude-sonnet-4-6",
+            inputTokens: 500,
+            outputTokens: 200,
+            responseTimeSeconds: 2.5,
+            containsOneRepMax: true,
+            oneRepMaxExercises: ["Back Squat"],
+            errorMessage: ""
+        )
+        XCTAssertTrue(result.containsOneRepMax)
+        XCTAssertEqual(result.oneRepMaxExercises, ["Back Squat"])
+        XCTAssertEqual(result.inputTokens, 500)
+        XCTAssertEqual(result.model, "claude-sonnet-4-6")
+    }
+    // END TEMP: TEST HARNESS
 }

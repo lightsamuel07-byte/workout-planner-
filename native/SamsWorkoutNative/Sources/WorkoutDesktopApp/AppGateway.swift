@@ -20,6 +20,9 @@ protocol NativeAppGateway {
     func loadTopExercises(limit: Int) -> [TopExerciseSummary]
     func loadRecentSessions(limit: Int) -> [RecentSessionSummary]
     func loadDBHealthSnapshot() -> DBHealthSnapshot
+    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+    func sendTestHarnessRequest(fortInput: String, oneRepMaxes: [String: Double]) async throws -> APITestHarnessResult
+    // END TEMP: TEST HARNESS
 }
 
 extension NativeAppGateway {
@@ -74,6 +77,14 @@ extension NativeAppGateway {
     func loadDBHealthSnapshot() -> DBHealthSnapshot {
         .empty
     }
+
+    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+    func sendTestHarnessRequest(fortInput: String, oneRepMaxes: [String: Double]) async throws -> APITestHarnessResult {
+        let _ = fortInput
+        let _ = oneRepMaxes
+        return .empty
+    }
+    // END TEMP: TEST HARNESS
 }
 
 struct InMemoryAppGateway: NativeAppGateway {

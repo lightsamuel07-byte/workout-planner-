@@ -50,6 +50,13 @@ final class AppCoordinator: ObservableObject {
     @Published var oneRepMaxFields: [OneRepMaxFieldState] = []
     @Published var oneRepMaxStatus = ""
 
+    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+    @Published var testHarnessFortInput = ""
+    @Published var testHarnessResult = APITestHarnessResult.empty
+    @Published var testHarnessIsSending = false
+    @Published var testHarnessShowPayload = false
+    // END TEMP: TEST HARNESS
+
     private let gateway: NativeAppGateway
     private let configStore: AppConfigurationStore
 
@@ -938,6 +945,99 @@ final class AppCoordinator: ObservableObject {
         }
         return result
     }
+
+    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+    var testHarnessPayloadPreview: String {
+        if testHarnessFortInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return "Enter Fort workout input above to preview the Claude API payload."
+        }
+        let oneRMs = oneRepMaxDictionary()
+        let input = PlanGenerationInput(
+            monday: testHarnessFortInput,
+            wednesday: "WEDNESDAY\nRest day placeholder",
+            friday: "FRIDAY\nRest day placeholder"
+        )
+        let oneRMSection: String
+        if oneRMs.isEmpty {
+            oneRMSection = "ATHLETE 1RM PROFILE:\nNo 1RM data provided."
+        } else {
+            let lines = oneRMs.sorted(by: { $0.key < $1.key }).map { exercise, value in
+                String(format: "- %@: %.1f kg", exercise, value)
+            }
+            oneRMSection = "ATHLETE 1RM PROFILE:\n" + lines.joined(separator: "\n")
+        }
+        return """
+        === PAYLOAD PREVIEW ===
+        Model: claude-sonnet-4-6
+        Max tokens: 2048
+        System: "You generate deterministic weekly workout plans..."
+
+        === 1RM SECTION ===
+        \(oneRMSection)
+
+        === FORT INPUT (Monday slot) ===
+        \(input.monday)
+
+        === FULL PROMPT LENGTH ===
+        ~\(testHarnessFortInput.count + oneRMSection.count + 1200) chars (estimated)
+        """
+    }
+
+    var testHarnessCanSend: Bool {
+        !testHarnessFortInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && !testHarnessIsSending
+            && setupState.validate().isEmpty
+    }
+
+    func sendTestHarnessRequest() async {
+        guard testHarnessCanSend else { return }
+        testHarnessIsSending = true
+        testHarnessResult = .empty
+        defer { testHarnessIsSending = false }
+
+        let oneRMs = oneRepMaxDictionary()
+
+        do {
+            testHarnessResult = try await gateway.sendTestHarnessRequest(
+                fortInput: testHarnessFortInput,
+                oneRepMaxes: oneRMs
+            )
+        } catch {
+            testHarnessResult = APITestHarnessResult(
+                prompt: "",
+                rawResponse: "",
+                model: "",
+                inputTokens: 0,
+                outputTokens: 0,
+                responseTimeSeconds: 0,
+                containsOneRepMax: false,
+                oneRepMaxExercises: [],
+                errorMessage: error.localizedDescription
+            )
+        }
+    }
+
+    func clearTestHarnessResult() {
+        testHarnessResult = .empty
+        testHarnessFortInput = ""
+        testHarnessShowPayload = false
+    }
+
+    func applyTestHarnessTemplate() {
+        testHarnessFortInput = """
+        MONDAY
+        IGNITION
+        Deadbug 3x10
+        Cat-Cow 2x8
+        CLUSTER SET
+        Back Squat 4x5 @ 80% 1RM
+        AUXILIARY
+        Reverse Pec Deck 3x15
+        THAW
+        BikeErg 10 min easy
+        """
+    }
+    // END TEMP: TEST HARNESS
 
     func quickNavigate(to target: AppRoute) {
         route = target

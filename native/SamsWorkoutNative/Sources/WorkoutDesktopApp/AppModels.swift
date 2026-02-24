@@ -9,6 +9,7 @@ enum AppRoute: String, CaseIterable, Identifiable {
     case weeklyReview = "Weekly Review"
     case exerciseHistory = "Exercise History"
     case settings = "Settings"
+    case apiTestHarness = "API Test Harness" // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
     case dbStatus = "DB Status"
 
     var id: String { rawValue }
@@ -415,6 +416,32 @@ struct DBRebuildReport: Equatable {
     let dbSessions: Int
     let dbExerciseLogs: Int
 }
+
+// TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+struct APITestHarnessResult: Equatable {
+    let prompt: String
+    let rawResponse: String
+    let model: String
+    let inputTokens: Int
+    let outputTokens: Int
+    let responseTimeSeconds: Double
+    let containsOneRepMax: Bool
+    let oneRepMaxExercises: [String]
+    let errorMessage: String
+
+    static let empty = APITestHarnessResult(
+        prompt: "",
+        rawResponse: "",
+        model: "",
+        inputTokens: 0,
+        outputTokens: 0,
+        responseTimeSeconds: 0,
+        containsOneRepMax: false,
+        oneRepMaxExercises: [],
+        errorMessage: ""
+    )
+}
+// END TEMP: TEST HARNESS
 
 struct OneRepMaxFieldState: Equatable, Identifiable {
     let id: String

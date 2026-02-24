@@ -583,6 +583,58 @@ struct LiveAppGateway: NativeAppGateway {
         }
     }
 
+    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+    func sendTestHarnessRequest(fortInput: String, oneRepMaxes: [String: Double]) async throws -> APITestHarnessResult {
+        let config = try requireGenerationSetup()
+
+        let input = PlanGenerationInput(
+            monday: fortInput,
+            wednesday: "WEDNESDAY\nRest day placeholder",
+            friday: "FRIDAY\nRest day placeholder"
+        )
+
+        let dbContext = buildRecentDBContext()
+        let prompt = buildGenerationPrompt(
+            input: input,
+            fortContext: "TEST HARNESS: Single-day input for verification.",
+            dbContext: dbContext,
+            progressionDirectivesBlock: "No progression directives in test mode.",
+            oneRepMaxes: oneRepMaxes
+        )
+
+        let anthropic = integrations.makeAnthropicClient(
+            apiKey: config.anthropicAPIKey,
+            model: "claude-sonnet-4-6",
+            maxTokens: 2048
+        )
+
+        let startTime = CFAbsoluteTimeGetCurrent()
+        let generation = try await anthropic.generatePlan(
+            systemPrompt: "You generate deterministic weekly workout plans in strict markdown format. This is a test harness call — respond concisely.",
+            userPrompt: prompt
+        )
+        let elapsed = CFAbsoluteTimeGetCurrent() - startTime
+
+        let promptLower = prompt.lowercased()
+        let contains1RM = promptLower.contains("1rm profile")
+        let detected1RMExercises = oneRepMaxes.keys.filter { exercise in
+            promptLower.contains(exercise.lowercased())
+        }.sorted()
+
+        return APITestHarnessResult(
+            prompt: prompt,
+            rawResponse: generation.text,
+            model: generation.model,
+            inputTokens: generation.inputTokens,
+            outputTokens: generation.outputTokens,
+            responseTimeSeconds: elapsed,
+            containsOneRepMax: contains1RM,
+            oneRepMaxExercises: detected1RMExercises,
+            errorMessage: ""
+        )
+    }
+    // END TEMP: TEST HARNESS
+
     func loadDBHealthSnapshot() -> DBHealthSnapshot {
         guard let database = try? openDatabase(),
               let health = try? database.fetchDBHealthSnapshot()

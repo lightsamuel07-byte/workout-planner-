@@ -48,6 +48,8 @@ struct NativeWorkoutRootView: View {
             return "clock.arrow.circlepath"
         case .settings:
             return "gearshape"
+        case .apiTestHarness: // TEMP: TEST HARNESS
+            return "ant"
         case .dbStatus:
             return "internaldrive"
         }
@@ -72,6 +74,8 @@ struct NativeWorkoutRootView: View {
             ExerciseHistoryPageView(coordinator: coordinator)
         case .settings:
             SettingsPageView(coordinator: coordinator)
+        case .apiTestHarness: // TEMP: TEST HARNESS
+            APITestHarnessPageView(coordinator: coordinator)
         case .dbStatus:
             DBStatusPageView(coordinator: coordinator)
         }
@@ -1688,6 +1692,324 @@ struct SettingsPageView: View {
         }
     }
 }
+
+// TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
+struct APITestHarnessPageView: View {
+    @ObservedObject var coordinator: AppCoordinator
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                HStack(alignment: .firstTextBaseline) {
+                    Text("API Test Harness")
+                        .font(.largeTitle.bold())
+                    Spacer()
+                    Text("⚠️ TEMPORARY — Remove after verification")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 3)
+                        .background(.orange.opacity(0.1))
+                        .clipShape(Capsule())
+                }
+
+                Text("Send a single Fort workout to the Claude API and inspect the raw request/response. Verify 1RM values appear in context and percentage calculations are correct.")
+                    .foregroundStyle(.secondary)
+
+                StatusBannerView(banner: coordinator.statusBanner)
+
+                // MARK: - 1RM Status
+                GroupBox("1RM Context Check") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        if coordinator.oneRepMaxesAreFilled {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Text("All 1RM values set — these will be injected into the API prompt.")
+                                    .font(.callout)
+                            }
+                            ForEach(coordinator.oneRepMaxFields) { field in
+                                if let value = field.parsedValue {
+                                    HStack(spacing: 8) {
+                                        Text(field.liftName)
+                                            .font(.system(.caption, design: .monospaced).bold())
+                                        Text(String(format: "%.1f kg", value))
+                                            .font(.system(.caption, design: .monospaced))
+                                            .foregroundStyle(.secondary)
+                                        Text("→ 80%: \(String(format: "%.1f", value * 0.80)) kg")
+                                            .font(.system(.caption2, design: .monospaced))
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+                            }
+                        } else {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                Text("1RM values not set. Go to Settings first.")
+                                    .font(.callout)
+                                Button("Go to Settings") { coordinator.quickNavigate(to: .settings) }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                // MARK: - Fort Input
+                GroupBox("Fort Workout Input (Monday slot)") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        TextEditor(text: $coordinator.testHarnessFortInput)
+                            .frame(height: 150)
+                            .font(.system(.body, design: .monospaced))
+
+                        HStack {
+                            Button("Load Template") { coordinator.applyTestHarnessTemplate() }
+                                .buttonStyle(.bordered)
+                            Button("Clear") { coordinator.testHarnessFortInput = "" }
+                                .buttonStyle(.bordered)
+                            Spacer()
+                            Text("\(coordinator.testHarnessFortInput.count) chars")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                // MARK: - Payload Preview
+                GroupBox {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Payload Preview")
+                                .font(.headline)
+                            Spacer()
+                            Toggle("Show", isOn: $coordinator.testHarnessShowPayload)
+                                .toggleStyle(.switch)
+                                .controlSize(.small)
+                        }
+
+                        if coordinator.testHarnessShowPayload {
+                            ScrollView {
+                                Text(coordinator.testHarnessPayloadPreview)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                            }
+                            .frame(maxHeight: 250)
+                            .padding(8)
+                            .background(Color(.textBackgroundColor).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+                }
+
+                // MARK: - Send Button
+                HStack(spacing: 12) {
+                    Button(coordinator.testHarnessIsSending ? "Sending..." : "Send to Claude") {
+                        Task { await coordinator.sendTestHarnessRequest() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.orange)
+                    .disabled(!coordinator.testHarnessCanSend)
+
+                    Button("Clear Results") { coordinator.clearTestHarnessResult() }
+                        .buttonStyle(.bordered)
+
+                    if coordinator.testHarnessIsSending {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+
+                    Spacer()
+
+                    if !coordinator.setupState.validate().isEmpty {
+                        Text("Setup incomplete — configure API key first")
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                // MARK: - Error Display
+                if !coordinator.testHarnessResult.errorMessage.isEmpty {
+                    GroupBox("Error") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            HStack(spacing: 6) {
+                                Image(systemName: "xmark.octagon.fill")
+                                    .foregroundStyle(.red)
+                                Text("API call failed")
+                                    .font(.headline)
+                                    .foregroundStyle(.red)
+                            }
+                            Text(coordinator.testHarnessResult.errorMessage)
+                                .font(.system(.callout, design: .monospaced))
+                                .textSelection(.enabled)
+                                .foregroundStyle(.red.opacity(0.8))
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                // MARK: - Response Metadata
+                if !coordinator.testHarnessResult.rawResponse.isEmpty {
+                    GroupBox("Response Metadata") {
+                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
+                            testHarnessMetricCard(title: "Model", value: coordinator.testHarnessResult.model)
+                            testHarnessMetricCard(title: "Input Tokens", value: "\(coordinator.testHarnessResult.inputTokens)")
+                            testHarnessMetricCard(title: "Output Tokens", value: "\(coordinator.testHarnessResult.outputTokens)")
+                            testHarnessMetricCard(
+                                title: "Response Time",
+                                value: String(format: "%.2fs", coordinator.testHarnessResult.responseTimeSeconds)
+                            )
+                            testHarnessMetricCard(
+                                title: "1RM in Prompt",
+                                value: coordinator.testHarnessResult.containsOneRepMax ? "YES ✓" : "NO ✗"
+                            )
+                            testHarnessMetricCard(
+                                title: "1RM Exercises",
+                                value: coordinator.testHarnessResult.oneRepMaxExercises.isEmpty
+                                    ? "None"
+                                    : coordinator.testHarnessResult.oneRepMaxExercises.joined(separator: ", ")
+                            )
+                        }
+                    }
+
+                    // MARK: - Verification Checklist
+                    GroupBox("Verification Checklist") {
+                        VStack(alignment: .leading, spacing: 6) {
+                            verificationRow(
+                                "1RM values present in prompt",
+                                passed: coordinator.testHarnessResult.containsOneRepMax
+                            )
+                            verificationRow(
+                                "Response is non-empty",
+                                passed: !coordinator.testHarnessResult.rawResponse.isEmpty
+                            )
+                            verificationRow(
+                                "Model is claude-sonnet-4-6",
+                                passed: coordinator.testHarnessResult.model.contains("claude")
+                            )
+                            verificationRow(
+                                "Response time < 30s",
+                                passed: coordinator.testHarnessResult.responseTimeSeconds < 30
+                            )
+                            verificationRow(
+                                "Contains markdown headers (##)",
+                                passed: coordinator.testHarnessResult.rawResponse.contains("##")
+                            )
+                            verificationRow(
+                                "Contains exercise notation (x ... @ ... kg)",
+                                passed: coordinator.testHarnessResult.rawResponse.contains("kg")
+                            )
+                            verificationRow(
+                                "No error",
+                                passed: coordinator.testHarnessResult.errorMessage.isEmpty
+                            )
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
+                    // MARK: - Raw Response
+                    GroupBox("Raw Response") {
+                        VStack(alignment: .leading, spacing: 8) {
+                            HStack {
+                                Text("\(coordinator.testHarnessResult.rawResponse.count) characters")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                                Button("Copy") {
+                                    NSPasteboard.general.clearContents()
+                                    NSPasteboard.general.setString(coordinator.testHarnessResult.rawResponse, forType: .string)
+                                }
+                                .buttonStyle(.bordered)
+                                .controlSize(.small)
+                            }
+                            ScrollView {
+                                Text(coordinator.testHarnessResult.rawResponse)
+                                    .font(.system(.caption, design: .monospaced))
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                            }
+                            .frame(maxHeight: 400)
+                            .padding(8)
+                            .background(Color(.textBackgroundColor).opacity(0.5))
+                            .clipShape(RoundedRectangle(cornerRadius: 6))
+                        }
+                    }
+
+                    // MARK: - Full Prompt (Sent to API)
+                    if !coordinator.testHarnessResult.prompt.isEmpty {
+                        GroupBox("Full Prompt (Sent to API)") {
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("\(coordinator.testHarnessResult.prompt.count) characters")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Spacer()
+                                    Button("Copy") {
+                                        NSPasteboard.general.clearContents()
+                                        NSPasteboard.general.setString(coordinator.testHarnessResult.prompt, forType: .string)
+                                    }
+                                    .buttonStyle(.bordered)
+                                    .controlSize(.small)
+                                }
+                                ScrollView {
+                                    Text(coordinator.testHarnessResult.prompt)
+                                        .font(.system(.caption, design: .monospaced))
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .textSelection(.enabled)
+                                }
+                                .frame(maxHeight: 300)
+                                .padding(8)
+                                .background(Color(.textBackgroundColor).opacity(0.5))
+                                .clipShape(RoundedRectangle(cornerRadius: 6))
+                            }
+                        }
+                    }
+                }
+
+                Spacer()
+            }
+        }
+        .onAppear {
+            coordinator.loadOneRepMaxFields()
+        }
+    }
+
+    private func testHarnessMetricCard(title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            Text(value)
+                .font(.system(.callout, design: .monospaced).bold())
+                .lineLimit(2)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(10)
+        .background(.thinMaterial)
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+
+    private func verificationRow(_ label: String, passed: Bool) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: passed ? "checkmark.circle.fill" : "xmark.circle.fill")
+                .foregroundStyle(passed ? .green : .red)
+            Text(label)
+                .font(.callout)
+            Spacer()
+            Text(passed ? "PASS" : "FAIL")
+                .font(.system(.caption, design: .monospaced).bold())
+                .foregroundStyle(passed ? .green : .red)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(passed ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
+                .clipShape(Capsule())
+        }
+    }
+}
+// END TEMP: TEST HARNESS
 
 struct DBStatusPageView: View {
     @ObservedObject var coordinator: AppCoordinator
