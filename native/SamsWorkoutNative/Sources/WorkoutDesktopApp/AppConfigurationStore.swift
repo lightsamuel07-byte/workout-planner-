@@ -1,17 +1,29 @@
 import Foundation
 
+struct OneRepMaxEntry: Codable, Equatable {
+    var valueKG: Double
+    var lastUpdated: Date
+
+    static let empty = OneRepMaxEntry(valueKG: 0, lastUpdated: .distantPast)
+}
+
 struct NativeAppConfiguration: Codable, Equatable {
     var anthropicAPIKey: String
     var spreadsheetID: String
     var googleAuthHint: String
     var localAppPassword: String
+    var oneRepMaxes: [String: OneRepMaxEntry]
 
     static let empty = NativeAppConfiguration(
         anthropicAPIKey: "",
         spreadsheetID: "",
         googleAuthHint: "OAuth token path",
-        localAppPassword: ""
+        localAppPassword: "",
+        oneRepMaxes: [:]
     )
+
+    /// Canonical lift names for the three main barbell lifts.
+    static let mainLifts = ["Back Squat", "Bench Press", "Deadlift"]
 }
 
 protocol AppConfigurationStore {

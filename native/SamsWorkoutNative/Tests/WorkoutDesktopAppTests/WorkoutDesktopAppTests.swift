@@ -39,6 +39,7 @@ final class WorkoutDesktopAppTests: XCTestCase {
             .progress,
             .weeklyReview,
             .exerciseHistory,
+            .settings,
             .dbStatus,
         ]
         XCTAssertEqual(Set(AppRoute.allCases), expected)
@@ -495,5 +496,97 @@ final class WorkoutDesktopAppTests: XCTestCase {
         coordinator.dbRebuildSummary = "Imported 10 rows. DB totals: 4 exercises."
         XCTAssertEqual(coordinator.formattedDBRebuildSummaryLines.count, 2)
         XCTAssertTrue(coordinator.formattedDBRebuildSummaryLines[0].hasSuffix("."))
+    }
+
+    // MARK: - One Rep Max Tests
+
+    func testOneRepMaxFieldValidation() {
+        var field = OneRepMaxFieldState(id: "squat", liftName: "Back Squat", inputText: "", lastUpdated: nil)
+        XCTAssertTrue(field.isValid, "Empty input should be valid (optional)")
+        XCTAssertNil(field.parsedValue)
+        XCTAssertEqual(field.lastUpdatedText, "Not set")
+
+        field.inputText = "140"
+        XCTAssertTrue(field.isValid)
+        XCTAssertEqual(field.parsedValue, 140.0)
+        XCTAssertTrue(field.validationMessage.isEmpty)
+
+        field.inputText = "15"
+        XCTAssertFalse(field.isValid)
+        XCTAssertNil(field.parsedValue)
+        XCTAssertTrue(field.validationMessage.contains("20"))
+
+        field.inputText = "305"
+        XCTAssertFalse(field.isValid)
+        XCTAssertNil(field.parsedValue)
+        XCTAssertTrue(field.validationMessage.contains("300"))
+
+        field.inputText = "abc"
+        XCTAssertFalse(field.isValid)
+        XCTAssertNil(field.parsedValue)
+        XCTAssertTrue(field.validationMessage.contains("numeric"))
+
+        field.inputText = "142,5"
+        XCTAssertTrue(field.isValid)
+        XCTAssertEqual(field.parsedValue, 142.5)
+    }
+
+    func testOneRepMaxSaveAndRestore() {
+        let coordinator = makeCoordinator()
+        coordinator.loadOneRepMaxFields()
+        XCTAssertEqual(coordinator.oneRepMaxFields.count, 3)
+        XCTAssertFalse(coordinator.oneRepMaxesAreFilled)
+        XCTAssertEqual(coordinator.oneRepMaxMissingLifts.count, 3)
+
+        for index in coordinator.oneRepMaxFields.indices {
+            coordinator.oneRepMaxFields[index].inputText = "\(100 + index * 20)"
+        }
+        coordinator.saveOneRepMaxes()
+        XCTAssertTrue(coordinator.oneRepMaxStatus.contains("saved"))
+
+        coordinator.loadOneRepMaxFields()
+        XCTAssertTrue(coordinator.oneRepMaxesAreFilled)
+        XCTAssertTrue(coordinator.oneRepMaxMissingLifts.isEmpty)
+
+        let dict = coordinator.oneRepMaxDictionary()
+        XCTAssertEqual(dict.count, 3)
+        XCTAssertEqual(dict["Back Squat"], 100.0)
+        XCTAssertEqual(dict["Bench Press"], 120.0)
+        XCTAssertEqual(dict["Deadlift"], 140.0)
+    }
+
+    func testOneRepMaxGenerationWarning() {
+        let coordinator = makeCoordinator()
+        XCTAssertFalse(coordinator.oneRepMaxWarningForGeneration.isEmpty)
+        XCTAssertTrue(coordinator.oneRepMaxWarningForGeneration.contains("Back Squat"))
+
+        coordinator.loadOneRepMaxFields()
+        for index in coordinator.oneRepMaxFields.indices {
+            coordinator.oneRepMaxFields[index].inputText = "100"
+        }
+        coordinator.saveOneRepMaxes()
+        XCTAssertTrue(coordinator.oneRepMaxWarningForGeneration.isEmpty)
+    }
+
+    func testOneRepMaxConfigPersistence() {
+        let entry = OneRepMaxEntry(valueKG: 140.0, lastUpdated: Date())
+        let config = NativeAppConfiguration(
+            anthropicAPIKey: "key",
+            spreadsheetID: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU",
+            googleAuthHint: "",
+            localAppPassword: "",
+            oneRepMaxes: ["Back Squat": entry]
+        )
+
+        let encoder = JSONEncoder()
+        let decoder = JSONDecoder()
+        let data = try! encoder.encode(config)
+        let decoded = try! decoder.decode(NativeAppConfiguration.self, from: data)
+        XCTAssertEqual(decoded.oneRepMaxes["Back Squat"]?.valueKG, 140.0)
+        XCTAssertEqual(decoded.anthropicAPIKey, "key")
+    }
+
+    func testOneRepMaxMainLiftsConstant() {
+        XCTAssertEqual(NativeAppConfiguration.mainLifts, ["Back Squat", "Bench Press", "Deadlift"])
     }
 }

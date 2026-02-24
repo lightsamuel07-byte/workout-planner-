@@ -47,6 +47,9 @@ final class AppCoordinator: ObservableObject {
     @Published var recentSessions: [RecentSessionSummary] = []
     @Published var dbHealthSnapshot = DBHealthSnapshot.empty
 
+    @Published var oneRepMaxFields: [OneRepMaxFieldState] = []
+    @Published var oneRepMaxStatus = ""
+
     private let gateway: NativeAppGateway
     private let configStore: AppConfigurationStore
 
@@ -189,6 +192,14 @@ final class AppCoordinator: ObservableObject {
             return setupErrors.joined(separator: " ")
         }
         return generationReadinessSummary == "Readiness checks passed." ? "" : generationReadinessSummary
+    }
+
+    var oneRepMaxWarningForGeneration: String {
+        if oneRepMaxesAreFilled {
+            return ""
+        }
+        let missing = oneRepMaxMissingLifts.joined(separator: ", ")
+        return "1RM values not set for: \(missing). Go to Settings to enter them. Generation will proceed but percentage-based loads may be inaccurate."
     }
 
     var generationReadinessReport: GenerationReadinessReport {
@@ -829,6 +840,105 @@ final class AppCoordinator: ObservableObject {
         selectedHistoryExercise = exerciseName
     }
 
+    // MARK: - One Rep Max
+
+    var oneRepMaxesAreFilled: Bool {
+        let config = configStore.load()
+        return NativeAppConfiguration.mainLifts.allSatisfy { lift in
+            guard let entry = config.oneRepMaxes[lift] else { return false }
+            return entry.valueKG >= 20 && entry.valueKG <= 300
+        }
+    }
+
+    var oneRepMaxMissingLifts: [String] {
+        let config = configStore.load()
+        return NativeAppConfiguration.mainLifts.filter { lift in
+            guard let entry = config.oneRepMaxes[lift] else { return true }
+            return entry.valueKG < 20 || entry.valueKG > 300
+        }
+    }
+
+    var oneRepMaxAllValid: Bool {
+        oneRepMaxFields.allSatisfy(\.isValid)
+    }
+
+    var oneRepMaxHasChanges: Bool {
+        let config = configStore.load()
+        for field in oneRepMaxFields {
+            guard let parsed = field.parsedValue else {
+                if config.oneRepMaxes[field.liftName] != nil {
+                    return true
+                }
+                continue
+            }
+            if let existing = config.oneRepMaxes[field.liftName] {
+                if abs(existing.valueKG - parsed) > 0.01 {
+                    return true
+                }
+            } else {
+                return true
+            }
+        }
+        return false
+    }
+
+    func loadOneRepMaxFields() {
+        let config = configStore.load()
+        oneRepMaxFields = NativeAppConfiguration.mainLifts.map { lift in
+            let entry = config.oneRepMaxes[lift]
+            let text: String
+            if let entry, entry.valueKG >= 20 {
+                text = String(format: "%.1f", entry.valueKG)
+                    .replacingOccurrences(of: "\\.0$", with: "", options: .regularExpression)
+            } else {
+                text = ""
+            }
+            return OneRepMaxFieldState(
+                id: lift,
+                liftName: lift,
+                inputText: text,
+                lastUpdated: entry?.lastUpdated
+            )
+        }
+    }
+
+    func saveOneRepMaxes() {
+        guard oneRepMaxAllValid else {
+            oneRepMaxStatus = "Fix invalid values before saving."
+            return
+        }
+
+        var config = configStore.load()
+        let now = Date()
+        for field in oneRepMaxFields {
+            if let parsed = field.parsedValue {
+                let existing = config.oneRepMaxes[field.liftName]
+                let needsTimestampUpdate = existing == nil || abs((existing?.valueKG ?? 0) - parsed) > 0.01
+                config.oneRepMaxes[field.liftName] = OneRepMaxEntry(
+                    valueKG: parsed,
+                    lastUpdated: needsTimestampUpdate ? now : (existing?.lastUpdated ?? now)
+                )
+            }
+        }
+
+        do {
+            try configStore.save(config)
+            oneRepMaxStatus = "1RM values saved."
+            loadOneRepMaxFields()
+        } catch {
+            oneRepMaxStatus = "Failed to save 1RM values: \(error.localizedDescription)"
+        }
+    }
+
+    func oneRepMaxDictionary() -> [String: Double] {
+        let config = configStore.load()
+        var result: [String: Double] = [:]
+        for (lift, entry) in config.oneRepMaxes where entry.valueKG >= 20 {
+            result[lift] = entry.valueKG
+        }
+        return result
+    }
+
     func quickNavigate(to target: AppRoute) {
         route = target
     }
@@ -1215,6 +1325,7 @@ final class AppCoordinator: ObservableObject {
         )
         isSetupComplete = true
         isUnlocked = config.localAppPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        loadOneRepMaxFields()
         Task {
             await refreshPlanSnapshot()
             await refreshLoggerSession()
@@ -1222,11 +1333,13 @@ final class AppCoordinator: ObservableObject {
     }
 
     private func persistConfig() {
+        let existingConfig = configStore.load()
         let config = NativeAppConfiguration(
             anthropicAPIKey: setupState.anthropicAPIKey,
             spreadsheetID: setupState.spreadsheetID,
             googleAuthHint: setupState.googleAuthHint,
-            localAppPassword: setupState.localAppPassword
+            localAppPassword: setupState.localAppPassword,
+            oneRepMaxes: existingConfig.oneRepMaxes
         )
         do {
             try configStore.save(config)

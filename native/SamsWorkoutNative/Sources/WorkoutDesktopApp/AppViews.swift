@@ -46,6 +46,8 @@ struct NativeWorkoutRootView: View {
             return "calendar"
         case .exerciseHistory:
             return "clock.arrow.circlepath"
+        case .settings:
+            return "gearshape"
         case .dbStatus:
             return "internaldrive"
         }
@@ -68,6 +70,8 @@ struct NativeWorkoutRootView: View {
             WeeklyReviewPageView(coordinator: coordinator)
         case .exerciseHistory:
             ExerciseHistoryPageView(coordinator: coordinator)
+        case .settings:
+            SettingsPageView(coordinator: coordinator)
         case .dbStatus:
             DBStatusPageView(coordinator: coordinator)
         }
@@ -496,6 +500,26 @@ struct GeneratePlanPageView: View {
                     RoundedRectangle(cornerRadius: 8)
                         .fill(preflightTint(for: coordinator.generationReadinessSeverity))
                 )
+
+                if !coordinator.oneRepMaxWarningForGeneration.isEmpty {
+                    HStack(alignment: .top, spacing: 8) {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(coordinator.oneRepMaxWarningForGeneration)
+                                .font(.callout)
+                                .foregroundStyle(.orange)
+                            Button("Go to Settings") {
+                                coordinator.quickNavigate(to: .settings)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(10)
+                    .background(.orange.opacity(0.08))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
 
                 HStack {
                     Text("Issues: \(coordinator.generationIssueCount)")
@@ -1138,6 +1162,186 @@ struct ExerciseHistoryPageView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+struct SettingsPageView: View {
+    @ObservedObject var coordinator: AppCoordinator
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Settings")
+                    .font(.largeTitle.bold())
+
+                Text("Configure your training profile. These values feed into AI plan generation.")
+                    .foregroundStyle(.secondary)
+
+                StatusBannerView(banner: coordinator.statusBanner)
+
+                GroupBox("One Rep Max (1RM) — Main Lifts") {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Enter your current 1RM for each lift in kg. These values are sent to Claude when generating supplemental workouts so percentage-based loads are accurate.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        ForEach($coordinator.oneRepMaxFields) { $field in
+                            VStack(alignment: .leading, spacing: 4) {
+                                HStack(alignment: .center, spacing: 12) {
+                                    Text(field.liftName)
+                                        .font(.headline)
+                                        .frame(width: 120, alignment: .leading)
+
+                                    TextField("e.g. 140", text: $field.inputText)
+                                        .textFieldStyle(.roundedBorder)
+                                        .frame(width: 100)
+
+                                    Text("kg")
+                                        .foregroundStyle(.secondary)
+
+                                    Spacer()
+
+                                    VStack(alignment: .trailing, spacing: 2) {
+                                        if let value = field.parsedValue {
+                                            Text(String(format: "%.1f kg", value))
+                                                .font(.caption)
+                                                .foregroundStyle(.green)
+                                        }
+                                        Text("Updated: \(field.lastUpdatedText)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.tertiary)
+                                    }
+                                }
+
+                                if !field.validationMessage.isEmpty {
+                                    Text(field.validationMessage)
+                                        .font(.caption)
+                                        .foregroundStyle(.red)
+                                }
+                            }
+                        }
+
+                        Divider()
+
+                        HStack {
+                            Button("Save 1RM Values") {
+                                coordinator.saveOneRepMaxes()
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(!coordinator.oneRepMaxAllValid)
+
+                            if !coordinator.oneRepMaxStatus.isEmpty {
+                                Text(coordinator.oneRepMaxStatus)
+                                    .font(.caption)
+                                    .foregroundStyle(
+                                        coordinator.oneRepMaxStatus.contains("saved") ? .green : .orange
+                                    )
+                            }
+                        }
+
+                        if !coordinator.oneRepMaxesAreFilled {
+                            HStack(spacing: 6) {
+                                Image(systemName: "exclamationmark.triangle.fill")
+                                    .foregroundStyle(.orange)
+                                Text("Set all three 1RM values before generating plans. Missing: \(coordinator.oneRepMaxMissingLifts.joined(separator: ", ")).")
+                                    .font(.caption)
+                                    .foregroundStyle(.orange)
+                            }
+                        } else {
+                            HStack(spacing: 6) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                Text("All 1RM values are set. These will be included in Claude API context during plan generation.")
+                                    .font(.caption)
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                GroupBox("Percentage Reference") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("Common training percentages based on your current 1RMs:")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        let percentages = [0.50, 0.60, 0.70, 0.80, 0.85, 0.90, 0.95]
+                        let config = coordinator.oneRepMaxFields
+
+                        HStack(alignment: .top, spacing: 20) {
+                            ForEach(config) { field in
+                                if let value = field.parsedValue {
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text(field.liftName)
+                                            .font(.caption.bold())
+                                        ForEach(percentages, id: \.self) { pct in
+                                            HStack {
+                                                Text("\(Int(pct * 100))%")
+                                                    .font(.system(.caption, design: .monospaced))
+                                                    .frame(width: 36, alignment: .trailing)
+                                                Text(String(format: "%.1f kg", value * pct))
+                                                    .font(.system(.caption, design: .monospaced))
+                                            }
+                                            .foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        if !coordinator.oneRepMaxesAreFilled {
+                            Text("Enter 1RM values above to see percentage breakdowns.")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                GroupBox("App Credentials") {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("Anthropic API Key")
+                                .font(.caption.bold())
+                            Spacer()
+                            Text(coordinator.setupState.anthropicAPIKey.isEmpty ? "Not set" : "Configured")
+                                .font(.caption)
+                                .foregroundStyle(coordinator.setupState.anthropicAPIKey.isEmpty ? .red : .green)
+                        }
+                        HStack {
+                            Text("Spreadsheet ID")
+                                .font(.caption.bold())
+                            Spacer()
+                            Text(coordinator.setupState.spreadsheetID.isEmpty ? "Not set" : "Configured")
+                                .font(.caption)
+                                .foregroundStyle(coordinator.setupState.spreadsheetID.isEmpty ? .red : .green)
+                        }
+                        HStack {
+                            Text("Google Auth")
+                                .font(.caption.bold())
+                            Spacer()
+                            let hint = coordinator.setupState.googleAuthHint.trimmingCharacters(in: .whitespacesAndNewlines)
+                            Text(hint.isEmpty || hint == "OAuth token path" ? "Not set" : "Configured")
+                                .font(.caption)
+                                .foregroundStyle(hint.isEmpty || hint == "OAuth token path" ? .orange : .green)
+                        }
+
+                        Button("Edit Credentials (Back to Setup)") {
+                            coordinator.markSetupIncomplete()
+                        }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
+                Spacer()
+            }
+        }
+        .onAppear {
+            coordinator.loadOneRepMaxFields()
         }
     }
 }

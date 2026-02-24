@@ -8,6 +8,7 @@ enum AppRoute: String, CaseIterable, Identifiable {
     case progress = "Progress"
     case weeklyReview = "Weekly Review"
     case exerciseHistory = "Exercise History"
+    case settings = "Settings"
     case dbStatus = "DB Status"
 
     var id: String { rawValue }
@@ -413,4 +414,55 @@ struct DBRebuildReport: Equatable {
     let dbExercises: Int
     let dbSessions: Int
     let dbExerciseLogs: Int
+}
+
+struct OneRepMaxFieldState: Equatable, Identifiable {
+    let id: String
+    let liftName: String
+    var inputText: String
+    var lastUpdated: Date?
+
+    var isValid: Bool {
+        guard let value = Double(inputText.replacingOccurrences(of: ",", with: ".")) else {
+            return inputText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        }
+        return value >= 20 && value <= 300
+    }
+
+    var validationMessage: String {
+        let trimmed = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            return ""
+        }
+        guard let value = Double(trimmed.replacingOccurrences(of: ",", with: ".")) else {
+            return "Enter a numeric value."
+        }
+        if value < 20 {
+            return "Minimum 20 kg."
+        }
+        if value > 300 {
+            return "Maximum 300 kg."
+        }
+        return ""
+    }
+
+    var parsedValue: Double? {
+        let trimmed = inputText.replacingOccurrences(of: ",", with: ".").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, let value = Double(trimmed), value >= 20, value <= 300 else {
+            return nil
+        }
+        return value
+    }
+
+    var lastUpdatedText: String {
+        guard let date = lastUpdated, date != .distantPast else {
+            return "Not set"
+        }
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+        return formatter.string(from: date)
+    }
 }

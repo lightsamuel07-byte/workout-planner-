@@ -129,11 +129,13 @@ struct LiveAppGateway: NativeAppGateway {
         let planDirectives = progressionRules.map { $0.asPlanDirective() }
         let directivesBlock = formatDirectivesForPrompt(progressionRules)
         let dbContext = buildRecentDBContext()
+        let oneRepMaxes = loadOneRepMaxesFromConfig()
         let prompt = buildGenerationPrompt(
             input: input,
             fortContext: fortContext,
             dbContext: dbContext,
-            progressionDirectivesBlock: directivesBlock
+            progressionDirectivesBlock: directivesBlock,
+            oneRepMaxes: oneRepMaxes
         )
 
         let anthropic = integrations.makeAnthropicClient(
@@ -662,6 +664,15 @@ private extension LiveAppGateway {
         return value.range(of: pattern, options: .regularExpression) != nil
     }
 
+    func loadOneRepMaxesFromConfig() -> [String: Double] {
+        let config = configStore.load()
+        var result: [String: Double] = [:]
+        for (lift, entry) in config.oneRepMaxes where entry.valueKG >= 20 {
+            result[lift] = entry.valueKG
+        }
+        return result
+    }
+
     func modeStatusText(config: NativeAppConfiguration) -> String {
         let authHint = config.googleAuthHint.trimmingCharacters(in: .whitespacesAndNewlines)
         let authText: String
@@ -807,12 +818,25 @@ private extension LiveAppGateway {
         input: PlanGenerationInput,
         fortContext: String,
         dbContext: String,
-        progressionDirectivesBlock: String
+        progressionDirectivesBlock: String,
+        oneRepMaxes: [String: Double] = [:]
     ) -> String {
-        """
+        let oneRMSection: String
+        if oneRepMaxes.isEmpty {
+            oneRMSection = "ATHLETE 1RM PROFILE:\nNo 1RM data provided. Use RPE feedback from recent logs to infer appropriate intensity."
+        } else {
+            let lines = oneRepMaxes.sorted(by: { $0.key < $1.key }).map { exercise, value in
+                String(format: "- %@: %.1f kg", exercise, value)
+            }
+            oneRMSection = "ATHLETE 1RM PROFILE (use these for percentage-based load calculations):\n" + lines.joined(separator: "\n")
+        }
+
+        return """
         You are an expert strength and conditioning coach creating a personalized weekly workout plan.
 
         CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
+
+        \(oneRMSection)
 
         \(fortContext)
 
