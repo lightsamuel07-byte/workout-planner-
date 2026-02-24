@@ -662,6 +662,42 @@ struct LiveAppGateway: NativeAppGateway {
             weekdayCompletion: weekdayCompletion
         )
     }
+
+    func loadWeeklyVolumePoints(limit: Int = 12) -> [WeeklyVolumePoint] {
+        guard let database = try? openDatabase(),
+              let points = try? database.fetchWeeklyVolume(limit: limit)
+        else {
+            return []
+        }
+
+        return points.map { row in
+            WeeklyVolumePoint(sheetName: row.sheetName, volume: row.volume)
+        }
+    }
+
+    func loadWeeklyRPEPoints(limit: Int = 12) -> [WeeklyRPEPoint] {
+        guard let database = try? openDatabase(),
+              let points = try? database.fetchWeeklyRPE(limit: limit)
+        else {
+            return []
+        }
+
+        return points.map { row in
+            WeeklyRPEPoint(sheetName: row.sheetName, averageRPE: row.averageRPE, rpeCount: row.rpeCount)
+        }
+    }
+
+    func loadMuscleGroupVolumes(limit: Int = 12) -> [MuscleGroupVolume] {
+        guard let database = try? openDatabase(),
+              let volumes = try? database.fetchMuscleGroupVolume(limit: limit)
+        else {
+            return []
+        }
+
+        return volumes.map { row in
+            MuscleGroupVolume(muscleGroup: row.muscleGroup, volume: row.volume, exerciseCount: row.exerciseCount)
+        }
+    }
 }
 
 private extension LiveAppGateway {

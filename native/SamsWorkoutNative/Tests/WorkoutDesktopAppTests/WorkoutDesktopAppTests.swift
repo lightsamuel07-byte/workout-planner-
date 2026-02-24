@@ -656,4 +656,93 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(result.model, "claude-sonnet-4-6")
     }
     // END TEMP: TEST HARNESS
+
+    // MARK: - Progress Page & New Analytics Tests
+
+    func testWeeklyVolumePointsLoadFromInMemoryGateway() {
+        let coordinator = makeCoordinator()
+        coordinator.refreshAnalytics()
+        XCTAssertEqual(coordinator.weeklyVolumePoints.count, 3)
+        XCTAssertEqual(coordinator.weeklyVolumePoints.first?.sheetName, "Weekly Plan (2/9/2026)")
+        XCTAssertGreaterThan(coordinator.weeklyVolumePoints.first?.volume ?? 0, 0)
+    }
+
+    func testWeeklyRPEPointsLoadFromInMemoryGateway() {
+        let coordinator = makeCoordinator()
+        coordinator.refreshAnalytics()
+        XCTAssertEqual(coordinator.weeklyRPEPoints.count, 3)
+        XCTAssertGreaterThan(coordinator.weeklyRPEPoints.first?.averageRPE ?? 0, 0)
+        XCTAssertGreaterThan(coordinator.weeklyRPEPoints.first?.rpeCount ?? 0, 0)
+    }
+
+    func testMuscleGroupVolumesLoadFromInMemoryGateway() {
+        let coordinator = makeCoordinator()
+        coordinator.refreshAnalytics()
+        XCTAssertEqual(coordinator.muscleGroupVolumes.count, 3)
+        XCTAssertEqual(coordinator.muscleGroupVolumes.first?.muscleGroup, "CLUSTER SET")
+        XCTAssertGreaterThan(coordinator.muscleGroupVolumes.first?.volume ?? 0, 0)
+    }
+
+    func testVolumeChartMaxReturnsHighestValue() {
+        let coordinator = makeCoordinator()
+        coordinator.weeklyVolumePoints = [
+            WeeklyVolumePoint(sheetName: "W1", volume: 1000),
+            WeeklyVolumePoint(sheetName: "W2", volume: 5000),
+            WeeklyVolumePoint(sheetName: "W3", volume: 3000),
+        ]
+        XCTAssertEqual(coordinator.volumeChartMax, 5000)
+    }
+
+    func testVolumeChangeTextShowsPercentDelta() {
+        let coordinator = makeCoordinator()
+        coordinator.weeklyVolumePoints = [
+            WeeklyVolumePoint(sheetName: "W2", volume: 11000),
+            WeeklyVolumePoint(sheetName: "W1", volume: 10000),
+        ]
+        // Reversed: [W1: 10000, W2: 11000]. Latest = 11000, previous = 10000 => +10.0%
+        XCTAssertEqual(coordinator.weeklyVolumeChangeText, "+10.0%")
+    }
+
+    func testAverageRPETextWeightedCorrectly() {
+        let coordinator = makeCoordinator()
+        coordinator.weeklyRPEPoints = [
+            WeeklyRPEPoint(sheetName: "W1", averageRPE: 8.0, rpeCount: 10),
+            WeeklyRPEPoint(sheetName: "W2", averageRPE: 7.0, rpeCount: 10),
+        ]
+        // Weighted: (8*10 + 7*10) / 20 = 7.5
+        XCTAssertEqual(coordinator.averageRPEText, "7.5")
+    }
+
+    func testQuickNavigateChangesRoute() {
+        let coordinator = makeCoordinator()
+        XCTAssertEqual(coordinator.route, .dashboard)
+        coordinator.quickNavigate(to: .progress)
+        XCTAssertEqual(coordinator.route, .progress)
+        coordinator.quickNavigate(to: .logWorkout)
+        XCTAssertEqual(coordinator.route, .logWorkout)
+    }
+
+    func testMoveToAdjacentPlanDayNavigatesCorrectly() {
+        let coordinator = makeCoordinator()
+        coordinator.planSnapshot = PlanSnapshot(
+            title: "Weekly Plan (2/23/2026)",
+            source: .localCache,
+            days: [
+                PlanDayDetail(id: "Monday", dayLabel: "Monday", source: .localCache, exercises: []),
+                PlanDayDetail(id: "Wednesday", dayLabel: "Wednesday", source: .localCache, exercises: []),
+                PlanDayDetail(id: "Friday", dayLabel: "Friday", source: .localCache, exercises: []),
+            ],
+            summary: ""
+        )
+        coordinator.selectedPlanDay = "Monday"
+        coordinator.moveToAdjacentPlanDay(step: 1)
+        XCTAssertEqual(coordinator.selectedPlanDay, "Wednesday")
+        coordinator.moveToAdjacentPlanDay(step: 1)
+        XCTAssertEqual(coordinator.selectedPlanDay, "Friday")
+        coordinator.moveToAdjacentPlanDay(step: 1)
+        // Should not go past the end
+        XCTAssertEqual(coordinator.selectedPlanDay, "Friday")
+        coordinator.moveToAdjacentPlanDay(step: -1)
+        XCTAssertEqual(coordinator.selectedPlanDay, "Wednesday")
+    }
 }

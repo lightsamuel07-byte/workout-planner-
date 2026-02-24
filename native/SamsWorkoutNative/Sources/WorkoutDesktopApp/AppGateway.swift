@@ -20,6 +20,9 @@ protocol NativeAppGateway {
     func loadTopExercises(limit: Int) -> [TopExerciseSummary]
     func loadRecentSessions(limit: Int) -> [RecentSessionSummary]
     func loadDBHealthSnapshot() -> DBHealthSnapshot
+    func loadWeeklyVolumePoints(limit: Int) -> [WeeklyVolumePoint]
+    func loadWeeklyRPEPoints(limit: Int) -> [WeeklyRPEPoint]
+    func loadMuscleGroupVolumes(limit: Int) -> [MuscleGroupVolume]
     // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
     func sendTestHarnessRequest(fortInput: String, oneRepMaxes: [String: Double]) async throws -> APITestHarnessResult
     // END TEMP: TEST HARNESS
@@ -76,6 +79,21 @@ extension NativeAppGateway {
 
     func loadDBHealthSnapshot() -> DBHealthSnapshot {
         .empty
+    }
+
+    func loadWeeklyVolumePoints(limit: Int = 12) -> [WeeklyVolumePoint] {
+        let _ = limit
+        return []
+    }
+
+    func loadWeeklyRPEPoints(limit: Int = 12) -> [WeeklyRPEPoint] {
+        let _ = limit
+        return []
+    }
+
+    func loadMuscleGroupVolumes(limit: Int = 12) -> [MuscleGroupVolume] {
+        let _ = limit
+        return []
     }
 
     // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
@@ -202,5 +220,32 @@ struct InMemoryAppGateway: NativeAppGateway {
                 WeekdayCompletionSummary(dayName: "Wednesday", loggedRows: 58, totalRows: 76),
             ]
         )
+    }
+
+    func loadWeeklyVolumePoints(limit: Int = 12) -> [WeeklyVolumePoint] {
+        let _ = limit
+        return [
+            WeeklyVolumePoint(sheetName: "Weekly Plan (2/9/2026)", volume: 28500),
+            WeeklyVolumePoint(sheetName: "Weekly Plan (2/16/2026)", volume: 31200),
+            WeeklyVolumePoint(sheetName: "Weekly Plan (2/23/2026)", volume: 29800),
+        ]
+    }
+
+    func loadWeeklyRPEPoints(limit: Int = 12) -> [WeeklyRPEPoint] {
+        let _ = limit
+        return [
+            WeeklyRPEPoint(sheetName: "Weekly Plan (2/9/2026)", averageRPE: 7.2, rpeCount: 18),
+            WeeklyRPEPoint(sheetName: "Weekly Plan (2/16/2026)", averageRPE: 7.8, rpeCount: 22),
+            WeeklyRPEPoint(sheetName: "Weekly Plan (2/23/2026)", averageRPE: 7.5, rpeCount: 20),
+        ]
+    }
+
+    func loadMuscleGroupVolumes(limit: Int = 12) -> [MuscleGroupVolume] {
+        let _ = limit
+        return [
+            MuscleGroupVolume(muscleGroup: "CLUSTER SET", volume: 15000, exerciseCount: 3),
+            MuscleGroupVolume(muscleGroup: "AUXILIARY", volume: 8500, exerciseCount: 6),
+            MuscleGroupVolume(muscleGroup: "BREAKPOINT", volume: 6200, exerciseCount: 2),
+        ]
     }
 }

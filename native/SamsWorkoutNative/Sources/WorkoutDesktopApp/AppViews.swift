@@ -28,6 +28,7 @@ struct NativeWorkoutRootView: View {
             }
         }
         .frame(minWidth: 1080, minHeight: 720)
+        .background(KeyboardShortcutOverlay(coordinator: coordinator))
     }
 
     private func icon(for route: AppRoute) -> String {
@@ -173,6 +174,67 @@ struct MetricCardView: View {
         .padding(10)
         .background(.thinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+    }
+}
+
+struct KeyboardShortcutOverlay: View {
+    @ObservedObject var coordinator: AppCoordinator
+
+    var body: some View {
+        Group {
+            // Cmd+1-9 navigation
+            Button("") { coordinator.quickNavigate(to: .dashboard) }
+                .keyboardShortcut("1", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .generatePlan) }
+                .keyboardShortcut("2", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .viewPlan) }
+                .keyboardShortcut("3", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .logWorkout) }
+                .keyboardShortcut("4", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .progress) }
+                .keyboardShortcut("5", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .weeklyReview) }
+                .keyboardShortcut("6", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .exerciseHistory) }
+                .keyboardShortcut("7", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .settings) }
+                .keyboardShortcut("8", modifiers: .command)
+            Button("") { coordinator.quickNavigate(to: .dbStatus) }
+                .keyboardShortcut("9", modifiers: .command)
+
+            // Cmd+D = mark done, Cmd+S = skip, Cmd+K = clear
+            Button("") { markCurrentLoggerDraftDone() }
+                .keyboardShortcut("d", modifiers: .command)
+            Button("") { skipCurrentLoggerDraft() }
+                .keyboardShortcut("k", modifiers: .command)
+
+            // Left/Right arrows for plan day navigation
+            Button("") { coordinator.moveToAdjacentPlanDay(step: -1) }
+                .keyboardShortcut(.leftArrow, modifiers: .command)
+            Button("") { coordinator.moveToAdjacentPlanDay(step: 1) }
+                .keyboardShortcut(.rightArrow, modifiers: .command)
+
+            // Cmd+R = refresh analytics
+            Button("") { coordinator.refreshAnalytics() }
+                .keyboardShortcut("r", modifiers: [.command, .shift])
+        }
+        .frame(width: 0, height: 0)
+        .opacity(0)
+        .allowsHitTesting(false)
+    }
+
+    private func markCurrentLoggerDraftDone() {
+        guard coordinator.route == .logWorkout else { return }
+        if let first = coordinator.loggerSession.drafts.first(where: { !coordinator.isDraftComplete($0) }) {
+            coordinator.markDraftDone(draftID: first.id)
+        }
+    }
+
+    private func skipCurrentLoggerDraft() {
+        guard coordinator.route == .logWorkout else { return }
+        if let first = coordinator.loggerSession.drafts.first(where: { !coordinator.isDraftComplete($0) }) {
+            coordinator.markDraftSkip(draftID: first.id)
+        }
     }
 }
 
@@ -1122,47 +1184,166 @@ struct ProgressPageView: View {
     @ObservedObject var coordinator: AppCoordinator
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Progress")
-                .font(.largeTitle.bold())
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("Progress")
+                    .font(.largeTitle.bold())
 
-            Text(coordinator.progressSummary.sourceText)
-                .foregroundStyle(.secondary)
+                Text(coordinator.progressSummary.sourceText)
+                    .foregroundStyle(.secondary)
 
-            StatusBannerView(banner: coordinator.statusBanner)
+                StatusBannerView(banner: coordinator.statusBanner)
 
-            HStack(spacing: 10) {
-                MetricCardView(title: "Completion", value: coordinator.progressSummary.completionRateText)
-                MetricCardView(title: "Weekly Volume", value: coordinator.progressSummary.weeklyVolumeText)
-                MetricCardView(title: "Recent Logs", value: coordinator.progressSummary.recentLoggedText)
-            }
+                // MARK: - Summary Cards
+                HStack(spacing: 10) {
+                    MetricCardView(title: "Completion", value: coordinator.progressSummary.completionRateText)
+                    MetricCardView(title: "Weekly Volume", value: coordinator.progressSummary.weeklyVolumeText)
+                    MetricCardView(title: "Recent Logs (14d)", value: coordinator.progressSummary.recentLoggedText)
+                    MetricCardView(title: "Volume Trend", value: coordinator.weeklyVolumeChangeText)
+                    MetricCardView(title: "Avg RPE", value: coordinator.averageRPEText)
+                }
 
-            GroupBox("Top Logged Exercises") {
-                if coordinator.topExercises.isEmpty {
-                    Text("No top exercise data yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(coordinator.topExercises) { row in
-                        HStack {
-                            Text(row.exerciseName)
-                            Spacer()
-                            Text("\(row.loggedCount) logs / \(row.sessionCount) sessions")
-                                .foregroundStyle(.secondary)
+                // MARK: - Volume Trend Chart
+                GroupBox("Weekly Volume Trend") {
+                    if coordinator.weeklyVolumePoints.isEmpty {
+                        Text("No weekly volume data yet. Rebuild DB cache to populate.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            let reversed = Array(coordinator.weeklyVolumePoints.reversed())
+                            let maxVol = coordinator.volumeChartMax
+                            ForEach(reversed) { point in
+                                HStack(spacing: 8) {
+                                    Text(shortSheetLabel(point.sheetName))
+                                        .font(.caption)
+                                        .frame(width: 80, alignment: .trailing)
+                                    GeometryReader { geo in
+                                        let fraction = maxVol > 0 ? CGFloat(point.volume / maxVol) : 0
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(.blue.gradient)
+                                            .frame(width: max(fraction * geo.size.width, 4))
+                                    }
+                                    .frame(height: 18)
+                                    Text(String(format: "%.0f", point.volume))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 60, alignment: .leading)
+                                }
+                            }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
-            }
 
-            Text("Metrics refreshed: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+                // MARK: - RPE Trend Chart
+                GroupBox("Weekly RPE Trend") {
+                    if coordinator.weeklyRPEPoints.isEmpty {
+                        Text("No RPE data yet. Log workouts with RPE values to populate.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            let reversed = Array(coordinator.weeklyRPEPoints.reversed())
+                            ForEach(reversed) { point in
+                                HStack(spacing: 8) {
+                                    Text(shortSheetLabel(point.sheetName))
+                                        .font(.caption)
+                                        .frame(width: 80, alignment: .trailing)
+                                    GeometryReader { geo in
+                                        let fraction = CGFloat(point.averageRPE / 10.0)
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(rpeColor(point.averageRPE).gradient)
+                                            .frame(width: max(fraction * geo.size.width, 4))
+                                    }
+                                    .frame(height: 18)
+                                    Text(String(format: "%.1f (%d)", point.averageRPE, point.rpeCount))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 80, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
 
-            Button("Refresh Metrics") {
-                coordinator.refreshAnalytics()
+                // MARK: - Block Volume Breakdown
+                GroupBox("Block Volume Breakdown (Last 28 Days)") {
+                    if coordinator.muscleGroupVolumes.isEmpty {
+                        Text("No block volume data yet.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 6) {
+                            let maxVol = coordinator.muscleGroupVolumeMax
+                            ForEach(coordinator.muscleGroupVolumes) { group in
+                                HStack(spacing: 8) {
+                                    Text(group.muscleGroup)
+                                        .font(.caption)
+                                        .frame(width: 120, alignment: .trailing)
+                                    GeometryReader { geo in
+                                        let fraction = maxVol > 0 ? CGFloat(group.volume / maxVol) : 0
+                                        RoundedRectangle(cornerRadius: 4)
+                                            .fill(.purple.gradient)
+                                            .frame(width: max(fraction * geo.size.width, 4))
+                                    }
+                                    .frame(height: 18)
+                                    Text(String(format: "%.0f (%d ex)", group.volume, group.exerciseCount))
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                        .frame(width: 100, alignment: .leading)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                // MARK: - Top Logged Exercises
+                GroupBox("Top Logged Exercises") {
+                    if coordinator.topExercises.isEmpty {
+                        Text("No top exercise data yet.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(coordinator.topExercises) { row in
+                                HStack {
+                                    Text(row.exerciseName)
+                                    Spacer()
+                                    Text("\(row.loggedCount) logs / \(row.sessionCount) sessions")
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
+                Text("Metrics refreshed: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Button("Refresh Metrics") {
+                    coordinator.refreshAnalytics()
+                }
+                .buttonStyle(.bordered)
             }
-            .buttonStyle(.bordered)
-            Spacer()
         }
+    }
+
+    private func shortSheetLabel(_ sheetName: String) -> String {
+        let cleaned = sheetName
+            .replacingOccurrences(of: "Weekly Plan (", with: "")
+            .replacingOccurrences(of: ")", with: "")
+        return cleaned
+    }
+
+    private func rpeColor(_ rpe: Double) -> Color {
+        if rpe >= 9.0 { return .red }
+        if rpe >= 7.5 { return .orange }
+        if rpe >= 6.0 { return .yellow }
+        return .green
     }
 }
 

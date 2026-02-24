@@ -274,6 +274,46 @@ struct ProgressSummary: Equatable {
     )
 }
 
+struct WeeklyVolumePoint: Equatable, Identifiable {
+    let id: UUID
+    let sheetName: String
+    let volume: Double
+
+    init(id: UUID = UUID(), sheetName: String, volume: Double) {
+        self.id = id
+        self.sheetName = sheetName
+        self.volume = volume
+    }
+}
+
+struct WeeklyRPEPoint: Equatable, Identifiable {
+    let id: UUID
+    let sheetName: String
+    let averageRPE: Double
+    let rpeCount: Int
+
+    init(id: UUID = UUID(), sheetName: String, averageRPE: Double, rpeCount: Int) {
+        self.id = id
+        self.sheetName = sheetName
+        self.averageRPE = averageRPE
+        self.rpeCount = rpeCount
+    }
+}
+
+struct MuscleGroupVolume: Equatable, Identifiable {
+    let id: UUID
+    let muscleGroup: String
+    let volume: Double
+    let exerciseCount: Int
+
+    init(id: UUID = UUID(), muscleGroup: String, volume: Double, exerciseCount: Int) {
+        self.id = id
+        self.muscleGroup = muscleGroup
+        self.volume = volume
+        self.exerciseCount = exerciseCount
+    }
+}
+
 enum WeeklyReviewSortMode: String, CaseIterable, Identifiable {
     case newest = "Newest"
     case highestCompletion = "Highest Completion"

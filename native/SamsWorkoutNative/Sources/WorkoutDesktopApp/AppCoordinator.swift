@@ -46,6 +46,9 @@ final class AppCoordinator: ObservableObject {
     @Published var topExercises: [TopExerciseSummary] = []
     @Published var recentSessions: [RecentSessionSummary] = []
     @Published var dbHealthSnapshot = DBHealthSnapshot.empty
+    @Published var weeklyVolumePoints: [WeeklyVolumePoint] = []
+    @Published var weeklyRPEPoints: [WeeklyRPEPoint] = []
+    @Published var muscleGroupVolumes: [MuscleGroupVolume] = []
 
     @Published var oneRepMaxFields: [OneRepMaxFieldState] = []
     @Published var oneRepMaxStatus = ""
@@ -627,6 +630,37 @@ final class AppCoordinator: ObservableObject {
         return parts
     }
 
+    var volumeChartMax: Double {
+        weeklyVolumePoints.map(\.volume).max() ?? 1
+    }
+
+    var rpeChartMax: Double {
+        10.0
+    }
+
+    var muscleGroupVolumeMax: Double {
+        muscleGroupVolumes.map(\.volume).max() ?? 1
+    }
+
+    var weeklyVolumeChangeText: String {
+        let reversed = weeklyVolumePoints.reversed().map(\.volume)
+        guard reversed.count >= 2 else { return "n/a" }
+        let latest = reversed.last ?? 0
+        let previous = reversed[reversed.count - 2]
+        if previous == 0 { return "n/a" }
+        let change = ((latest - previous) / previous) * 100
+        let sign = change >= 0 ? "+" : ""
+        return String(format: "%@%.1f%%", sign, change)
+    }
+
+    var averageRPEText: String {
+        guard !weeklyRPEPoints.isEmpty else { return "n/a" }
+        let totalWeighted = weeklyRPEPoints.reduce(0.0) { $0 + $1.averageRPE * Double($1.rpeCount) }
+        let totalCount = weeklyRPEPoints.reduce(0) { $0 + $1.rpeCount }
+        if totalCount == 0 { return "n/a" }
+        return String(format: "%.1f", totalWeighted / Double(totalCount))
+    }
+
     var exerciseHistorySummary: ExerciseHistorySummary {
         let points = historyPoints
         guard !points.isEmpty else {
@@ -835,6 +869,9 @@ final class AppCoordinator: ObservableObject {
         topExercises = gateway.loadTopExercises(limit: 5)
         recentSessions = gateway.loadRecentSessions(limit: 8)
         dbHealthSnapshot = gateway.loadDBHealthSnapshot()
+        weeklyVolumePoints = gateway.loadWeeklyVolumePoints(limit: 12)
+        weeklyRPEPoints = gateway.loadWeeklyRPEPoints(limit: 12)
+        muscleGroupVolumes = gateway.loadMuscleGroupVolumes(limit: 12)
         lastAnalyticsRefreshAt = Date()
         refreshExerciseCatalog()
     }

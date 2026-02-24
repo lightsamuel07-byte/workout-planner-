@@ -54,6 +54,30 @@ public struct PersistedWeeklyVolumePoint: Equatable, Sendable {
     }
 }
 
+public struct PersistedWeeklyRPEPoint: Equatable, Sendable {
+    public let sheetName: String
+    public let averageRPE: Double
+    public let rpeCount: Int
+
+    public init(sheetName: String, averageRPE: Double, rpeCount: Int) {
+        self.sheetName = sheetName
+        self.averageRPE = averageRPE
+        self.rpeCount = rpeCount
+    }
+}
+
+public struct PersistedMuscleGroupVolume: Equatable, Sendable {
+    public let muscleGroup: String
+    public let volume: Double
+    public let exerciseCount: Int
+
+    public init(muscleGroup: String, volume: Double, exerciseCount: Int) {
+        self.muscleGroup = muscleGroup
+        self.volume = volume
+        self.exerciseCount = exerciseCount
+    }
+}
+
 public struct PersistedProgressSummary: Equatable, Sendable {
     public let totalRows: Int
     public let loggedRows: Int
@@ -718,6 +742,76 @@ public struct WorkoutDatabase: Sendable {
                     dayName: row["day_name"],
                     loggedRows: row["logged_rows"],
                     totalRows: row["total_rows"]
+                )
+            }
+        }
+    }
+
+    public func fetchWeeklyRPE(limit: Int = 12) throws -> [PersistedWeeklyRPEPoint] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    ws.sheet_name AS sheet_name,
+                    AVG(el.parsed_rpe) AS avg_rpe,
+                    COUNT(el.parsed_rpe) AS rpe_count,
+                    MAX(COALESCE(ws.session_date, '')) AS max_date
+                FROM exercise_logs el
+                JOIN workout_sessions ws ON ws.id = el.session_id
+                WHERE el.parsed_rpe IS NOT NULL
+                GROUP BY ws.sheet_name
+                ORDER BY max_date DESC, ws.sheet_name DESC
+                LIMIT ?
+                """,
+                arguments: [limit]
+            )
+
+            return rows.map { row in
+                PersistedWeeklyRPEPoint(
+                    sheetName: row["sheet_name"],
+                    averageRPE: row["avg_rpe"],
+                    rpeCount: row["rpe_count"]
+                )
+            }
+        }
+    }
+
+    public func fetchMuscleGroupVolume(limit: Int = 12) throws -> [PersistedMuscleGroupVolume] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    COALESCE(NULLIF(TRIM(el.block), ''), 'Unspecified') AS muscle_group,
+                    COALESCE(
+                        SUM(
+                            CASE
+                                WHEN TRIM(COALESCE(el.log_text, '')) <> '' THEN
+                                    COALESCE(CAST(el.prescribed_sets AS REAL), 0) *
+                                    COALESCE(CAST(el.prescribed_reps AS REAL), 0) *
+                                    COALESCE(CAST(el.prescribed_load AS REAL), 0)
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ) AS volume,
+                    COUNT(DISTINCT el.exercise_id) AS exercise_count
+                FROM exercise_logs el
+                JOIN workout_sessions ws ON ws.id = el.session_id
+                WHERE COALESCE(ws.session_date, '') >= date('now', '-28 day')
+                GROUP BY muscle_group
+                ORDER BY volume DESC
+                LIMIT ?
+                """,
+                arguments: [limit]
+            )
+
+            return rows.map { row in
+                PersistedMuscleGroupVolume(
+                    muscleGroup: row["muscle_group"],
+                    volume: row["volume"],
+                    exerciseCount: row["exercise_count"]
                 )
             }
         }
