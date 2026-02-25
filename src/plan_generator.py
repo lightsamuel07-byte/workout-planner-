@@ -284,7 +284,7 @@ Example: ["DB Hammer Curl", "Rope Pressdown", "15 Degree DB Chest Press", ...]
                 )
                 message2 = self.client.messages.create(
                     model=self.model,
-                    max_tokens=self.max_tokens,
+                    max_tokens=5000,  # correction only needs to reproduce the plan, not expand it
                     messages=[
                         {"role": "user", "content": correction_prompt}
                     ]
