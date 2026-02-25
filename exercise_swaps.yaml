@@ -43,17 +43,34 @@ hard_preferences:
   - "American spelling only"
 
 # Lateral raise guardrail
-lateral_raise_rule: "If Monday used DB laterals, avoid DB laterals on Tuesday (use rear-delt/low-trap variants instead)"
+lateral_raise_rule: "If Monday Fort included DB lateral raises or any lateral-delt-dominant movement, do NOT program DB lateral raises on Tuesday. Instead use rear-delt or scapular hygiene work (e.g., reverse pec deck, cable Y-raise, rear-delt face pulls). This protects Wednesday bench and prevents redundant local fatigue."
 
-# Triceps attachment rotation
+# Triceps attachment rotation (strict)
 triceps_rules:
-  tuesday: "rope (elbow-friendly)"
-  friday: "straight-bar heavy"
-  saturday: "variety but no single-arm D-handle"
+  tuesday: "rope only (elbow-friendly — low joint stress)"
+  friday: "straight-bar or heavier loading (can push load here)"
+  saturday: "varied angle/implement — NOT single-arm D-handle (disliked). Options: EZ-bar, V-bar, overhead rope, close-grip push-up variation."
+  rule: "Do not repeat the same triceps attachment on consecutive days. Vary across the week."
 
-# Biceps rules
+# Biceps rules (strict system — plan across all three days together, not day-by-day)
 biceps_rules:
-  - "Never same-grip two days in a row"
-  - "Rotate grips: supinated → neutral → pronated"
-  - "Keep ~48h before another long-length stimulus (e.g., incline curls)"
+  - "Never same-grip two days in a row on supplemental days (Tue/Thu/Sat)"
+  - "Rotate grips: supinated → neutral → pronated (in that order across the week)"
+  - "Keep ≥48h between long-length stimuli (incline curls, spider curls, etc.)"
   - "Cap biceps hard sets at 10-12 per rolling 4 days"
+  - "Plan biceps as a system: decide Tue/Thu/Sat grips before writing any single day"
+
+# Delt programming rules
+delt_rules:
+  - "Medial delts: priority target — include cable or DB lateral raise variation at least twice per week"
+  - "Rear delts: include at least once per week (face pulls, reverse pec deck, cable Y-raise)"
+  - "No back-to-back lateral delt loading — if Mon had laterals, Tue gets rear-delt instead"
+  - "Shoulder work must be distributed intelligently across the week around bench and Fort auxiliaries"
+
+# Saturday-specific rules
+saturday_rules:
+  - "Upper body only"
+  - "Arms + delts + upper chest are the priority"
+  - "No heavy lower back, no heavy leg compounds, no spinal fatigue"
+  - "No single-arm D-handle triceps pressdowns (disliked)"
+  - "Grip on biceps must differ from Thursday's grip"

@@ -67,8 +67,16 @@ class PlanGenerator:
         for day, attachment in triceps.items():
             formatted += f"- {day.capitalize()}: {attachment}\n"
 
-        formatted += "\n**BICEPS RULES:**\n"
+        formatted += "\n**BICEPS RULES (plan as a system across Tue/Thu/Sat — not day-by-day):**\n"
         for rule in swaps_config.get('biceps_rules', []):
+            formatted += f"- {rule}\n"
+
+        formatted += "\n**DELT PROGRAMMING RULES:**\n"
+        for rule in swaps_config.get('delt_rules', []):
+            formatted += f"- {rule}\n"
+
+        formatted += "\n**SATURDAY-SPECIFIC RULES:**\n"
+        for rule in swaps_config.get('saturday_rules', []):
             formatted += f"- {rule}\n"
 
         return formatted
@@ -683,9 +691,11 @@ PLAN:
         if progression_directives_block:
             directives_block = f"\n{progression_directives_block}\n\n---\n"
 
-        prompt = f"""You are an expert strength and conditioning coach creating a personalized weekly workout plan for {self.config['athlete']['name']}.
+        prompt = f"""You are an expert strength and conditioning coach generating a complete weekly workout plan for {self.config['athlete']['name']}.
 
-CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
+CRITICAL OUTPUT RULE: NO RANGES anywhere in prescription lines. Use single values only.
+  ✓ "15 reps" / "24 kg" — CORRECT
+  ✗ "12-15 reps" / "22-26 kg" — FORBIDDEN (will be rejected)
 
 {athlete_config}
 
@@ -703,16 +713,37 @@ CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 k
 
 {directives_block}
 
-FORT WORKOUT CONVERSION (CRITICAL):
-The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You MUST convert them to the exercise format:
-  * If "FORT COMPILER DIRECTIVES" are present, treat section order and listed exercise anchors as hard constraints.
-  * Extract ALL exercises from detected sections, including non-cluster programs (examples: PREP/IGNITION/WARM-UP, POWER, BUILD-UP, WORKING SET/BREAKPOINT/CLUSTER work, BACK OFFS, AUXILIARY/MYO, THAW/REDEMPTION).
-  * Keep day section order aligned with detected Fort sections and include each anchor exercise at least once.
-  * Convert each to the ### A1. [Exercise Name] format with Sets, Reps, Load, Rest, Notes (coaching details in Notes field only)
-  * Keep logical block labeling by intent (A=prep, B=build/power, C/D=main work and back-off, E=auxiliary, F=conditioning)
-  * Calculate actual kg loads from percentages if specified (1RMs listed below)
-  * Put technique cues, intensity targets, and adjustments in the Notes field (NOT separate RPE/Form/Energy/Adjustments fields)
-  * Never output section headers or instructional text as exercises. Examples forbidden as exercise names: "Targeted Warm-Up", "1RM Test", "Back-offs", "TIPS", "Rest 2 minutes", "Right into".
+================================================================================
+FORT WORKOUT CONVERSION (Mon/Wed/Fri)
+================================================================================
+The Fort workouts below come from TrainHeroic in raw copy-paste format. Convert each to the standard exercise format. Rules:
+
+1. STRUCTURE: If FORT COMPILER DIRECTIVES are present, treat section order and anchor exercises as hard constraints. Preserve block order A→B→C→D→E→F exactly.
+
+2. EXTRACT ALL EXERCISES: Include every exercise from every section — PREP/IGNITION, WARM-UP, POWER, CLUSTER WARM-UP, CLUSTER SET SINGLES, CLUSTER SET DOUBLES, WORKING SET, BREAKPOINT, BACK-OFFS, AUXILIARY/MYO, CIRCUIT/THAW/REDEMPTION.
+
+3. LOAD CALCULATION: Convert all percentage-based loads to actual kg using the 1RMs below.
+   - If Fort defines "training max" or "working max" in coach notes (e.g., "use 90% of your 1RM as training max"), apply that definition first, then calculate set percentages from it.
+   - Round all barbell loads to nearest 2.5 kg.
+   - Example: 85% × 94 kg bench = 79.9 → round to 80 kg.
+
+4. CLUSTER SETS: Format cluster set singles as individual prescription lines where each "set" is one cluster rep.
+   - Example: 6 cluster singles at 85% bench → 6 x 1 @ 80 kg
+
+5. FORBIDDEN AS EXERCISE NAMES: Never output section headers or instructional text as exercise names.
+   Forbidden: "Targeted Warm-Up", "Back-offs", "TIPS", "HISTORY", "COMPLETE", "Rest 2 minutes", "Right into", "Rx", "Weight", "Reps", "Meters", "Calories"
+
+6. NOTES FIELD ONLY: All coaching context (technique cues, intensity targets, cluster instructions, myo-rep protocols) goes in the Notes field — not in separate fields.
+
+7. CIRCUIT/GARAGE: When Fort offers location options (Underground / Garage), always use the Garage version.
+
+CONCRETE EXAMPLE — Fort input → correct output:
+  Input: "CLUSTER SET SINGLES / BENCH PRESS / 6 Sets / 85%, 6 reps"
+  Output:
+  ### C1. Bench Press (Cluster Singles)
+  - 6 x 1 @ 80 kg
+  - **Rest:** 25-30 sec intra-cluster, 3 min after final rep
+  - **Notes:** Un-rack for a fresh rep every 25-30 sec. Max bar speed each rep. 85% of 94 kg bench = 80 kg.
 
 {trainer_workouts}
 
@@ -722,87 +753,128 @@ The Fort workouts below (Mon/Wed/Fri) are from Train Heroic in raw format. You M
 
 ---
 
-CORE PRINCIPLES:
-- Supplemental days (Tue/Thu/Sat) support Fort work - focus: arms, medial delts, upper chest, back detail
-- SWAP directives from logs are HARD constraints - replace as requested, don't progress
+================================================================================
+SUPPLEMENTAL DAYS (Tue/Thu/Sat) — AESTHETIC HYPERTROPHY
+================================================================================
+These are the growth sessions. Every exercise must serve the aesthetic objective: arms, medial delts, upper chest, back detail. If an exercise doesn't directly serve one of those four priorities, it shouldn't be there.
 
-PROGRESSIVE OVERLOAD RULES (CRITICAL):
-When the prior week's LOGGED field contains performance notes, those notes are ABSOLUTE TRUTH and override everything else.
+STRUCTURE FOR ALL THREE SUPPLEMENTAL DAYS:
+  A-block: McGill Big-3 warm-up (always — 1 set each: curl-up, side-bridge, bird-dog)
+  B-block: Main hypertrophy work (2-4 exercises targeting the day's priority muscles)
+  C/D-block: Secondary hypertrophy (2-3 exercises, complementary muscle groups)
+  E-block: Isolation finishers (1-2 exercises, high-rep, short rest)
+  F-block: Incline walk — Tuesday & Thursday: 10 min @ 3.4 kph, 8% incline | Saturday: 15 min @ 3.5 kph, 6% incline
 
-**HOW TO READ LOGGED NOTES:**
-- "felt heavy", "quite heavy", "struggled", "tough", "challenging", "failed" = USER STRUGGLED
-- "easy", "too light", "could do more", "had reps left" = USER EXCEEDED
-- No logged note OR neutral note (e.g., "4x12 @ 6.25kg") = HIT EXACTLY
-- If present, use explicit `RPE x` (or `RPE_PARSED`) as quantitative signal:
-  - RPE >= 9.0 = at/near failure, hold or reduce next week
-  - RPE 7.5-8.5 = challenging but productive, progress conservatively
-  - RPE <= 7.0 = comfortable, can progress
+TUESDAY priority: Arms (biceps + triceps) + medial/rear delts. Carries go here if programmed.
+THURSDAY priority: Medial delts + upper chest (incline pressing) + back detail. Keep grip load low.
+SATURDAY priority: Arms (different grip/attachment from Tuesday/Thursday) + upper chest + rear delts.
 
-**PROGRESSION LOGIC:**
-1. **If user STRUGGLED** (logged "felt heavy", "tough", etc.):
-   - DO NOT increase load
-   - DO NOT increase reps
-   - MAINTAIN same load and reps OR reduce if user failed
-   - Example: If logged "8.25kg felt quite heavy for 12 reps" → keep 6.25kg for 12 reps (stay at working weight)
+PROGRESSIVE OVERLOAD — HOW TO READ LOGS AND PROGRESS:
 
-2. **If user EXCEEDED** (logged "easy", "could do more", etc.):
-   - Increase reps by 1-2 within range OR increase load by one step (NOT both)
-   - Example: If logged "6.25kg felt easy for 12 reps" → try 13 reps @ 6.25kg OR 12 reps @ 8kg
+Read prior logged performance from the EXERCISE HISTORY and PROGRESSION DIRECTIVES above.
 
-3. **If user HIT EXACTLY** (no struggle/easy notes):
-   - Increase load by one small step (DBs: next increment, cables: +1 plate)
-   - Keep reps same OR increase by 1 if at bottom of range
-   - Example: If logged "4x12 @ 6.25kg" (neutral) → try 12 reps @ 8kg
+Signal classification:
+  STRUGGLED: "felt heavy", "quite heavy", "struggled", "tough", "challenging", "failed", RPE ≥ 9.0
+    → DO NOT increase load or reps. Hold same prescription. If failed, consider slight reduction.
+  EXCEEDED: "easy", "too light", "could do more", "had reps left", "fly", RPE ≤ 7.0
+    → Increase EITHER reps by 1-2 OR load by one step. NEVER both in the same week.
+  NEUTRAL (no qualifier, or RPE 7.5-8.5): hit the target cleanly
+    → DBs: increase load by next even increment (e.g., 10→12 kg). Cables: add one plate. Keep reps same.
 
-**NEVER INCREASE BOTH REPS AND LOAD IN THE SAME WEEK** - this violates progressive overload principles
-**When text cue and numeric RPE conflict, prioritize text cue first, then use RPE to size the adjustment.**
-Assume the canonical logging format is: `performance | RPE x | Notes: ...`.
+Conflict rule: When log text and RPE conflict, text wins. Use RPE only to size the adjustment.
+  Example: "felt heavy (RPE 7.5)" → text=struggled wins → hold load, don't progress.
 
-FOR SUPPLEMENTAL DAYS - INTERFERENCE PREVENTION:
-Tue (post-squat/pre-press): Arms, shoulders, upper chest, back detail only. NO heavy legs/pressing
-Thu (post-press/pre-deadlift): Light legs, chest, delts only. NO heavy biceps/grip work
-Sat (post-deadlift): Upper body only. NO heavy lower back/leg compounds
+NEVER increase both reps AND load in the same week.
 
-MANDATORY HARD RULES:
-• Equipment: No belt on pulls, standing calves only, no split squats
-• Dumbbells: even-number loads only (no odd-number DB loads)
-• Biceps: Rotate grips (sup→neutral→pron), never same grip consecutive days, ≤12 sets/4days
-• Triceps: Vary attachments Tue/Fri/Sat, no single-arm D-handle Sat
-• Carries: Tuesday only, moderate load (preserve Friday grip)
-• Daily: McGill Big-3 warm-up, incline walking (10min@3.4mph/6%, 15min@3.5mph/6%)
+MANDATORY HARD RULES (enforced post-generation — violations trigger correction):
+• No ranges in prescription lines (single values only)
+• DB loads: even numbers only (2 kg increments)
+• No split squats (any variant) — replace with heel-elevated goblet squat or leg extension
+• Standing calves only — never seated calf raises
+• No belt on pulls
+• Biceps: never same grip on consecutive supplemental days | rotate sup→neutral→pron | ≤12 hard sets/rolling 4 days | ≥48h between long-length stimuli
+• Triceps: rope on Tuesday, straight-bar on Friday, no single-arm D-handle on Saturday
+• Carries: Tuesday only, RPE 6-7 max (grip protection for Friday deadlift)
 
-EXERCISE FORMAT (ALL DAYS - SIMPLIFIED):
+EXERCISE FORMAT (identical for all days):
 ### A1. [Exercise Name]
 - [Sets] x [Reps] @ [Load] kg
 - **Rest:** [period]
-- **Notes:** [Brief coaching cues, technique points, and progression context. 1-2 sentences max.]
-
-IMPORTANT: Do NOT include RPE, Form, Energy, or Adjustments fields - all essential coaching info goes in Notes field only.
+- **Notes:** [Coaching cues, technique, progression context — 1-2 sentences max.]
 
 NAMING RULES:
-• Bench: specify angle (e.g., "30° Incline DB Press")
-• Cable dual: load per side
-• Carries: use kettlebells
+• DB pressing: always specify angle (e.g., "30° Incline DB Press")
+• Cable exercises with dual cables: state load per side
+• Carries: always kettlebell (never dumbbell)
+• Calves: always "Standing" in the name
 
 REST PERIODS:
-• Fort main lifts: 3-5min, compounds: 2-3min, isolation: 60-90s
-• Supplemental main: 90-120s, isolation: 60-90s, finishers: 30-45s
+• Fort main lifts: 3-5 min | Fort compounds: 2-3 min | Fort isolation: 60-90 sec
+• Supplemental compounds: 90-120 sec | Supplemental isolation: 60-90 sec | Finishers: 30-45 sec
 
-1RMs: Squat 129kg, Bench 94kg, Deadlift 168kg
+1RMs: Squat 129 kg | Bench Press 94 kg | Deadlift 168 kg
 
-OUTPUT: Use ## day headers, ### exercise format, American spelling. Include sanity check confirmation.
+================================================================================
+OUTPUT FORMAT
+================================================================================
+Use ## MONDAY, ## TUESDAY, etc. headers.
+Use ### A1., ### A2., ### B1. etc. exercise labels.
+American spelling throughout.
+End the plan with a brief SANITY CHECK confirming:
+  - Biceps grip used each supplemental day (and that no consecutive days repeat)
+  - Triceps attachment used each day (Tue/Fri/Sat)
+  - No interference rule violations
+  - No hard rule violations
 
-Generate complete weekly plan following ALL rules above."""
+Generate the complete weekly plan now."""
 
         return prompt
 
     def _format_athlete_config_compressed(self):
-        """Format the athlete configuration section for the prompt in compressed format."""
+        """Format the athlete configuration section for the prompt."""
         return f"""
 ATHLETE: {self.config['athlete']['name']} | {self.config['athlete']['units']} | {self.config['athlete']['spelling']} spelling
-GOAL: {self.config['goals']['primary']} | Focus: {', '.join(self.config['goals']['focus_areas'])}
-SCHEDULE: Fort {', '.join(self.config['weekly_structure']['main_days'])} | Supplemental {', '.join(self.config['weekly_structure']['supplemental_days'])}
-HARD RULES: {' | '.join(self.config['hard_rules']['equipment'])} | Biceps: {' | '.join(self.config['hard_rules']['biceps'])}"""
+SCHEDULE: Fort Mon/Wed/Fri | Supplemental Tue/Thu/Sat
+
+AESTHETIC OBJECTIVE (the entire point of Tue/Thu/Sat):
+Samuel's goal is a strength-first, visibly muscular physique. Think broader shoulders, bigger arms, upper-chest shelf, upper-back density. Priority order for supplemental volume:
+  1. Arms — biceps shape + triceps fullness (HIGH priority)
+  2. Delts — medial delt cap for width, rear delt for 3D look (HIGH priority)
+  3. Upper chest — clavicular pec "pop", incline pressing/fly patterns (HIGH priority)
+  4. Back detail — upper-back density, rear-delt tie-in, posture (HIGH priority)
+  5. Everything else is secondary and must not crowd out the above.
+
+Supplemental days exist to grow these muscle groups — NOT to be generic fitness sessions.
+Aesthetics cannot blunt main-lift performance. Stimulus-efficient hypertrophy: enough volume to grow, not so much fatigue that Mon/Wed/Fri bar speed suffers.
+
+INTERFERENCE PREVENTION (strict — defines what is forbidden on each supplemental day):
+• Tuesday (after Monday squat, before Wednesday bench):
+  - ALLOWED: arm isolation, medial/rear delt work, upper-chest pressing (moderate), back detail, carries
+  - FORBIDDEN: any leg compounds, barbell pressing, heavy front-delt loading, anything that crushes Wednesday bench
+  - "Heavy" = RPE > 7 on pressing movements, or any barbell chest/shoulder pressing
+• Thursday (after Wednesday bench, before Friday deadlift):
+  - ALLOWED: light leg isolation (leg extension, leg curl — NOT leg press or squats), chest isolation, delt isolation, light upper back
+  - FORBIDDEN: heavy grip work (no loaded carries), heavy rows, heavy bicep volume (>6 hard sets), anything that compromises Friday deadlift setup or grip
+  - "Heavy grip" = any loaded carry, heavy cable rows, heavy DB rows exceeding RPE 7
+• Saturday (after Friday deadlift, before Monday squat):
+  - ALLOWED: upper body only — arms, delts, upper chest, upper back
+  - FORBIDDEN: heavy lower back compounds, heavy leg work, junk volume with no aesthetic payoff
+  - Spinal fatigue must be minimal going into Sunday rest → Monday squat
+
+HARD RULES (absolute — violations require correction):
+Equipment: {' | '.join(self.config['hard_rules']['equipment'])}
+DB loads: Even numbers only (2 kg increments — never odd-kg DB loads)
+Biceps grip rotation: Never same grip on consecutive supplemental days | Rotate sup → neutral → pron | ≤12 hard sets per rolling 4 days | ≥48h between long-length stimuli (e.g., incline curls)
+Triceps: Vary attachment across Tue/Fri/Sat (rope Tue, straight-bar Fri, varied Sat) | No single-arm D-handle on Saturday
+Carries: Tuesday only, moderate load (RPE 6-7 max) to preserve Friday deadlift grip
+Calves: Standing only — if any seated calf exercise appears, replace with standing variant
+
+LOAD ROUNDING RULES:
+• Barbell: round to nearest 2.5 kg
+• Dumbbell: round to nearest 2 kg (even numbers only)
+• Cable: round to nearest 2.5 kg (or nearest available plate increment)
+• Percentage-based Fort loads: compute from 1RM, then round to nearest 2.5 kg
+• Training max / working max: if Fort notes define it (e.g., "training max = 90% of 1RM"), apply that definition before calculating set percentages"""
 
     def save_plan(self, plan, explanation=None, output_folder="output", format="markdown"):
         """

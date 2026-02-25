@@ -45,6 +45,22 @@ goals:
   training_philosophy: "Maximize aesthetics without ever interfering with Mon/Wed/Fri Fort program"
   approach: "Progressive overload every session"
 
+  # Explicit aesthetic objective for Claude — used in prompt generation
+  aesthetic_objective: |
+    Target physique: strength-first, visibly muscular. Think broader shoulders, bigger arms,
+    upper-chest shelf, upper-back density. Priority order for supplemental volume:
+      1. Arms — biceps shape + triceps fullness (HIGH)
+      2. Delts — medial delt cap for width, rear delt for 3D look (HIGH)
+      3. Upper chest — clavicular pec "pop", incline pressing/fly patterns (HIGH)
+      4. Back detail — upper-back density, rear-delt tie-in, posture (HIGH)
+    Aesthetics cannot blunt main-lift performance. Stimulus-efficient hypertrophy only.
+
+  visual_outcome:
+    - "Broader-looking shoulders (medial delt cap)"
+    - "More arm presence from front/side views (biceps + triceps)"
+    - "Upper chest shelf — incline pressing and fly patterns"
+    - "Upper-back/rear-delt density for posture and finished look"
+
 # ============================================================================
 # REFERENCE 1RMs
 # ============================================================================
@@ -84,13 +100,36 @@ hard_rules:
   equipment:
     - "No belt on pulls"
     - "Standing calf raises only (NEVER seated)"
-    - "No split squats (any variant)"
+    - "No split squats (any variant — includes Bulgarian, rear-foot elevated, forward split)"
+    - "DB loads: even numbers only (2 kg increments — never odd kg)"
 
   biceps:
-    - "Never same-grip two days in a row"
+    - "Never same-grip two days in a row on supplemental days"
     - "Rotate grips: supinated → neutral → pronated"
-    - "Keep ~48h before another long-length stimulus (e.g., incline curls)"
+    - "Keep ≥48h between long-length stimuli (e.g., incline curls)"
     - "Cap biceps hard sets at 10-12 per rolling 4 days"
+    - "Biceps work must be planned as a system across Tue/Thu/Sat — not day-by-day in isolation"
+
+  triceps:
+    - "Tuesday: rope attachment (elbow-friendly)"
+    - "Friday: straight-bar or heavier loading"
+    - "Saturday: varied — NOT single-arm D-handle (disliked)"
+    - "Do not repeat the same triceps pattern mindlessly across Tue/Fri/Sat"
+
+  delts:
+    - "No redundant lateral delt overlap on back-to-back days"
+    - "If Monday Fort already included DB lateral raises, Tuesday defaults to rear-delt / scapular hygiene instead"
+    - "Reason: protects Wednesday bench performance and avoids redundant local fatigue"
+
+  carries:
+    - "Carries on Tuesday only (not Thursday or Saturday)"
+    - "Moderate load — RPE 6-7 max — to preserve Friday deadlift grip"
+    - "Use kettlebells (never dumbbells) for carries"
+
+  interference_protection:
+    tuesday: "Protect Wednesday bench — no heavy chest/triceps/front-delt loading, no barbell pressing"
+    thursday: "Protect Friday deadlift — no loaded carries, no heavy rows, no heavy biceps (>6 hard sets), no grip-fatiguing work"
+    saturday: "Protect Monday squat / overall recovery — no heavy lower back, no spinal fatigue, no junk volume"
 
   spelling: "American spelling only"
 
