@@ -870,11 +870,11 @@ Carries: Tuesday only, moderate load (RPE 6-7 max) to preserve Friday deadlift g
 Calves: Standing only — if any seated calf exercise appears, replace with standing variant
 
 LOAD ROUNDING RULES:
-• Barbell: round to nearest 2.5 kg
-• Dumbbell: round to nearest 2 kg (even numbers only)
-• Cable: round to nearest 2.5 kg (or nearest available plate increment)
-• Percentage-based Fort loads: compute from 1RM, then round to nearest 2.5 kg
-• Training max / working max: if Fort notes define it (e.g., "training max = 90% of 1RM"), apply that definition before calculating set percentages"""
+• Barbell: round to nearest 0.5 kg (microplates available — e.g., 79.9 → 80 kg, 82.3 → 82.5 kg)
+• Dumbbell: round to nearest 2 kg, even numbers only (e.g., 11 → 12 kg, 13 → 14 kg)
+• Cable: use load from history or a sensible round number — no fixed increment, cable stacks vary by machine
+• Percentage-based Fort loads: compute from 1RM or training max, then round to nearest 0.5 kg
+• Training max / working max: if Fort coach notes define it (e.g., "use 90% of your 1RM as training max"), apply that definition first, then calculate set percentages from it"""
 
     def save_plan(self, plan, explanation=None, output_folder="output", format="markdown"):
         """
