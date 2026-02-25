@@ -12,7 +12,7 @@ protocol NativeAppGateway {
     func loadExerciseCatalog(limit: Int) -> [String]
     func dbStatusText() -> String
     func rebuildDatabaseCache() async throws -> DBRebuildReport
-    func loadPlanSnapshot() async throws -> PlanSnapshot
+    func loadPlanSnapshot(forceRemote: Bool) async throws -> PlanSnapshot
     func loadTodayLoggerSession() async throws -> LoggerSessionState
     func saveLoggerSession(_ session: LoggerSessionState) async throws -> WorkoutDBSummary
     func loadProgressSummary() -> ProgressSummary
@@ -29,8 +29,9 @@ protocol NativeAppGateway {
 }
 
 extension NativeAppGateway {
-    func loadPlanSnapshot() async throws -> PlanSnapshot {
-        PlanSnapshot.empty
+    func loadPlanSnapshot(forceRemote: Bool = false) async throws -> PlanSnapshot {
+        let _ = forceRemote
+        return PlanSnapshot.empty
     }
 
     func loadTodayLoggerSession() async throws -> LoggerSessionState {
@@ -170,8 +171,9 @@ struct InMemoryAppGateway: NativeAppGateway {
         )
     }
 
-    func loadPlanSnapshot() async throws -> PlanSnapshot {
-        PlanSnapshot(
+    func loadPlanSnapshot(forceRemote: Bool = false) async throws -> PlanSnapshot {
+        let _ = forceRemote
+        return PlanSnapshot(
             title: "In-memory plan",
             source: .localCache,
             days: [],

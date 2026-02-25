@@ -375,30 +375,48 @@ struct LiveAppGateway: NativeAppGateway {
         )
     }
 
-    func loadPlanSnapshot() async throws -> PlanSnapshot {
+    func loadPlanSnapshot(forceRemote: Bool = false) async throws -> PlanSnapshot {
+        // When not forcing remote, try local cache first for fast startup.
+        if !forceRemote, let local = try? loadLocalPlanSnapshot(), !local.days.isEmpty {
+            return local
+        }
+
+        // Try Google Sheets (primary source of truth).
+        if let config = try? requireSheetsSetup() {
+            do {
+                let sheetsClient = try await makeSheetsClient(config: config)
+                let sheetNames = try await sheetsClient.fetchSheetNames()
+                if let preferredSheet = preferredWeeklyPlanSheetName(sheetNames) {
+                    let values = try await sheetsClient.readSheetAtoH(sheetName: preferredSheet)
+                    let days = sheetDaysToPlanDays(values: values, source: .googleSheets)
+                    if !days.isEmpty {
+                        return PlanSnapshot(
+                            title: normalizedPlanTitle(preferredSheet),
+                            source: .googleSheets,
+                            days: days,
+                            summary: normalizedPlanSummary(
+                                forceRemote
+                                    ? "Refreshed from Google Sheets."
+                                    : "Loaded from Google Sheets."
+                            )
+                        )
+                    }
+                }
+            } catch {
+                // If forceRemote was requested and Sheets fails, propagate the error.
+                if forceRemote {
+                    throw error
+                }
+                // Otherwise fall through to local cache below.
+            }
+        }
+
+        // Fallback: local cache (only reached when not forcing remote, or Sheets had no data).
         if let local = try? loadLocalPlanSnapshot(), !local.days.isEmpty {
             return local
         }
 
-        let config = try requireSheetsSetup()
-        let sheetsClient = try await makeSheetsClient(config: config)
-        let sheetNames = try await sheetsClient.fetchSheetNames()
-        guard let preferredSheet = preferredWeeklyPlanSheetName(sheetNames) else {
-            throw LiveGatewayError.noWeeklyPlanSheets
-        }
-
-        let values = try await sheetsClient.readSheetAtoH(sheetName: preferredSheet)
-        let days = sheetDaysToPlanDays(values: values, source: .googleSheets)
-        guard !days.isEmpty else {
-            throw LiveGatewayError.noPlanData
-        }
-
-        return PlanSnapshot(
-            title: normalizedPlanTitle(preferredSheet),
-            source: .googleSheets,
-            days: days,
-            summary: normalizedPlanSummary("Loaded from Google Sheets fallback.")
-        )
+        throw LiveGatewayError.noPlanData
     }
 
     func loadTodayLoggerSession() async throws -> LoggerSessionState {

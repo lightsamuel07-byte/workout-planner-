@@ -546,7 +546,7 @@ struct DashboardPageView: View {
 
                     GroupBox("Refresh") {
                         HStack(spacing: 8) {
-                            Button("Plan") { Task { await coordinator.refreshPlanSnapshot() } }
+                            Button("Plan") { Task { await coordinator.refreshPlanSnapshot(forceRemote: true) } }
                             Button("Logger") { Task { await coordinator.refreshLoggerSession() } }
                             Button("Analytics") { coordinator.refreshAnalytics() }
                         }
@@ -1015,7 +1015,7 @@ struct ViewPlanPageView: View {
                          : coordinator.viewPlanError)
                 } actions: {
                     Button("Reload") {
-                        Task { await coordinator.refreshPlanSnapshot() }
+                        Task { await coordinator.refreshPlanSnapshot(forceRemote: true) }
                     }
                     .buttonStyle(.bordered)
                 }
@@ -1092,11 +1092,11 @@ struct ViewPlanPageView: View {
             ToolbarItem(placement: .automatic) {
                 HStack(spacing: 8) {
                     Button {
-                        Task { await coordinator.refreshPlanSnapshot() }
+                        Task { await coordinator.refreshPlanSnapshot(forceRemote: true) }
                     } label: {
                         Label("Reload", systemImage: "arrow.clockwise")
                     }
-                    .help("Reload plan from source")
+                    .help("Reload plan from Google Sheets")
 
                     Button {
                         let text = coordinator.buildSelectedPlanDayExportText()

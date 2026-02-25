@@ -810,9 +810,9 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    func refreshPlanSnapshot() async {
+    func refreshPlanSnapshot(forceRemote: Bool = false) async {
         do {
-            let snapshot = try await gateway.loadPlanSnapshot()
+            let snapshot = try await gateway.loadPlanSnapshot(forceRemote: forceRemote)
             planSnapshot = snapshot
             viewPlanError = ""
             lastPlanRefreshAt = Date()
