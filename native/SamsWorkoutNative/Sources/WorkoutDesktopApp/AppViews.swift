@@ -17,6 +17,7 @@ struct NativeWorkoutRootView: View {
                     .navigationTitle("Workouts")
                 } detail: {
                     routeView(route: coordinator.route)
+                        .padding(.leading, 4)
                 }
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
@@ -339,7 +340,7 @@ struct DashboardPageView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 20) {
                 HStack(alignment: .firstTextBaseline) {
                     Text("Dashboard")
                         .font(.largeTitle.bold())
@@ -351,55 +352,34 @@ struct DashboardPageView: View {
 
                 StatusBannerView(banner: coordinator.statusBanner)
 
-                // MARK: - Key Metrics Row
-                LazyVGrid(columns: [GridItem(.adaptive(minimum: 155), spacing: 10)], spacing: 10) {
-                    DashboardMetricCard(
-                        icon: "checkmark.circle.fill",
-                        iconColor: .green,
-                        title: "Completion",
-                        value: String(format: "%.0f%%", coordinator.weeklyReviewAverageCompletion),
-                        subtitle: "Avg across weeks"
-                    )
-                    DashboardMetricCard(
-                        icon: "figure.strengthtraining.traditional",
-                        iconColor: .blue,
-                        title: "Exercises",
-                        value: "\(coordinator.planExerciseCount)",
-                        subtitle: coordinator.planSnapshot.title.isEmpty ? "No plan" : coordinator.planSnapshot.title
-                    )
-                    DashboardMetricCard(
-                        icon: "scalemass.fill",
-                        iconColor: .purple,
-                        title: "Est. Volume",
-                        value: String(format: "%.0f kg", coordinator.planDayStats.estimatedVolumeKG),
-                        subtitle: coordinator.selectedPlanDetail?.dayLabel ?? "Selected day"
-                    )
-                    DashboardMetricCard(
-                        icon: "chart.xyaxis.line",
-                        iconColor: .indigo,
-                        title: "Weekly Avg RPE",
-                        value: coordinator.averageRPEText,
-                        subtitle: "Last 12 weeks"
-                    )
+                // MARK: - Training Week Grid
+                GroupBox("This Week") {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
+                        ForEach(coordinator.dashboardDays) { day in
+                            DashboardDayCard(day: day)
+                                .onTapGesture {
+                                    coordinator.selectedPlanDay = day.title.capitalized
+                                    coordinator.quickNavigate(to: .viewPlan)
+                                }
+                        }
+                    }
                 }
 
-                // MARK: - 1RM Status Strip
+                // MARK: - 1RM Strip
                 if coordinator.oneRepMaxesAreFilled {
                     GroupBox {
-                        HStack(spacing: 16) {
-                            Label("1RM Profile", systemImage: "dumbbell.fill")
+                        HStack(spacing: 24) {
+                            Label("1RM", systemImage: "dumbbell.fill")
                                 .font(.caption.bold())
+                                .foregroundStyle(.secondary)
                             ForEach(coordinator.oneRepMaxFields) { field in
                                 if let value = field.parsedValue {
-                                    HStack(spacing: 4) {
-                                        Text(abbreviatedLiftName(field.liftName))
-                                            .font(.system(.caption2, design: .monospaced))
+                                    HStack(spacing: 5) {
+                                        Text(field.liftName)
+                                            .font(.caption)
                                             .foregroundStyle(.secondary)
-                                        Text(String(format: "%.0f", value))
-                                            .font(.system(.caption, design: .monospaced).bold())
-                                        Text("kg")
-                                            .font(.caption2)
-                                            .foregroundStyle(.tertiary)
+                                        Text(String(format: "%.0f kg", value))
+                                            .font(.caption.bold())
                                     }
                                 }
                             }
@@ -424,19 +404,6 @@ struct DashboardPageView: View {
                     .padding(8)
                     .background(.orange.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                // MARK: - Training Week Grid
-                GroupBox("This Week") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
-                        ForEach(coordinator.dashboardDays) { day in
-                            DashboardDayCard(day: day)
-                                .onTapGesture {
-                                    coordinator.selectedPlanDay = day.title.capitalized
-                                    coordinator.quickNavigate(to: .viewPlan)
-                                }
-                        }
-                    }
                 }
 
                 // MARK: - Quick Actions & Refresh
@@ -512,15 +479,6 @@ struct DashboardPageView: View {
         }
     }
 
-    private func abbreviatedLiftName(_ name: String) -> String {
-        switch name {
-        case "Back Squat": return "SQ"
-        case "Bench Press": return "BP"
-        case "Deadlift": return "DL"
-        default: return String(name.prefix(3)).uppercased()
-        }
-    }
-
     private func completionBadge(_ pct: Double) -> some View {
         Text(String(format: "%.0f%%", pct))
             .font(.system(.caption2, design: .monospaced).bold())
@@ -532,36 +490,6 @@ struct DashboardPageView: View {
     }
 }
 
-struct DashboardMetricCard: View {
-    let icon: String
-    let iconColor: Color
-    let title: String
-    let value: String
-    let subtitle: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .foregroundStyle(iconColor)
-                    .font(.caption)
-                Text(title)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            Text(value)
-                .font(.title2.bold())
-            Text(subtitle)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(12)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
-    }
-}
 
 struct DashboardDayCard: View {
     let day: DayPlanSummary
