@@ -57,7 +57,18 @@ final class AppCoordinator: ObservableObject {
     }
 
     var dashboardDays: [DayPlanSummary] {
-        gateway.loadDashboardDays()
+        // Prefer live planSnapshot (Sheets data) when available; fallback to local cache.
+        if !planSnapshot.days.isEmpty {
+            return planSnapshot.days.map { day in
+                DayPlanSummary(
+                    id: day.dayLabel.lowercased(),
+                    title: day.dayLabel.uppercased(),
+                    source: day.source,
+                    blocks: day.exercises.count
+                )
+            }
+        }
+        return gateway.loadDashboardDays()
     }
 
     var historyPoints: [ExerciseHistoryPoint] {

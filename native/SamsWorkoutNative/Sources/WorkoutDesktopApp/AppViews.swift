@@ -474,8 +474,9 @@ struct DashboardPageView: View {
                 }
             }
         }
-        .onAppear {
+        .task {
             coordinator.loadOneRepMaxFields()
+            await coordinator.refreshPlanSnapshot(forceRemote: true)
         }
     }
 
