@@ -679,6 +679,9 @@ if !generationStatus.isEmpty {
             if !planBlockCatalog.contains(planBlockFilter) {
                 planBlockFilter = "All Blocks"
             }
+        } catch is CancellationError {
+            // User navigated away before the fetch completed — not an error.
+            return
         } catch {
             viewPlanError = "Unable to load plan: \(error.localizedDescription)"
             if planSnapshot.days.isEmpty {
