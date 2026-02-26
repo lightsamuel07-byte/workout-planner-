@@ -53,7 +53,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
         coordinator.completeSetup()
         XCTAssertTrue(coordinator.isSetupComplete)
         XCTAssertTrue(coordinator.setupErrors.isEmpty)
-        XCTAssertTrue(coordinator.isUnlocked)
     }
 
     func testGenerationGuardPreventsRunWhenInputsMissing() async {
@@ -82,26 +81,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertNotNil(coordinator.lastDBRebuildAt)
     }
 
-    func testUnlockFlowWithPassword() {
-        let coordinator = makeCoordinator()
-        coordinator.setupState.anthropicAPIKey = "key"
-        coordinator.setupState.spreadsheetID = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
-        coordinator.setupState.localAppPassword = "1234"
-        coordinator.completeSetup()
-
-        XCTAssertTrue(coordinator.isSetupComplete)
-        XCTAssertFalse(coordinator.isUnlocked)
-
-        coordinator.unlockInput = "wrong"
-        coordinator.unlock()
-        XCTAssertFalse(coordinator.isUnlocked)
-        XCTAssertTrue(coordinator.unlockError.contains("Incorrect"))
-
-        coordinator.unlockInput = "1234"
-        coordinator.unlock()
-        XCTAssertTrue(coordinator.isUnlocked)
-        XCTAssertTrue(coordinator.unlockError.isEmpty)
-    }
 
     func testPreferredWeeklyPlanSheetPrefersNearCurrentWeekOverFarFuture() {
         let reference = dateUTC(2026, 2, 22)
@@ -337,7 +316,7 @@ final class WorkoutDesktopAppTests: XCTestCase {
 
     func testSetupChecklistAndCompletionPercent() {
         let coordinator = makeCoordinator()
-        XCTAssertEqual(Int(coordinator.setupCompletionPercent.rounded()), 25)
+        XCTAssertEqual(Int(coordinator.setupCompletionPercent.rounded()), 0)
         XCTAssertTrue(coordinator.setupMissingSummary.contains("Anthropic API key"))
 
         coordinator.setupState.anthropicAPIKey = "key"
@@ -465,7 +444,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
             anthropicAPIKey: "key",
             spreadsheetID: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU",
             googleAuthHint: "",
-            localAppPassword: "",
             oneRepMaxes: ["Back Squat": entry]
         )
 

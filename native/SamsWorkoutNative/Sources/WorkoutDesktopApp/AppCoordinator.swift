@@ -9,10 +9,6 @@ final class AppCoordinator: ObservableObject {
     @Published var setupState = SetupState()
     @Published var isSetupComplete = false
     @Published var setupErrors: [String] = []
-    @Published var unlockInput = ""
-    @Published var unlockError = ""
-    @Published var isUnlocked = false
-
     @Published var generationInput = PlanGenerationInput()
     @Published var generationStatus = ""
     @Published var isGenerating = false
@@ -112,10 +108,6 @@ if !generationStatus.isEmpty {
             return StatusBanner(text: generationStatus, severity: severity(for: generationStatus))
         }
 
-        if !unlockError.isEmpty {
-            return StatusBanner(text: unlockError, severity: .error)
-        }
-
         return .empty
     }
 
@@ -136,13 +128,11 @@ if !generationStatus.isEmpty {
         let sheetReady = !normalizedWhitespace(setupState.spreadsheetID).isEmpty
         let authHint = normalizedWhitespace(setupState.googleAuthHint)
         let authReady = !authHint.isEmpty && authHint.caseInsensitiveCompare("OAuth token path") != .orderedSame
-        let unlockReady = true
 
         return [
             SetupChecklistItem(id: "anthropic_key", title: "Anthropic API key provided", isComplete: keyReady),
             SetupChecklistItem(id: "sheet_id", title: "Spreadsheet ID provided", isComplete: sheetReady),
             SetupChecklistItem(id: "google_auth", title: "Google auth hint provided", isComplete: authReady),
-            SetupChecklistItem(id: "unlock", title: "Unlock preference configured", isComplete: unlockReady),
         ]
     }
 
@@ -581,16 +571,13 @@ if !generationStatus.isEmpty {
         setupState = SetupState(
             anthropicAPIKey: normalizedWhitespace(setupState.anthropicAPIKey),
             spreadsheetID: normalizedWhitespace(setupState.spreadsheetID),
-            googleAuthHint: normalizedWhitespace(setupState.googleAuthHint),
-            localAppPassword: setupState.localAppPassword
+            googleAuthHint: normalizedWhitespace(setupState.googleAuthHint)
         )
 
         let errors = setupState.validate()
         setupErrors = errors
         if errors.isEmpty {
             isSetupComplete = true
-            unlockError = ""
-            isUnlocked = setupState.localAppPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             persistConfig()
             generationStatus = "Setup saved. Ready to use live workflows."
             Task {
@@ -602,7 +589,6 @@ if !generationStatus.isEmpty {
 
     func markSetupIncomplete() {
         isSetupComplete = false
-        isUnlocked = false
         planSnapshot = .empty
     }
 
@@ -637,23 +623,6 @@ if !generationStatus.isEmpty {
             refreshExerciseCatalog()
         } catch {
             generationStatus = "DB cache rebuild failed: \(error.localizedDescription)"
-        }
-    }
-
-    func unlock() {
-        let required = setupState.localAppPassword.trimmingCharacters(in: .whitespacesAndNewlines)
-        if required.isEmpty {
-            isUnlocked = true
-            unlockError = ""
-            return
-        }
-
-        if unlockInput == required {
-            isUnlocked = true
-            unlockError = ""
-            unlockInput = ""
-        } else {
-            unlockError = "Incorrect app password."
         }
     }
 
@@ -1102,11 +1071,9 @@ if !generationStatus.isEmpty {
         setupState = SetupState(
             anthropicAPIKey: config.anthropicAPIKey,
             spreadsheetID: config.spreadsheetID,
-            googleAuthHint: config.googleAuthHint,
-            localAppPassword: config.localAppPassword
+            googleAuthHint: config.googleAuthHint
         )
         isSetupComplete = true
-        isUnlocked = config.localAppPassword.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         loadOneRepMaxFields()
         Task {
             await refreshPlanSnapshot()
@@ -1119,7 +1086,6 @@ if !generationStatus.isEmpty {
             anthropicAPIKey: setupState.anthropicAPIKey,
             spreadsheetID: setupState.spreadsheetID,
             googleAuthHint: setupState.googleAuthHint,
-            localAppPassword: setupState.localAppPassword,
             oneRepMaxes: existingConfig.oneRepMaxes
         )
         do {

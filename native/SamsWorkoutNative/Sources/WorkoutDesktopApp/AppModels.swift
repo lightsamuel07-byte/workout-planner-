@@ -35,7 +35,6 @@ struct SetupState: Equatable {
     var anthropicAPIKey: String = ""
     var spreadsheetID: String = ""
     var googleAuthHint: String = "OAuth token path"
-    var localAppPassword: String = ""
 
     func validate() -> [String] {
         var errors: [String] = []

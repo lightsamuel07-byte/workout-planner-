@@ -7,29 +7,24 @@ struct NativeWorkoutRootView: View {
     var body: some View {
         Group {
             if coordinator.isSetupComplete {
-                if coordinator.isUnlocked {
-                    NavigationSplitView(columnVisibility: $coordinator.sidebarVisibility) {
-                        List(AppRoute.allCases, selection: $coordinator.route) { route in
-                            Label(route.rawValue, systemImage: icon(for: route))
-                                .tag(route)
-                        }
-                        .listStyle(.sidebar)
-                        .frame(minWidth: 200)
-                        .navigationTitle("Workouts")
-                    } detail: {
-                        routeView(route: coordinator.route)
+                NavigationSplitView(columnVisibility: $coordinator.sidebarVisibility) {
+                    List(AppRoute.allCases, selection: $coordinator.route) { route in
+                        Label(route.rawValue, systemImage: icon(for: route))
+                            .tag(route)
                     }
-                    .toolbar {
-                        ToolbarItem(placement: .navigation) {
-                            Button(action: { coordinator.toggleSidebar() }) {
-                                Image(systemName: "sidebar.leading")
-                            }
-                            .help("Toggle Sidebar (Cmd+0)")
+                    .listStyle(.sidebar)
+                    .frame(minWidth: 200)
+                    .navigationTitle("Workouts")
+                } detail: {
+                    routeView(route: coordinator.route)
+                }
+                .toolbar {
+                    ToolbarItem(placement: .navigation) {
+                        Button(action: { coordinator.toggleSidebar() }) {
+                            Image(systemName: "sidebar.leading")
                         }
+                        .help("Toggle Sidebar (Cmd+0)")
                     }
-                } else {
-                    UnlockView(coordinator: coordinator)
-                        .padding(20)
                 }
             } else {
                 SetupFlowView(coordinator: coordinator)
@@ -246,10 +241,6 @@ struct SetupFlowView: View {
                     TextField("/Users/.../token.json", text: $coordinator.setupState.googleAuthHint)
                         .textFieldStyle(.roundedBorder)
 
-                    Text("Local App Password (optional)")
-                        .font(.headline)
-                    SecureField("Set app unlock password", text: $coordinator.setupState.localAppPassword)
-                        .textFieldStyle(.roundedBorder)
                 }
 
                 GroupBox("Readiness") {
@@ -342,44 +333,6 @@ struct SetupFlowView: View {
     }
 }
 
-struct UnlockView: View {
-    @ObservedObject var coordinator: AppCoordinator
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Unlock App")
-                .font(.largeTitle.bold())
-            Text("Enter your local app password to continue. If forgotten, return to Setup and set a new local password.")
-                .foregroundStyle(.secondary)
-
-            SecureField("App Password", text: $coordinator.unlockInput)
-                .textFieldStyle(.roundedBorder)
-                .onChange(of: coordinator.unlockInput) {
-                    if !coordinator.unlockError.isEmpty {
-                        coordinator.unlockError = ""
-                    }
-                }
-                .onSubmit {
-                    coordinator.unlock()
-                }
-
-            HStack {
-                Button("Unlock") {
-                    coordinator.unlock()
-                }
-                .buttonStyle(.borderedProminent)
-
-                Button("Back To Setup") {
-                    coordinator.markSetupIncomplete()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            StatusBannerView(banner: coordinator.statusBanner)
-            Spacer()
-        }
-    }
-}
 
 struct DashboardPageView: View {
     @ObservedObject var coordinator: AppCoordinator

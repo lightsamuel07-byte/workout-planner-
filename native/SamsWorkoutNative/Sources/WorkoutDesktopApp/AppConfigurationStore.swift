@@ -11,14 +11,12 @@ struct NativeAppConfiguration: Codable, Equatable {
     var anthropicAPIKey: String
     var spreadsheetID: String
     var googleAuthHint: String
-    var localAppPassword: String
     var oneRepMaxes: [String: OneRepMaxEntry]
 
     static let empty = NativeAppConfiguration(
         anthropicAPIKey: "",
         spreadsheetID: "",
         googleAuthHint: "OAuth token path",
-        localAppPassword: "",
         oneRepMaxes: [:]
     )
 
