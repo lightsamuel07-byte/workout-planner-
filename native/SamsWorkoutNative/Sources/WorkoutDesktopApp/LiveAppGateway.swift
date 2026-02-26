@@ -477,8 +477,9 @@ struct LiveAppGateway: NativeAppGateway {
     }
 
     func loadRecentSessions(limit: Int = 8) -> [RecentSessionSummary] {
+        let today = isoDate(nowProvider())
         guard let database = try? openDatabase(),
-              let summaries = try? database.fetchRecentSessionSummaries(limit: limit)
+              let summaries = try? database.fetchRecentSessionSummaries(limit: limit, todayISO: today)
         else {
             return []
         }

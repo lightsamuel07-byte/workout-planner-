@@ -656,8 +656,9 @@ public struct WorkoutDatabase: Sendable {
         }
     }
 
-    public func fetchRecentSessionSummaries(limit: Int = 8) throws -> [PersistedRecentSessionSummary] {
+    public func fetchRecentSessionSummaries(limit: Int = 8, todayISO: String? = nil) throws -> [PersistedRecentSessionSummary] {
         try dbQueue.read { db in
+            let dateFilter = todayISO.map { "AND COALESCE(ws.session_date, '') <= '\($0)'" } ?? ""
             let rows = try Row.fetchAll(
                 db,
                 sql: """
@@ -669,6 +670,7 @@ public struct WorkoutDatabase: Sendable {
                     COUNT(el.id) AS total_rows
                 FROM workout_sessions ws
                 LEFT JOIN exercise_logs el ON el.session_id = ws.id
+                WHERE 1=1 \(dateFilter)
                 GROUP BY ws.id
                 ORDER BY COALESCE(ws.session_date, '') DESC, ws.id DESC
                 LIMIT ?

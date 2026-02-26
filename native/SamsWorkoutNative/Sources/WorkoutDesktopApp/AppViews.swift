@@ -1628,6 +1628,41 @@ struct SettingsPageView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
+                GroupBox("Database") {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("The local DB cache stores your exercise history synced from Google Sheets. Rebuild it to pick up recent log entries.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 12) {
+                            Button {
+                                Task { await coordinator.triggerRebuildDBCache() }
+                            } label: {
+                                if coordinator.isRebuildingDBCache {
+                                    Label("Rebuilding…", systemImage: "arrow.triangle.2.circlepath")
+                                } else {
+                                    Label("Rebuild DB Cache", systemImage: "arrow.triangle.2.circlepath")
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(coordinator.isRebuildingDBCache)
+
+                            if let rebuildAt = coordinator.lastDBRebuildAt {
+                                Text("Last rebuilt: \(coordinator.formatTimestamp(rebuildAt))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if !coordinator.dbRebuildSummary.isEmpty {
+                            Text(coordinator.dbRebuildSummary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                }
+
                 GroupBox("App Credentials") {
                     VStack(alignment: .leading, spacing: 6) {
                         HStack {
