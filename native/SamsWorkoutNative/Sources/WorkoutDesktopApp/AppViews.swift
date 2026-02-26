@@ -17,7 +17,7 @@ struct NativeWorkoutRootView: View {
                     .navigationTitle("Workouts")
                 } detail: {
                     routeView(route: coordinator.route)
-                        .padding(.leading, 4)
+                        .padding(.leading, 12)
                 }
                 .toolbar {
                     ToolbarItem(placement: .navigation) {
@@ -147,6 +147,22 @@ struct StatusBannerView: View {
             return .orange.opacity(0.08)
         case .error:
             return .red.opacity(0.08)
+        }
+    }
+}
+
+/// All-caps section header with a thin rule — used in place of GroupBox titles
+/// for top-level page sections.
+struct SectionLabel: View {
+    let text: String
+    init(_ text: String) { self.text = text }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            Text(text.uppercased())
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+                .kerning(0.6)
+            Divider()
         }
     }
 }
@@ -340,7 +356,8 @@ struct DashboardPageView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 32) {
+                // MARK: - Title row
                 HStack(alignment: .firstTextBaseline) {
                     Text("Dashboard")
                         .font(.largeTitle.bold())
@@ -353,8 +370,9 @@ struct DashboardPageView: View {
                 StatusBannerView(banner: coordinator.statusBanner)
 
                 // MARK: - Training Week Grid
-                GroupBox("This Week") {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("This Week")
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
                         ForEach(coordinator.dashboardDays) { day in
                             DashboardDayCard(day: day)
                                 .onTapGesture {
@@ -367,28 +385,25 @@ struct DashboardPageView: View {
 
                 // MARK: - 1RM Strip
                 if coordinator.oneRepMaxesAreFilled {
-                    GroupBox {
-                        HStack(spacing: 24) {
-                            Label("1RM", systemImage: "dumbbell.fill")
-                                .font(.caption.bold())
-                                .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionLabel("1RM")
+                        HStack(spacing: 32) {
                             ForEach(coordinator.oneRepMaxFields) { field in
                                 if let value = field.parsedValue {
-                                    HStack(spacing: 5) {
+                                    VStack(alignment: .leading, spacing: 2) {
                                         Text(field.liftName)
                                             .font(.caption)
                                             .foregroundStyle(.secondary)
                                         Text(String(format: "%.0f kg", value))
-                                            .font(.caption.bold())
+                                            .font(.system(.title3, design: .rounded, weight: .heavy))
                                     }
                                 }
                             }
                             Spacer()
                             Button("Edit") { coordinator.quickNavigate(to: .settings) }
                                 .buttonStyle(.bordered)
-                                .controlSize(.mini)
+                                .controlSize(.small)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 } else {
                     HStack(spacing: 8) {
@@ -401,78 +416,75 @@ struct DashboardPageView: View {
                             .controlSize(.small)
                         Spacer()
                     }
-                    .padding(8)
+                    .padding(10)
                     .background(.orange.opacity(0.06))
                     .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
 
-                // MARK: - Quick Actions & Refresh
-                HStack(spacing: 12) {
-                    GroupBox("Quick Actions") {
-                        HStack(spacing: 8) {
-                            Button { coordinator.quickNavigate(to: .generatePlan) } label: {
-                                Label("Generate", systemImage: "wand.and.stars")
-                            }
-                            Button { coordinator.quickNavigate(to: .viewPlan) } label: {
-                                Label("View Plan", systemImage: "list.bullet.rectangle")
-                            }
-                            Button { coordinator.quickNavigate(to: .exerciseHistory) } label: {
-                                Label("History", systemImage: "clock.arrow.circlepath")
-                            }
-                            Button { coordinator.quickNavigate(to: .progress) } label: {
-                                Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
-                            }
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-
-                    Spacer()
-
-                    GroupBox("Refresh") {
-                        HStack(spacing: 8) {
-                            Button("Plan") { Task { await coordinator.refreshPlanSnapshot(forceRemote: true) } }
-                            Button("Analytics") { coordinator.refreshAnalytics() }
-                        }
-                        .buttonStyle(.bordered)
-                        .controlSize(.small)
-                    }
-                }
-
                 // MARK: - Recent Activity
                 if !coordinator.recentSessions.isEmpty {
-                    GroupBox("Recent Sessions") {
-                        VStack(alignment: .leading, spacing: 6) {
+                    VStack(alignment: .leading, spacing: 14) {
+                        SectionLabel("Recent Sessions")
+                        VStack(alignment: .leading, spacing: 10) {
                             ForEach(coordinator.recentSessions.prefix(5)) { session in
                                 HStack {
-                                    Text(session.dayLabel)
-                                        .font(.callout.weight(.medium))
-                                    Text(session.sessionDateISO)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(session.dayLabel)
+                                            .font(.callout.weight(.semibold))
+                                        Text(session.sessionDateISO)
+                                            .font(.caption)
+                                            .foregroundStyle(.tertiary)
+                                    }
                                     Spacer()
                                     let pct = session.totalRows > 0 ? Double(session.loggedRows) / Double(session.totalRows) * 100 : 0
                                     Text("\(session.loggedRows)/\(session.totalRows)")
                                         .font(.system(.caption, design: .monospaced))
+                                        .foregroundStyle(.secondary)
                                     completionBadge(pct)
                                 }
                             }
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
 
-                // MARK: - Timestamp Footer
-                GroupBox("Last Refresh") {
-                    HStack(spacing: 16) {
-                        Label("Plan: \(coordinator.formatTimestamp(coordinator.lastPlanRefreshAt))", systemImage: "doc.text")
-                        Label("Analytics: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))", systemImage: "chart.bar")
+                // MARK: - Quick Actions & Refresh
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("Quick Actions")
+                    HStack(spacing: 10) {
+                        Button { coordinator.quickNavigate(to: .generatePlan) } label: {
+                            Label("Generate", systemImage: "wand.and.stars")
+                        }
+                        Button { coordinator.quickNavigate(to: .viewPlan) } label: {
+                            Label("View Plan", systemImage: "list.bullet.rectangle")
+                        }
+                        Button { coordinator.quickNavigate(to: .exerciseHistory) } label: {
+                            Label("History", systemImage: "clock.arrow.circlepath")
+                        }
+                        Button { coordinator.quickNavigate(to: .progress) } label: {
+                            Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
+                        }
+                        Spacer()
+                        Button { Task { await coordinator.refreshPlanSnapshot(forceRemote: true) } } label: {
+                            Label("Refresh Plan", systemImage: "arrow.clockwise")
+                        }
+                        Button { coordinator.refreshAnalytics() } label: {
+                            Label("Refresh Analytics", systemImage: "chart.bar")
+                        }
                     }
-                    .font(.caption2)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
+
+                // MARK: - Timestamp footer
+                HStack(spacing: 20) {
+                    Label("Plan: \(coordinator.formatTimestamp(coordinator.lastPlanRefreshAt))", systemImage: "doc.text")
+                    Label("Analytics: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))", systemImage: "chart.bar")
+                }
+                .font(.caption2)
+                .foregroundStyle(.quaternary)
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
         }
         .task {
             coordinator.loadOneRepMaxFields()
@@ -506,49 +518,47 @@ struct DashboardDayCard: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(day.title)
-                    .font(.caption.bold())
-                Spacer()
-                if isFortDay {
-                    Text("FORT")
-                        .font(.system(.caption2, design: .rounded).bold())
-                        .foregroundStyle(.blue)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(.blue.opacity(0.12))
-                        .clipShape(Capsule())
-                } else if day.blocks > 0 {
-                    Text("SUPP")
-                        .font(.system(.caption2, design: .rounded).bold())
-                        .foregroundStyle(.purple)
-                        .padding(.horizontal, 5)
-                        .padding(.vertical, 1)
-                        .background(.purple.opacity(0.12))
-                        .clipShape(Capsule())
+        HStack(spacing: 0) {
+            Rectangle()
+                .fill(accentColor)
+                .frame(width: 3)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(alignment: .center) {
+                    Text(day.title)
+                        .font(.caption.bold())
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    if isFortDay {
+                        Text("FORT")
+                            .font(.system(.caption2, design: .rounded).bold())
+                            .foregroundStyle(.blue)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.blue.opacity(0.18))
+                            .clipShape(Capsule())
+                    } else if day.blocks > 0 {
+                        Text("SUPP")
+                            .font(.system(.caption2, design: .rounded).bold())
+                            .foregroundStyle(.purple)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(.purple.opacity(0.18))
+                            .clipShape(Capsule())
+                    }
                 }
-            }
-            HStack(spacing: 4) {
                 Text("\(day.blocks)")
-                    .font(.title3.bold())
+                    .font(.system(.title2, design: .rounded, weight: .heavy))
                     .foregroundStyle(accentColor)
                 Text(day.blocks == 1 ? "exercise" : "exercises")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
             }
-            Text(day.source.rawValue)
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(accentColor.opacity(0.04))
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(accentColor.opacity(0.15), lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .background(accentColor.opacity(0.05))
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
     }
 }
 
@@ -557,7 +567,7 @@ struct GeneratePlanPageView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 28) {
                 Text("Generate Plan")
                     .font(.largeTitle.bold())
 
@@ -646,30 +656,36 @@ struct GeneratePlanPageView: View {
                     }
                 }
 
-                Group {
-                    Text("Monday Fort Input")
-                        .font(.headline)
-                    TextEditor(text: $coordinator.generationInput.monday)
-                        .frame(height: 130)
-                    Text("Characters: \(coordinator.mondayCharacterCount) | Lines: \(coordinator.generationDayLineCounts["Monday"] ?? 0)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionLabel("Monday — FORT Input")
+                        TextEditor(text: $coordinator.generationInput.monday)
+                            .frame(height: 130)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Text("Characters: \(coordinator.mondayCharacterCount) · Lines: \(coordinator.generationDayLineCounts["Monday"] ?? 0)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
 
-                    Text("Wednesday Fort Input")
-                        .font(.headline)
-                    TextEditor(text: $coordinator.generationInput.wednesday)
-                        .frame(height: 130)
-                    Text("Characters: \(coordinator.wednesdayCharacterCount) | Lines: \(coordinator.generationDayLineCounts["Wednesday"] ?? 0)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionLabel("Wednesday — FORT Input")
+                        TextEditor(text: $coordinator.generationInput.wednesday)
+                            .frame(height: 130)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Text("Characters: \(coordinator.wednesdayCharacterCount) · Lines: \(coordinator.generationDayLineCounts["Wednesday"] ?? 0)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
 
-                    Text("Friday Fort Input")
-                        .font(.headline)
-                    TextEditor(text: $coordinator.generationInput.friday)
-                        .frame(height: 130)
-                    Text("Characters: \(coordinator.fridayCharacterCount) | Lines: \(coordinator.generationDayLineCounts["Friday"] ?? 0)")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                    VStack(alignment: .leading, spacing: 8) {
+                        SectionLabel("Friday — FORT Input")
+                        TextEditor(text: $coordinator.generationInput.friday)
+                            .frame(height: 130)
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                        Text("Characters: \(coordinator.fridayCharacterCount) · Lines: \(coordinator.generationDayLineCounts["Friday"] ?? 0)")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                    }
                 }
 
                 HStack {
@@ -707,8 +723,10 @@ struct GeneratePlanPageView: View {
 
                 Text("Tip: keep day headers and section cues from Fort to improve deterministic parsing and anchor fidelity.")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.tertiary)
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
         }
     }
 
@@ -732,39 +750,46 @@ struct DayPillBar: View {
     let shortName: (String) -> String
     let subtitle: (String) -> String
 
+    private func pillColor(for dayLabel: String) -> Color {
+        let lower = dayLabel.lowercased()
+        let isFort = lower.contains("monday") || lower.contains("wednesday") || lower.contains("friday")
+        return isFort ? .blue : .purple
+    }
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 ForEach(days) { day in
                     let isSelected = day.dayLabel == selectedDay
+                    let color = pillColor(for: day.dayLabel)
                     Button {
                         selectedDay = day.dayLabel
                     } label: {
-                        VStack(spacing: 2) {
+                        VStack(spacing: 3) {
                             Text(shortName(day.dayLabel))
                                 .font(.system(.callout, design: .rounded, weight: isSelected ? .semibold : .regular))
                             let sub = subtitle(day.dayLabel)
                             if !sub.isEmpty {
                                 Text(sub)
                                     .font(.caption2)
-                                    .foregroundStyle(isSelected ? .white.opacity(0.8) : .secondary)
+                                    .foregroundStyle(isSelected ? .white.opacity(0.85) : .secondary)
                                     .lineLimit(1)
                             }
                         }
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 8)
-                        .background(isSelected ? Color.accentColor : Color.clear)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(isSelected ? color : color.opacity(0.08))
                         .foregroundStyle(isSelected ? .white : .primary)
                         .clipShape(Capsule())
                         .overlay(
                             Capsule()
-                                .stroke(isSelected ? Color.clear : Color.secondary.opacity(0.3), lineWidth: 1)
+                                .stroke(isSelected ? Color.clear : color.opacity(0.35), lineWidth: 1)
                         )
                     }
                     .buttonStyle(.plain)
                 }
             }
-            .padding(.horizontal, 4)
+            .padding(.horizontal, 2)
         }
     }
 }
@@ -784,50 +809,47 @@ struct ExerciseCardView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .firstTextBaseline) {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center) {
                 Text(exercise.block.uppercased())
                     .font(.system(.caption2, design: .rounded, weight: .semibold))
                     .foregroundStyle(blockColor)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(blockColor.opacity(0.12))
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 3)
+                    .background(blockColor.opacity(0.13))
                     .clipShape(Capsule())
 
                 Text(exercise.exercise)
-                    .font(.headline)
+                    .font(.title3.bold())
 
                 Spacer()
 
                 if !exercise.log.isEmpty {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
-                        .font(.caption)
+                        .font(.callout)
                 }
             }
 
-            HStack(spacing: 16) {
+            HStack(spacing: 20) {
                 Label(exercise.sets, systemImage: "square.stack.3d.up")
-                    .font(.subheadline)
                 Label(exercise.reps, systemImage: "repeat")
-                    .font(.subheadline)
                 Label("\(exercise.load) kg", systemImage: "scalemass")
-                    .font(.subheadline)
                 if !exercise.rest.isEmpty {
                     Label(exercise.rest, systemImage: "clock")
-                        .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
             }
+            .font(.callout)
 
             if showNotes, !exercise.notes.isEmpty {
                 Text(exercise.notes)
                     .font(.callout)
                     .foregroundStyle(.secondary)
-                    .padding(8)
+                    .padding(10)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color.secondary.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
             if showLogs, !exercise.log.isEmpty {
@@ -840,9 +862,9 @@ struct ExerciseCardView: View {
                 .foregroundStyle(.green)
             }
         }
-        .padding(12)
+        .padding(16)
         .background(.regularMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
     }
 }
 
@@ -866,7 +888,7 @@ struct ViewPlanPageView: View {
                 }
             } else {
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 20) {
                         StatusBannerView(banner: coordinator.statusBanner)
 
                         DayPillBar(
@@ -915,7 +937,7 @@ struct ViewPlanPageView: View {
                                 .buttonStyle(.bordered)
                             }
                         } else {
-                            LazyVStack(spacing: 10) {
+                            LazyVStack(spacing: 12) {
                                 ForEach(coordinator.filteredPlanExercises) { exercise in
                                     ExerciseCardView(
                                         exercise: exercise,
@@ -926,8 +948,8 @@ struct ViewPlanPageView: View {
                             }
                         }
                     }
-                    .padding(.horizontal, 20)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 28)
+                    .padding(.vertical, 20)
                 }
             }
         }
@@ -985,7 +1007,7 @@ struct ProgressPageView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 32) {
                 Text("Progress")
                     .font(.largeTitle.bold())
 
@@ -995,7 +1017,7 @@ struct ProgressPageView: View {
                 StatusBannerView(banner: coordinator.statusBanner)
 
                 // MARK: - Summary Cards
-                HStack(spacing: 10) {
+                HStack(spacing: 12) {
                     MetricCardView(title: "Completion", value: coordinator.progressSummary.completionRateText)
                     MetricCardView(title: "Weekly Volume", value: coordinator.progressSummary.weeklyVolumeText)
                     MetricCardView(title: "Recent Logs (14d)", value: coordinator.progressSummary.recentLoggedText)
@@ -1004,9 +1026,10 @@ struct ProgressPageView: View {
                 }
 
                 // MARK: - Volume Trend Chart
-                GroupBox("Weekly Volume Trend") {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("Weekly Volume Trend")
                     if coordinator.weeklyVolumePoints.isEmpty {
-                        Text("No weekly volume data yet. Rebuild DB cache to populate.")
+                        Text("No weekly volume data yet. Rebuild DB cache in Settings.")
                             .foregroundStyle(.secondary)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     } else {
@@ -1034,10 +1057,11 @@ struct ProgressPageView: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
+                } // end volume VStack
 
                 // MARK: - RPE Trend Chart
-                GroupBox("Weekly RPE Trend") {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("Weekly RPE Trend")
                     if coordinator.weeklyRPEPoints.isEmpty {
                         Text("No RPE data yet. Log workouts with RPE values to populate.")
                             .foregroundStyle(.secondary)
@@ -1069,7 +1093,8 @@ struct ProgressPageView: View {
                 }
 
                 // MARK: - Block Volume Breakdown
-                GroupBox("Block Volume Breakdown (Last 28 Days)") {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("Block Volume — Last 28 Days")
                     if coordinator.muscleGroupVolumes.isEmpty {
                         Text("No block volume data yet.")
                             .foregroundStyle(.secondary)
@@ -1101,17 +1126,20 @@ struct ProgressPageView: View {
                 }
 
                 // MARK: - Top Logged Exercises
-                GroupBox("Top Logged Exercises") {
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("Top Logged Exercises")
                     if coordinator.topExercises.isEmpty {
                         Text("No top exercise data yet.")
                             .foregroundStyle(.secondary)
                     } else {
-                        VStack(alignment: .leading, spacing: 4) {
+                        VStack(alignment: .leading, spacing: 8) {
                             ForEach(coordinator.topExercises) { row in
                                 HStack {
                                     Text(row.exerciseName)
+                                        .font(.callout)
                                     Spacer()
                                     Text("\(row.loggedCount) logs / \(row.sessionCount) sessions")
+                                        .font(.caption)
                                         .foregroundStyle(.secondary)
                                 }
                             }
@@ -1120,15 +1148,20 @@ struct ProgressPageView: View {
                     }
                 }
 
-                Text("Metrics refreshed: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Button("Refresh Metrics") {
-                    coordinator.refreshAnalytics()
+                HStack {
+                    Text("Metrics refreshed: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))")
+                        .font(.caption2)
+                        .foregroundStyle(.quaternary)
+                    Spacer()
+                    Button("Refresh Metrics") {
+                        coordinator.refreshAnalytics()
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
                 }
-                .buttonStyle(.bordered)
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
         }
     }
 
@@ -1151,72 +1184,74 @@ struct WeeklyReviewPageView: View {
     @ObservedObject var coordinator: AppCoordinator
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Weekly Review")
-                .font(.largeTitle.bold())
+        ScrollView {
+            VStack(alignment: .leading, spacing: 28) {
+                Text("Weekly Review")
+                    .font(.largeTitle.bold())
 
-            StatusBannerView(banner: coordinator.statusBanner)
+                StatusBannerView(banner: coordinator.statusBanner)
 
-            HStack {
-                TextField("Filter by sheet name", text: $coordinator.weeklyReviewQuery)
-                    .textFieldStyle(.roundedBorder)
-
-                Picker("Sort", selection: $coordinator.weeklyReviewSort) {
-                    ForEach(WeeklyReviewSortMode.allCases) { mode in
-                        Text(mode.rawValue).tag(mode)
-                    }
-                }
-                .pickerStyle(.menu)
-            }
-
-            HStack(spacing: 10) {
-                MetricCardView(title: "Avg Completion", value: String(format: "%.1f%%", coordinator.weeklyReviewAverageCompletion))
-                MetricCardView(title: "Best Week", value: coordinator.weeklyReviewBestWeek?.completionRateText ?? "n/a")
-                MetricCardView(title: "Worst Week", value: coordinator.weeklyReviewWorstWeek?.completionRateText ?? "n/a")
-            }
-
-            HStack {
-                Text("Best: \(coordinator.weeklyReviewBestWeek?.sheetName ?? "n/a")")
-                Text("Worst: \(coordinator.weeklyReviewWorstWeek?.sheetName ?? "n/a")")
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
-
-            if coordinator.filteredWeeklyReviewSummaries.isEmpty {
-                Text("No weekly summaries in local DB yet.")
-                    .foregroundStyle(.secondary)
-            } else {
-                List(coordinator.filteredWeeklyReviewSummaries) { week in
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text(week.sheetName)
-                                .font(.headline)
-                            Spacer()
-                            Text(week.completionRateText)
-                                .font(.caption)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 3)
-                                .background(completionBadgeColor(week))
-                                .clipShape(Capsule())
+                HStack(spacing: 12) {
+                    TextField("Filter by sheet name", text: $coordinator.weeklyReviewQuery)
+                        .textFieldStyle(.roundedBorder)
+                    Picker("Sort", selection: $coordinator.weeklyReviewSort) {
+                        ForEach(WeeklyReviewSortMode.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
                         }
-                        Text("Sessions: \(week.sessions)")
-                        Text("Logged: \(week.loggedCount)/\(week.totalCount)")
-                            .foregroundStyle(.secondary)
                     }
-                    .padding(.vertical, 4)
+                    .pickerStyle(.menu)
+                    Button("Refresh") { coordinator.refreshAnalytics() }
+                        .buttonStyle(.bordered)
+                        .controlSize(.small)
                 }
 
-                Text("Showing \(coordinator.filteredWeeklyReviewSummaries.count) week(s)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+                HStack(spacing: 12) {
+                    MetricCardView(title: "Avg Completion", value: String(format: "%.1f%%", coordinator.weeklyReviewAverageCompletion))
+                    MetricCardView(title: "Best Week", value: coordinator.weeklyReviewBestWeek?.completionRateText ?? "n/a")
+                    MetricCardView(title: "Worst Week", value: coordinator.weeklyReviewWorstWeek?.completionRateText ?? "n/a")
+                }
 
-            Button("Refresh Weekly Review") {
-                coordinator.refreshAnalytics()
-            }
-            .buttonStyle(.bordered)
+                HStack(spacing: 16) {
+                    Text("Best: \(coordinator.weeklyReviewBestWeek?.sheetName ?? "n/a")")
+                    Text("Worst: \(coordinator.weeklyReviewWorstWeek?.sheetName ?? "n/a")")
+                }
+                .font(.caption)
+                .foregroundStyle(.tertiary)
 
-            Spacer()
+                if coordinator.filteredWeeklyReviewSummaries.isEmpty {
+                    Text("No weekly summaries in local DB yet.")
+                        .foregroundStyle(.secondary)
+                } else {
+                    VStack(alignment: .leading, spacing: 0) {
+                        SectionLabel("Weeks — \(coordinator.filteredWeeklyReviewSummaries.count) total")
+                            .padding(.bottom, 12)
+                        ForEach(coordinator.filteredWeeklyReviewSummaries) { week in
+                            VStack(alignment: .leading, spacing: 0) {
+                                HStack(alignment: .center) {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(week.sheetName)
+                                            .font(.callout.weight(.semibold))
+                                        Text("Sessions: \(week.sessions) · Logged: \(week.loggedCount)/\(week.totalCount)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Text(week.completionRateText)
+                                        .font(.system(.caption, design: .monospaced).bold())
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 4)
+                                        .background(completionBadgeColor(week))
+                                        .clipShape(Capsule())
+                                }
+                                .padding(.vertical, 12)
+                                Divider()
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
         }
     }
 
@@ -1236,7 +1271,7 @@ struct ExerciseHistoryPageView: View {
     @ObservedObject var coordinator: AppCoordinator
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 24) {
             HStack(alignment: .firstTextBaseline) {
                 Text("Exercise History")
                     .font(.largeTitle.bold())
@@ -1391,10 +1426,12 @@ struct ExerciseHistoryPageView: View {
                                 .foregroundStyle(.secondary)
                         }
                     }
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 4)
                 }
             }
         }
+        .padding(.horizontal, 28)
+        .padding(.top, 24)
     }
 
     private func trendBadge(delta: Double) -> String? {
@@ -1499,7 +1536,7 @@ struct SettingsPageView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
+            VStack(alignment: .leading, spacing: 28) {
                 Text("Settings")
                     .font(.largeTitle.bold())
 
@@ -1702,6 +1739,8 @@ struct SettingsPageView: View {
 
                 Spacer()
             }
+            .padding(.horizontal, 28)
+            .padding(.vertical, 24)
         }
         .onAppear {
             coordinator.loadOneRepMaxFields()
