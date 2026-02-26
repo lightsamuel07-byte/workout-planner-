@@ -593,6 +593,7 @@ if !generationStatus.isEmpty {
             generationStatus = "Setup saved. Ready to use live workflows."
             Task {
                 await refreshPlanSnapshot()
+                await triggerRebuildDBCache()
             }
             refreshAnalytics()
         }
@@ -1091,6 +1092,8 @@ if !generationStatus.isEmpty {
         loadOneRepMaxFields()
         Task {
             await refreshPlanSnapshot()
+            // Rebuild DB cache in the background so log data is always fresh on launch.
+            await triggerRebuildDBCache()
         }
     }
 
