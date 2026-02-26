@@ -48,8 +48,6 @@ struct NativeWorkoutRootView: View {
             return "wand.and.stars"
         case .viewPlan:
             return "list.bullet.rectangle"
-        case .logWorkout:
-            return "square.and.pencil"
         case .progress:
             return "chart.line.uptrend.xyaxis"
         case .weeklyReview:
@@ -58,10 +56,6 @@ struct NativeWorkoutRootView: View {
             return "clock.arrow.circlepath"
         case .settings:
             return "gearshape"
-        case .apiTestHarness: // TEMP: TEST HARNESS
-            return "ant"
-        case .dbStatus:
-            return "internaldrive"
         }
     }
 
@@ -74,8 +68,6 @@ struct NativeWorkoutRootView: View {
             GeneratePlanPageView(coordinator: coordinator)
         case .viewPlan:
             ViewPlanPageView(coordinator: coordinator)
-        case .logWorkout:
-            LogWorkoutPageView(coordinator: coordinator)
         case .progress:
             ProgressPageView(coordinator: coordinator)
         case .weeklyReview:
@@ -84,10 +76,6 @@ struct NativeWorkoutRootView: View {
             ExerciseHistoryPageView(coordinator: coordinator)
         case .settings:
             SettingsPageView(coordinator: coordinator)
-        case .apiTestHarness: // TEMP: TEST HARNESS
-            APITestHarnessPageView(coordinator: coordinator)
-        case .dbStatus:
-            DBStatusPageView(coordinator: coordinator)
         }
     }
 }
@@ -191,31 +179,21 @@ struct KeyboardShortcutOverlay: View {
 
     var body: some View {
         Group {
-            // Cmd+1-9 navigation
+            // Cmd+1-7 navigation
             Button("") { coordinator.quickNavigate(to: .dashboard) }
                 .keyboardShortcut("1", modifiers: .command)
             Button("") { coordinator.quickNavigate(to: .generatePlan) }
                 .keyboardShortcut("2", modifiers: .command)
             Button("") { coordinator.quickNavigate(to: .viewPlan) }
                 .keyboardShortcut("3", modifiers: .command)
-            Button("") { coordinator.quickNavigate(to: .logWorkout) }
-                .keyboardShortcut("4", modifiers: .command)
             Button("") { coordinator.quickNavigate(to: .progress) }
-                .keyboardShortcut("5", modifiers: .command)
+                .keyboardShortcut("4", modifiers: .command)
             Button("") { coordinator.quickNavigate(to: .weeklyReview) }
-                .keyboardShortcut("6", modifiers: .command)
+                .keyboardShortcut("5", modifiers: .command)
             Button("") { coordinator.quickNavigate(to: .exerciseHistory) }
-                .keyboardShortcut("7", modifiers: .command)
+                .keyboardShortcut("6", modifiers: .command)
             Button("") { coordinator.quickNavigate(to: .settings) }
-                .keyboardShortcut("8", modifiers: .command)
-            Button("") { coordinator.quickNavigate(to: .dbStatus) }
-                .keyboardShortcut("9", modifiers: .command)
-
-            // Cmd+D = mark done, Cmd+S = skip, Cmd+K = clear
-            Button("") { markCurrentLoggerDraftDone() }
-                .keyboardShortcut("d", modifiers: .command)
-            Button("") { skipCurrentLoggerDraft() }
-                .keyboardShortcut("k", modifiers: .command)
+                .keyboardShortcut("7", modifiers: .command)
 
             // Left/Right arrows for plan day navigation
             Button("") { coordinator.moveToAdjacentPlanDay(step: -1) }
@@ -236,19 +214,6 @@ struct KeyboardShortcutOverlay: View {
         .allowsHitTesting(false)
     }
 
-    private func markCurrentLoggerDraftDone() {
-        guard coordinator.route == .logWorkout else { return }
-        if let first = coordinator.loggerSession.drafts.first(where: { !coordinator.isDraftComplete($0) }) {
-            coordinator.markDraftDone(draftID: first.id)
-        }
-    }
-
-    private func skipCurrentLoggerDraft() {
-        guard coordinator.route == .logWorkout else { return }
-        if let first = coordinator.loggerSession.drafts.first(where: { !coordinator.isDraftComplete($0) }) {
-            coordinator.markDraftSkip(draftID: first.id)
-        }
-    }
 }
 
 struct SetupFlowView: View {
@@ -457,11 +422,11 @@ struct DashboardPageView: View {
                         subtitle: coordinator.selectedPlanDetail?.dayLabel ?? "Selected day"
                     )
                     DashboardMetricCard(
-                        icon: "pencil.and.list.clipboard",
-                        iconColor: coordinator.loggerPendingVisibleCount > 0 ? .orange : .green,
-                        title: "Logger",
-                        value: "\(coordinator.loggerCompletionCount)/\(coordinator.loggerTotalCount)",
-                        subtitle: coordinator.loggerPendingVisibleCount > 0 ? "\(coordinator.loggerPendingVisibleCount) pending" : "All done"
+                        icon: "chart.xyaxis.line",
+                        iconColor: .indigo,
+                        title: "Weekly Avg RPE",
+                        value: coordinator.averageRPEText,
+                        subtitle: "Last 12 weeks"
                     )
                 }
 
@@ -531,11 +496,11 @@ struct DashboardPageView: View {
                             Button { coordinator.quickNavigate(to: .viewPlan) } label: {
                                 Label("View Plan", systemImage: "list.bullet.rectangle")
                             }
-                            Button { coordinator.quickNavigate(to: .logWorkout) } label: {
-                                Label("Log", systemImage: "square.and.pencil")
+                            Button { coordinator.quickNavigate(to: .exerciseHistory) } label: {
+                                Label("History", systemImage: "clock.arrow.circlepath")
                             }
-                            Button { coordinator.quickNavigate(to: .dbStatus) } label: {
-                                Label("DB", systemImage: "internaldrive")
+                            Button { coordinator.quickNavigate(to: .progress) } label: {
+                                Label("Progress", systemImage: "chart.line.uptrend.xyaxis")
                             }
                         }
                         .buttonStyle(.bordered)
@@ -547,7 +512,6 @@ struct DashboardPageView: View {
                     GroupBox("Refresh") {
                         HStack(spacing: 8) {
                             Button("Plan") { Task { await coordinator.refreshPlanSnapshot(forceRemote: true) } }
-                            Button("Logger") { Task { await coordinator.refreshLoggerSession() } }
                             Button("Analytics") { coordinator.refreshAnalytics() }
                         }
                         .buttonStyle(.bordered)
@@ -582,7 +546,6 @@ struct DashboardPageView: View {
                 GroupBox("Last Refresh") {
                     HStack(spacing: 16) {
                         Label("Plan: \(coordinator.formatTimestamp(coordinator.lastPlanRefreshAt))", systemImage: "doc.text")
-                        Label("Logger: \(coordinator.formatTimestamp(coordinator.lastLoggerRefreshAt))", systemImage: "pencil")
                         Label("Analytics: \(coordinator.formatTimestamp(coordinator.lastAnalyticsRefreshAt))", systemImage: "chart.bar")
                     }
                     .font(.caption2)
@@ -1135,183 +1098,6 @@ struct ViewPlanPageView: View {
     }
 }
 
-struct LogWorkoutPageView: View {
-    @ObservedObject var coordinator: AppCoordinator
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("Log Workout")
-                .font(.largeTitle.bold())
-
-            StatusBannerView(banner: coordinator.statusBanner)
-
-            HStack {
-                Text(coordinator.loggerSession.dayLabel.isEmpty ? "No workout loaded" : "\(coordinator.loggerSession.dayLabel) | \(coordinator.loggerSession.sheetName)")
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Button("Load Today") {
-                    Task { await coordinator.refreshLoggerSession() }
-                }
-                .buttonStyle(.bordered)
-
-                Button("Save Logs") {
-                    Task { await coordinator.saveLoggerSession() }
-                }
-                .buttonStyle(.borderedProminent)
-                .disabled(!coordinator.loggerSaveDisabledReason.isEmpty)
-            }
-
-            HStack(spacing: 10) {
-                MetricCardView(title: "Completed", value: "\(coordinator.loggerCompletionCount)/\(coordinator.loggerTotalCount)")
-                MetricCardView(title: "Invalid RPE", value: "\(coordinator.loggerInvalidRPECount)")
-                MetricCardView(title: "Unsaved", value: coordinator.hasUnsavedLoggerChanges ? "Yes" : "No")
-                MetricCardView(title: "Visible", value: "\(coordinator.loggerVisibleCount)")
-                MetricCardView(title: "Pending", value: "\(coordinator.loggerPendingVisibleCount)")
-            }
-
-            ProgressView(value: coordinator.loggerCompletionPercent / 100.0) {
-                Text("Completion")
-            } currentValueLabel: {
-                Text("\(Int(coordinator.loggerCompletionPercent.rounded()))%")
-            }
-
-            HStack {
-                TextField("Search exercises, blocks, notes", text: $coordinator.loggerSearchQuery)
-                    .textFieldStyle(.roundedBorder)
-
-                Button("Mark All Done") {
-                    coordinator.markAllDraftsDone()
-                }
-                .buttonStyle(.bordered)
-                .disabled(coordinator.loggerSession.drafts.isEmpty)
-
-                Button("Clear All Edits") {
-                    coordinator.clearAllDraftEntries()
-                }
-                .buttonStyle(.bordered)
-                .disabled(coordinator.loggerSession.drafts.isEmpty)
-
-                Picker("Block", selection: $coordinator.loggerBlockFilter) {
-                    ForEach(coordinator.loggerBlockCatalog, id: \.self) { block in
-                        Text(block).tag(block)
-                    }
-                }
-                .pickerStyle(.menu)
-
-                Toggle("Show Incomplete Only", isOn: $coordinator.showLoggerIncompleteOnly)
-                    .toggleStyle(.switch)
-
-                Button("Reset Filters") {
-                    coordinator.resetLoggerFilters()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            if !coordinator.loggerSaveDisabledReason.isEmpty {
-                Text(coordinator.loggerSaveDisabledReason)
-                    .foregroundStyle(.secondary)
-                    .font(.caption)
-            }
-
-            if coordinator.hasInvalidLoggerEntries {
-                Text("Some RPE values are invalid. Use a value between 1 and 10.")
-                    .foregroundStyle(.orange)
-                    .font(.callout)
-            }
-
-            if coordinator.loggerSession.drafts.isEmpty {
-                Text("No exercises available for logging yet.")
-                    .foregroundStyle(.secondary)
-            } else {
-                GroupBox("Block Progress") {
-                    if coordinator.loggerBlockProgressRows.isEmpty {
-                        Text("No blocks loaded.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        VStack(alignment: .leading, spacing: 4) {
-                            ForEach(coordinator.loggerBlockProgressRows) { row in
-                                HStack {
-                                    Text(row.block)
-                                    Spacer()
-                                    Text("\(row.completed)/\(row.total) (\(Int(row.completionPercent.rounded()))%)")
-                                        .foregroundStyle(.secondary)
-                                }
-                                ProgressView(value: row.completionPercent / 100.0)
-                            }
-                        }
-                    }
-                }
-
-                List {
-                    ForEach($coordinator.loggerSession.drafts) { $draft in
-                        if coordinator.shouldShowDraft(draft) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Image(systemName: coordinator.draftCompletionIcon(draft))
-                                        .foregroundStyle(coordinator.isDraftComplete(draft) ? .green : .secondary)
-                                    Text("\(draft.block) - \(draft.exercise)")
-                                        .font(.headline)
-                                    Spacer()
-                                    Button("Done") {
-                                        coordinator.markDraftDone(draftID: draft.id)
-                                    }
-                                    .buttonStyle(.bordered)
-
-                                    Button("Skip") {
-                                        coordinator.markDraftSkip(draftID: draft.id)
-                                    }
-                                    .buttonStyle(.bordered)
-
-                                    Button("Clear") {
-                                        coordinator.clearDraftEntry(draftID: draft.id)
-                                    }
-                                    .buttonStyle(.bordered)
-                                }
-
-                                Text("\(draft.sets) x \(draft.reps) @ \(draft.load) kg")
-                                    .foregroundStyle(.secondary)
-
-                                TextField("Performance (e.g. Done or Skip)", text: $draft.performance)
-                                    .textFieldStyle(.roundedBorder)
-                                TextField("RPE (1-10)", text: $draft.rpe)
-                                    .textFieldStyle(.roundedBorder)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 6)
-                                            .stroke(
-                                                !coordinator.isValidRPE(draft.rpe) && !draft.rpe.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                                    ? Color.red
-                                                    : Color.clear,
-                                                lineWidth: 1
-                                            )
-                                    )
-                                TextField("Notes", text: $draft.noteEntry)
-                                    .textFieldStyle(.roundedBorder)
-
-                                if !draft.existingLog.isEmpty {
-                                    Text("Current: \(draft.existingLog)")
-                                        .foregroundStyle(.secondary)
-                                        .font(.caption)
-                                }
-                            }
-                            .padding(.vertical, 6)
-                            .padding(.horizontal, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(coordinator.isDraftComplete(draft) ? Color.green.opacity(0.06) : Color.clear)
-                            )
-                        }
-                    }
-                }
-            }
-
-            Text("Write format: performance | RPE x | Notes: ... (Column H)")
-                .foregroundStyle(.secondary)
-
-            Spacer()
-        }
-    }
-}
-
 struct ProgressPageView: View {
     @ObservedObject var coordinator: AppCoordinator
 
@@ -1678,7 +1464,7 @@ struct ExerciseHistoryPageView: View {
                         }
                     }
                 } else {
-                    Text("No exercise catalog yet. Use DB Status > Rebuild DB Cache.")
+                    Text("No exercise catalog yet. Rebuild DB cache in Settings.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -2006,448 +1792,3 @@ struct SettingsPageView: View {
     }
 }
 
-// TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-struct APITestHarnessPageView: View {
-    @ObservedObject var coordinator: AppCoordinator
-
-    var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text("API Test Harness")
-                        .font(.largeTitle.bold())
-                    Spacer()
-                    Text("⚠️ TEMPORARY — Remove after verification")
-                        .font(.caption)
-                        .foregroundStyle(.orange)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 3)
-                        .background(.orange.opacity(0.1))
-                        .clipShape(Capsule())
-                }
-
-                Text("Send a single Fort workout to the Claude API and inspect the raw request/response. Verify 1RM values appear in context and percentage calculations are correct.")
-                    .foregroundStyle(.secondary)
-
-                StatusBannerView(banner: coordinator.statusBanner)
-
-                // MARK: - 1RM Status
-                GroupBox("1RM Context Check") {
-                    VStack(alignment: .leading, spacing: 6) {
-                        if coordinator.oneRepMaxesAreFilled {
-                            HStack(spacing: 6) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                Text("All 1RM values set — these will be injected into the API prompt.")
-                                    .font(.callout)
-                            }
-                            ForEach(coordinator.oneRepMaxFields) { field in
-                                if let value = field.parsedValue {
-                                    HStack(spacing: 8) {
-                                        Text(field.liftName)
-                                            .font(.system(.caption, design: .monospaced).bold())
-                                        Text(String(format: "%.1f kg", value))
-                                            .font(.system(.caption, design: .monospaced))
-                                            .foregroundStyle(.secondary)
-                                        Text("→ 80%: \(String(format: "%.1f", value * 0.80)) kg")
-                                            .font(.system(.caption2, design: .monospaced))
-                                            .foregroundStyle(.tertiary)
-                                    }
-                                }
-                            }
-                        } else {
-                            HStack(spacing: 6) {
-                                Image(systemName: "exclamationmark.triangle.fill")
-                                    .foregroundStyle(.orange)
-                                Text("1RM values not set. Go to Settings first.")
-                                    .font(.callout)
-                                Button("Go to Settings") { coordinator.quickNavigate(to: .settings) }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                // MARK: - Fort Input
-                GroupBox("Fort Workout Input (Monday slot)") {
-                    VStack(alignment: .leading, spacing: 8) {
-                        TextEditor(text: $coordinator.testHarnessFortInput)
-                            .frame(height: 150)
-                            .font(.system(.body, design: .monospaced))
-
-                        HStack {
-                            Button("Load Template") { coordinator.applyTestHarnessTemplate() }
-                                .buttonStyle(.bordered)
-                            Button("Clear") { coordinator.testHarnessFortInput = "" }
-                                .buttonStyle(.bordered)
-                            Spacer()
-                            Text("\(coordinator.testHarnessFortInput.count) chars")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-
-                // MARK: - Payload Preview
-                GroupBox {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("Payload Preview")
-                                .font(.headline)
-                            Spacer()
-                            Toggle("Show", isOn: $coordinator.testHarnessShowPayload)
-                                .toggleStyle(.switch)
-                                .controlSize(.small)
-                        }
-
-                        if coordinator.testHarnessShowPayload {
-                            ScrollView {
-                                Text(coordinator.testHarnessPayloadPreview)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                            }
-                            .frame(maxHeight: 250)
-                            .padding(8)
-                            .background(Color(.textBackgroundColor).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
-                }
-
-                // MARK: - Send Button
-                HStack(spacing: 12) {
-                    Button(coordinator.testHarnessIsSending ? "Sending..." : "Send to Claude") {
-                        Task { await coordinator.sendTestHarnessRequest() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .tint(.orange)
-                    .disabled(!coordinator.testHarnessCanSend)
-
-                    Button("Clear Results") { coordinator.clearTestHarnessResult() }
-                        .buttonStyle(.bordered)
-
-                    if coordinator.testHarnessIsSending {
-                        ProgressView()
-                            .controlSize(.small)
-                    }
-
-                    Spacer()
-
-                    if !coordinator.setupState.validate().isEmpty {
-                        Text("Setup incomplete — configure API key first")
-                            .font(.caption)
-                            .foregroundStyle(.red)
-                    }
-                }
-
-                // MARK: - Error Display
-                if !coordinator.testHarnessResult.errorMessage.isEmpty {
-                    GroupBox("Error") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            HStack(spacing: 6) {
-                                Image(systemName: "xmark.octagon.fill")
-                                    .foregroundStyle(.red)
-                                Text("API call failed")
-                                    .font(.headline)
-                                    .foregroundStyle(.red)
-                            }
-                            Text(coordinator.testHarnessResult.errorMessage)
-                                .font(.system(.callout, design: .monospaced))
-                                .textSelection(.enabled)
-                                .foregroundStyle(.red.opacity(0.8))
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                }
-
-                // MARK: - Response Metadata
-                if !coordinator.testHarnessResult.rawResponse.isEmpty {
-                    GroupBox("Response Metadata") {
-                        LazyVGrid(columns: [GridItem(.adaptive(minimum: 140), spacing: 10)], spacing: 10) {
-                            testHarnessMetricCard(title: "Model", value: coordinator.testHarnessResult.model)
-                            testHarnessMetricCard(title: "Input Tokens", value: "\(coordinator.testHarnessResult.inputTokens)")
-                            testHarnessMetricCard(title: "Output Tokens", value: "\(coordinator.testHarnessResult.outputTokens)")
-                            testHarnessMetricCard(
-                                title: "Response Time",
-                                value: String(format: "%.2fs", coordinator.testHarnessResult.responseTimeSeconds)
-                            )
-                            testHarnessMetricCard(
-                                title: "1RM in Prompt",
-                                value: coordinator.testHarnessResult.containsOneRepMax ? "YES ✓" : "NO ✗"
-                            )
-                            testHarnessMetricCard(
-                                title: "1RM Exercises",
-                                value: coordinator.testHarnessResult.oneRepMaxExercises.isEmpty
-                                    ? "None"
-                                    : coordinator.testHarnessResult.oneRepMaxExercises.joined(separator: ", ")
-                            )
-                        }
-                    }
-
-                    // MARK: - Verification Checklist
-                    GroupBox("Verification Checklist") {
-                        VStack(alignment: .leading, spacing: 6) {
-                            verificationRow(
-                                "1RM values present in prompt",
-                                passed: coordinator.testHarnessResult.containsOneRepMax
-                            )
-                            verificationRow(
-                                "Response is non-empty",
-                                passed: !coordinator.testHarnessResult.rawResponse.isEmpty
-                            )
-                            verificationRow(
-                                "Model is claude-sonnet-4-6",
-                                passed: coordinator.testHarnessResult.model.contains("claude")
-                            )
-                            verificationRow(
-                                "Response time < 30s",
-                                passed: coordinator.testHarnessResult.responseTimeSeconds < 30
-                            )
-                            verificationRow(
-                                "Contains markdown headers (##)",
-                                passed: coordinator.testHarnessResult.rawResponse.contains("##")
-                            )
-                            verificationRow(
-                                "Contains exercise notation (x ... @ ... kg)",
-                                passed: coordinator.testHarnessResult.rawResponse.contains("kg")
-                            )
-                            verificationRow(
-                                "No error",
-                                passed: coordinator.testHarnessResult.errorMessage.isEmpty
-                            )
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-
-                    // MARK: - Raw Response
-                    GroupBox("Raw Response") {
-                        VStack(alignment: .leading, spacing: 8) {
-                            HStack {
-                                Text("\(coordinator.testHarnessResult.rawResponse.count) characters")
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Button("Copy") {
-                                    NSPasteboard.general.clearContents()
-                                    NSPasteboard.general.setString(coordinator.testHarnessResult.rawResponse, forType: .string)
-                                }
-                                .buttonStyle(.bordered)
-                                .controlSize(.small)
-                            }
-                            ScrollView {
-                                Text(coordinator.testHarnessResult.rawResponse)
-                                    .font(.system(.caption, design: .monospaced))
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .textSelection(.enabled)
-                            }
-                            .frame(maxHeight: 400)
-                            .padding(8)
-                            .background(Color(.textBackgroundColor).opacity(0.5))
-                            .clipShape(RoundedRectangle(cornerRadius: 6))
-                        }
-                    }
-
-                    // MARK: - Full Prompt (Sent to API)
-                    if !coordinator.testHarnessResult.prompt.isEmpty {
-                        GroupBox("Full Prompt (Sent to API)") {
-                            VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("\(coordinator.testHarnessResult.prompt.count) characters")
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                    Spacer()
-                                    Button("Copy") {
-                                        NSPasteboard.general.clearContents()
-                                        NSPasteboard.general.setString(coordinator.testHarnessResult.prompt, forType: .string)
-                                    }
-                                    .buttonStyle(.bordered)
-                                    .controlSize(.small)
-                                }
-                                ScrollView {
-                                    Text(coordinator.testHarnessResult.prompt)
-                                        .font(.system(.caption, design: .monospaced))
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .textSelection(.enabled)
-                                }
-                                .frame(maxHeight: 300)
-                                .padding(8)
-                                .background(Color(.textBackgroundColor).opacity(0.5))
-                                .clipShape(RoundedRectangle(cornerRadius: 6))
-                            }
-                        }
-                    }
-                }
-
-                Spacer()
-            }
-        }
-        .onAppear {
-            coordinator.loadOneRepMaxFields()
-        }
-    }
-
-    private func testHarnessMetricCard(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title)
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(.callout, design: .monospaced).bold())
-                .lineLimit(2)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(10)
-        .background(.thinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
-    }
-
-    private func verificationRow(_ label: String, passed: Bool) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: passed ? "checkmark.circle.fill" : "xmark.circle.fill")
-                .foregroundStyle(passed ? .green : .red)
-            Text(label)
-                .font(.callout)
-            Spacer()
-            Text(passed ? "PASS" : "FAIL")
-                .font(.system(.caption, design: .monospaced).bold())
-                .foregroundStyle(passed ? .green : .red)
-                .padding(.horizontal, 6)
-                .padding(.vertical, 2)
-                .background(passed ? Color.green.opacity(0.1) : Color.red.opacity(0.1))
-                .clipShape(Capsule())
-        }
-    }
-}
-// END TEMP: TEST HARNESS
-
-struct DBStatusPageView: View {
-    @ObservedObject var coordinator: AppCoordinator
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("DB Status")
-                .font(.largeTitle.bold())
-
-            Text(coordinator.dbStatusText)
-                .foregroundStyle(.secondary)
-
-            StatusBannerView(banner: coordinator.statusBanner)
-
-            HStack {
-                MetricCardView(title: "Exercises", value: "\(coordinator.dbHealthSnapshot.exerciseCount)")
-                MetricCardView(title: "Sessions", value: "\(coordinator.dbHealthSnapshot.sessionCount)")
-                MetricCardView(title: "Rows", value: "\(coordinator.dbHealthSnapshot.logCount)")
-                MetricCardView(title: "Non-Empty Logs", value: "\(coordinator.dbHealthSnapshot.nonEmptyLogCount)")
-            }
-
-            Text("Latest session date: \(coordinator.dbHealthSnapshot.latestSessionDateISO.isEmpty ? "n/a" : coordinator.dbHealthSnapshot.latestSessionDateISO)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-            Text("Last rebuild: \(coordinator.formatTimestamp(coordinator.lastDBRebuildAt))")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-
-            HStack {
-                Button("Rebuild DB Cache") {
-                    Task {
-                        await coordinator.triggerRebuildDBCache()
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(!coordinator.dbRebuildDisabledReason.isEmpty)
-
-                Button("Refresh DB Metrics") {
-                    coordinator.refreshAnalytics()
-                }
-                .buttonStyle(.bordered)
-
-                Button("Re-auth") {
-                    coordinator.triggerReauth()
-                }
-                .buttonStyle(.bordered)
-            }
-
-            if !coordinator.dbRebuildDisabledReason.isEmpty {
-                Text(coordinator.dbRebuildDisabledReason)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            if coordinator.isRebuildingDBCache {
-                ProgressView("Importing weekly sheets into local DB...")
-                    .controlSize(.small)
-            }
-
-            if !coordinator.dbRebuildSummary.isEmpty {
-                GroupBox("Last Rebuild") {
-                    VStack(alignment: .leading, spacing: 4) {
-                        ForEach(coordinator.formattedDBRebuildSummaryLines, id: \.self) { line in
-                            Text("• \(line)")
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .font(.system(.callout, design: .monospaced))
-                        }
-                    }
-                }
-            }
-
-            GroupBox("Top Exercises") {
-                if coordinator.dbHealthSnapshot.topExercises.isEmpty {
-                    Text("No top exercise metrics yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(coordinator.dbHealthSnapshot.topExercises) { row in
-                        HStack {
-                            Text(row.exerciseName)
-                            Spacer()
-                            Text("\(row.loggedCount) logs")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-
-            GroupBox("Recent Sessions") {
-                if coordinator.dbHealthSnapshot.recentSessions.isEmpty {
-                    Text("No recent sessions yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(coordinator.dbHealthSnapshot.recentSessions) { row in
-                        HStack {
-                            VStack(alignment: .leading) {
-                                Text(row.dayLabel)
-                                Text(row.sheetName)
-                                    .font(.caption)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text("\(row.loggedRows)/\(row.totalRows)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-
-            GroupBox("Weekday Completion") {
-                if coordinator.dbHealthSnapshot.weekdayCompletion.isEmpty {
-                    Text("No weekday completion metrics yet.")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(coordinator.dbHealthSnapshot.weekdayCompletion) { row in
-                        HStack {
-                            Text(row.dayName.isEmpty ? "Unknown" : row.dayName)
-                            Spacer()
-                            Text("\(row.loggedRows)/\(row.totalRows) (\(Int(coordinator.dbWeekdayCompletionPercent(row).rounded()))%)")
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                }
-            }
-
-            Spacer()
-        }
-    }
-}

@@ -19,8 +19,6 @@ final class AppCoordinator: ObservableObject {
     @Published var planSnapshot = PlanSnapshot.empty
     @Published var selectedPlanDay = ""
     @Published var viewPlanError = ""
-    @Published var loggerSession = LoggerSessionState.empty
-    @Published var loggerStatus = ""
     @Published var progressSummary = ProgressSummary.empty
     @Published var weeklyReviewSummaries: [WeeklyReviewSummary] = []
 
@@ -34,20 +32,15 @@ final class AppCoordinator: ObservableObject {
     @Published var showPlanLogs = false
     @Published var showPlanLoggedOnly = false
     @Published var planBlockFilter = "All Blocks"
-    @Published var loggerSearchQuery = ""
-    @Published var showLoggerIncompleteOnly = false
-    @Published var loggerBlockFilter = "All Blocks"
     @Published var weeklyReviewQuery = ""
     @Published var weeklyReviewSort: WeeklyReviewSortMode = .newest
 
     @Published var lastPlanRefreshAt: Date?
-    @Published var lastLoggerRefreshAt: Date?
     @Published var lastAnalyticsRefreshAt: Date?
     @Published var lastDBRebuildAt: Date?
 
     @Published var topExercises: [TopExerciseSummary] = []
     @Published var recentSessions: [RecentSessionSummary] = []
-    @Published var dbHealthSnapshot = DBHealthSnapshot.empty
     @Published var weeklyVolumePoints: [WeeklyVolumePoint] = []
     @Published var weeklyRPEPoints: [WeeklyRPEPoint] = []
     @Published var muscleGroupVolumes: [MuscleGroupVolume] = []
@@ -55,12 +48,6 @@ final class AppCoordinator: ObservableObject {
     @Published var oneRepMaxFields: [OneRepMaxFieldState] = []
     @Published var oneRepMaxStatus = ""
 
-    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-    @Published var testHarnessFortInput = ""
-    @Published var testHarnessResult = APITestHarnessResult.empty
-    @Published var testHarnessIsSending = false
-    @Published var testHarnessShowPayload = false
-    // END TEMP: TEST HARNESS
 
     private let gateway: NativeAppGateway
     private let configStore: AppConfigurationStore
@@ -121,11 +108,7 @@ final class AppCoordinator: ObservableObject {
             return StatusBanner(text: viewPlanError, severity: .error)
         }
 
-        if !loggerStatus.isEmpty {
-            return StatusBanner(text: loggerStatus, severity: severity(for: loggerStatus))
-        }
-
-        if !generationStatus.isEmpty {
+if !generationStatus.isEmpty {
             return StatusBanner(text: generationStatus, severity: severity(for: generationStatus))
         }
 
@@ -460,102 +443,6 @@ final class AppCoordinator: ObservableObject {
         )
     }
 
-    var loggerCompletionCount: Int {
-        loggerSession.drafts.filter { isDraftComplete($0) }.count
-    }
-
-    var loggerTotalCount: Int {
-        loggerSession.drafts.count
-    }
-
-    var loggerInvalidRPECount: Int {
-        loggerSession.drafts.filter { draft in
-            let trimmed = normalizedWhitespace(draft.rpe)
-            return !trimmed.isEmpty && !isValidRPE(trimmed)
-        }.count
-    }
-
-    var hasInvalidLoggerEntries: Bool {
-        loggerInvalidRPECount > 0
-    }
-
-    var hasUnsavedLoggerChanges: Bool {
-        loggerSession.drafts.contains { draft in
-            !normalizedWhitespace(draft.performance).isEmpty ||
-                !normalizedWhitespace(draft.rpe).isEmpty ||
-                !normalizedWhitespace(draft.noteEntry).isEmpty
-        }
-    }
-
-    var loggerCompletionPercent: Double {
-        if loggerTotalCount == 0 {
-            return 0
-        }
-        return (Double(loggerCompletionCount) / Double(loggerTotalCount)) * 100
-    }
-
-    var loggerVisibleCount: Int {
-        loggerSession.drafts.filter { shouldShowDraft($0) }.count
-    }
-
-    var loggerPendingVisibleCount: Int {
-        loggerSession.drafts.filter { shouldShowDraft($0) && !isDraftComplete($0) }.count
-    }
-
-    var loggerEditedCount: Int {
-        loggerSession.drafts.filter { draft in
-            !normalizedWhitespace(draft.performance).isEmpty ||
-                !normalizedWhitespace(draft.rpe).isEmpty ||
-                !normalizedWhitespace(draft.noteEntry).isEmpty
-        }.count
-    }
-
-    var loggerNotesCount: Int {
-        loggerSession.drafts.filter { !normalizedWhitespace($0.noteEntry).isEmpty }.count
-    }
-
-    var loggerSaveDisabledReason: String {
-        if loggerSession.drafts.isEmpty {
-            return "No exercises loaded for today."
-        }
-        if hasInvalidLoggerEntries {
-            return "Fix invalid RPE values before saving (use 1-10)."
-        }
-        return ""
-    }
-
-    var loggerBlockCatalog: [String] {
-        let blocks = Set(
-            loggerSession.drafts
-                .map { normalizedWhitespace($0.block) }
-                .filter { !$0.isEmpty }
-        )
-        return ["All Blocks"] + blocks.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }
-    }
-
-    var loggerBlockProgressRows: [LoggerBlockProgress] {
-        var grouped: [String: (completed: Int, total: Int)] = [:]
-        for draft in loggerSession.drafts {
-            let block = normalizedWhitespace(draft.block).isEmpty ? "Unspecified" : normalizedWhitespace(draft.block)
-            var value = grouped[block] ?? (0, 0)
-            value.total += 1
-            if isDraftComplete(draft) {
-                value.completed += 1
-            }
-            grouped[block] = value
-        }
-
-        return grouped.keys.sorted { $0.localizedCaseInsensitiveCompare($1) == .orderedAscending }.map { block in
-            let value = grouped[block] ?? (0, 0)
-            return LoggerBlockProgress(
-                id: block.lowercased(),
-                block: block,
-                completed: value.completed,
-                total: value.total
-            )
-        }
-    }
-
     var filteredWeeklyReviewSummaries: [WeeklyReviewSummary] {
         var rows = weeklyReviewSummaries
         let query = normalizedWhitespace(weeklyReviewQuery).lowercased()
@@ -608,13 +495,6 @@ final class AppCoordinator: ObservableObject {
             return "Setup required: Google auth token path or bearer token is missing."
         }
         return ""
-    }
-
-    func dbWeekdayCompletionPercent(_ row: WeekdayCompletionSummary) -> Double {
-        if row.totalRows == 0 {
-            return 0
-        }
-        return (Double(row.loggedRows) / Double(row.totalRows)) * 100
     }
 
     var formattedDBRebuildSummaryLines: [String] {
@@ -715,7 +595,6 @@ final class AppCoordinator: ObservableObject {
             generationStatus = "Setup saved. Ready to use live workflows."
             Task {
                 await refreshPlanSnapshot()
-                await refreshLoggerSession()
             }
             refreshAnalytics()
         }
@@ -725,8 +604,6 @@ final class AppCoordinator: ObservableObject {
         isSetupComplete = false
         isUnlocked = false
         planSnapshot = .empty
-        loggerSession = .empty
-        loggerStatus = ""
     }
 
     func triggerReauth() {
@@ -830,47 +707,11 @@ final class AppCoordinator: ObservableObject {
         }
     }
 
-    func refreshLoggerSession() async {
-        do {
-            loggerSession = try await gateway.loadTodayLoggerSession()
-            loggerStatus = ""
-            lastLoggerRefreshAt = Date()
-            if !loggerBlockCatalog.contains(loggerBlockFilter) {
-                loggerBlockFilter = "All Blocks"
-            }
-        } catch {
-            loggerStatus = "Unable to load workout logger: \(error.localizedDescription)"
-            if loggerSession.drafts.isEmpty {
-                loggerSession = .empty
-            }
-        }
-    }
-
-    func saveLoggerSession() async {
-        if !loggerSaveDisabledReason.isEmpty {
-            loggerStatus = "Failed to save logs: \(loggerSaveDisabledReason)"
-            return
-        }
-
-        let sanitized = sanitizedLoggerSession(loggerSession)
-        loggerSession = sanitized
-
-        do {
-            let summary = try await gateway.saveLoggerSession(sanitized)
-            loggerStatus = "Saved logs. DB now has \(summary.exerciseLogs) log rows across \(summary.sessions) sessions."
-            lastLoggerRefreshAt = Date()
-            refreshAnalytics()
-        } catch {
-            loggerStatus = "Failed to save logs: \(error.localizedDescription)"
-        }
-    }
-
     func refreshAnalytics() {
         progressSummary = gateway.loadProgressSummary()
         weeklyReviewSummaries = gateway.loadWeeklyReviewSummaries()
         topExercises = gateway.loadTopExercises(limit: 5)
         recentSessions = gateway.loadRecentSessions(limit: 8)
-        dbHealthSnapshot = gateway.loadDBHealthSnapshot()
         weeklyVolumePoints = gateway.loadWeeklyVolumePoints(limit: 12)
         weeklyRPEPoints = gateway.loadWeeklyRPEPoints(limit: 12)
         muscleGroupVolumes = gateway.loadMuscleGroupVolumes(limit: 12)
@@ -984,99 +825,6 @@ final class AppCoordinator: ObservableObject {
         }
         return result
     }
-
-    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-    var testHarnessPayloadPreview: String {
-        if testHarnessFortInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            return "Enter Fort workout input above to preview the Claude API payload."
-        }
-        let oneRMs = oneRepMaxDictionary()
-        let input = PlanGenerationInput(
-            monday: testHarnessFortInput,
-            wednesday: "WEDNESDAY\nRest day placeholder",
-            friday: "FRIDAY\nRest day placeholder"
-        )
-        let oneRMSection: String
-        if oneRMs.isEmpty {
-            oneRMSection = "ATHLETE 1RM PROFILE:\nNo 1RM data provided."
-        } else {
-            let lines = oneRMs.sorted(by: { $0.key < $1.key }).map { exercise, value in
-                String(format: "- %@: %.1f kg", exercise, value)
-            }
-            oneRMSection = "ATHLETE 1RM PROFILE:\n" + lines.joined(separator: "\n")
-        }
-        return """
-        === PAYLOAD PREVIEW ===
-        Model: claude-sonnet-4-6
-        Max tokens: 2048
-        System: "You generate deterministic weekly workout plans..."
-
-        === 1RM SECTION ===
-        \(oneRMSection)
-
-        === FORT INPUT (Monday slot) ===
-        \(input.monday)
-
-        === FULL PROMPT LENGTH ===
-        ~\(testHarnessFortInput.count + oneRMSection.count + 1200) chars (estimated)
-        """
-    }
-
-    var testHarnessCanSend: Bool {
-        !testHarnessFortInput.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            && !testHarnessIsSending
-            && setupState.validate().isEmpty
-    }
-
-    func sendTestHarnessRequest() async {
-        guard testHarnessCanSend else { return }
-        testHarnessIsSending = true
-        testHarnessResult = .empty
-        defer { testHarnessIsSending = false }
-
-        let oneRMs = oneRepMaxDictionary()
-
-        do {
-            testHarnessResult = try await gateway.sendTestHarnessRequest(
-                fortInput: testHarnessFortInput,
-                oneRepMaxes: oneRMs
-            )
-        } catch {
-            testHarnessResult = APITestHarnessResult(
-                prompt: "",
-                rawResponse: "",
-                model: "",
-                inputTokens: 0,
-                outputTokens: 0,
-                responseTimeSeconds: 0,
-                containsOneRepMax: false,
-                oneRepMaxExercises: [],
-                errorMessage: error.localizedDescription
-            )
-        }
-    }
-
-    func clearTestHarnessResult() {
-        testHarnessResult = .empty
-        testHarnessFortInput = ""
-        testHarnessShowPayload = false
-    }
-
-    func applyTestHarnessTemplate() {
-        testHarnessFortInput = """
-        MONDAY
-        IGNITION
-        Deadbug 3x10
-        Cat-Cow 2x8
-        CLUSTER SET
-        Back Squat 4x5 @ 80% 1RM
-        AUXILIARY
-        Reverse Pec Deck 3x15
-        THAW
-        BikeErg 10 min easy
-        """
-    }
-    // END TEMP: TEST HARNESS
 
     func quickNavigate(to target: AppRoute) {
         route = target
@@ -1236,108 +984,6 @@ final class AppCoordinator: ObservableObject {
         selectedPlanDay = orderedPlanDays[next].dayLabel
     }
 
-    func markDraftDone(draftID: UUID) {
-        mutateDraft(draftID) { draft in
-            draft.performance = "Done"
-            if normalizedWhitespace(draft.rpe).isEmpty {
-                draft.rpe = "8"
-            }
-        }
-    }
-
-    func markDraftSkip(draftID: UUID) {
-        mutateDraft(draftID) { draft in
-            draft.performance = "Skip"
-        }
-    }
-
-    func clearDraftEntry(draftID: UUID) {
-        mutateDraft(draftID) { draft in
-            draft.performance = ""
-            draft.rpe = ""
-            draft.noteEntry = ""
-        }
-    }
-
-    func markAllDraftsDone() {
-        for index in loggerSession.drafts.indices {
-            loggerSession.drafts[index].performance = "Done"
-            if normalizedWhitespace(loggerSession.drafts[index].rpe).isEmpty {
-                loggerSession.drafts[index].rpe = "8"
-            }
-        }
-    }
-
-    func clearAllDraftEntries() {
-        for index in loggerSession.drafts.indices {
-            loggerSession.drafts[index].performance = ""
-            loggerSession.drafts[index].rpe = ""
-            loggerSession.drafts[index].noteEntry = ""
-        }
-    }
-
-    func resetLoggerFilters() {
-        loggerSearchQuery = ""
-        showLoggerIncompleteOnly = false
-        loggerBlockFilter = "All Blocks"
-    }
-
-    func shouldShowDraft(_ draft: WorkoutLogDraft) -> Bool {
-        let blockFilter = normalizedWhitespace(loggerBlockFilter)
-        if !blockFilter.isEmpty,
-           blockFilter != "All Blocks",
-           normalizedWhitespace(draft.block).caseInsensitiveCompare(blockFilter) != .orderedSame {
-            return false
-        }
-
-        let query = normalizedWhitespace(loggerSearchQuery).lowercased()
-        if !query.isEmpty {
-            let haystack = [
-                draft.block,
-                draft.exercise,
-                draft.sets,
-                draft.reps,
-                draft.load,
-                draft.rest,
-                draft.notes,
-                draft.existingLog,
-                draft.performance,
-                draft.rpe,
-                draft.noteEntry,
-            ].joined(separator: " ").lowercased()
-            if !haystack.contains(query) {
-                return false
-            }
-        }
-
-        if !showLoggerIncompleteOnly {
-            return true
-        }
-        return !isDraftComplete(draft)
-    }
-
-    func isValidRPE(_ raw: String) -> Bool {
-        let normalized = raw.replacingOccurrences(of: ",", with: ".")
-        guard let value = Double(normalized) else {
-            return false
-        }
-        return value >= 1 && value <= 10
-    }
-
-    func isDraftComplete(_ draft: WorkoutLogDraft) -> Bool {
-        !normalizedWhitespace(draft.existingLog).isEmpty ||
-            !normalizedWhitespace(draft.performance).isEmpty ||
-            !normalizedWhitespace(draft.rpe).isEmpty ||
-            !normalizedWhitespace(draft.noteEntry).isEmpty
-    }
-
-    func draftCompletionIcon(_ draft: WorkoutLogDraft) -> String {
-        if isDraftComplete(draft) {
-            return "checkmark.circle.fill"
-        }
-        return "circle"
-    }
-
     func formatTimestamp(_ date: Date?) -> String {
         guard let date else {
             return "Not refreshed yet"
@@ -1349,42 +995,6 @@ final class AppCoordinator: ObservableObject {
         formatter.timeStyle = .short
         formatter.dateStyle = .medium
         return formatter.string(from: date)
-    }
-
-    private func mutateDraft(_ draftID: UUID, mutate: (inout WorkoutLogDraft) -> Void) {
-        guard let index = loggerSession.drafts.firstIndex(where: { $0.id == draftID }) else {
-            return
-        }
-
-        mutate(&loggerSession.drafts[index])
-    }
-
-    private func sanitizedLoggerSession(_ session: LoggerSessionState) -> LoggerSessionState {
-        let drafts = session.drafts.map { draft in
-            let normalizedRPE = normalizedWhitespace(draft.rpe).replacingOccurrences(of: ",", with: ".")
-            return WorkoutLogDraft(
-                id: draft.id,
-                sourceRow: draft.sourceRow,
-                block: normalizedWhitespace(draft.block),
-                exercise: normalizedWhitespace(draft.exercise),
-                sets: normalizedWhitespace(draft.sets),
-                reps: normalizedWhitespace(draft.reps),
-                load: normalizedWhitespace(draft.load),
-                rest: normalizedWhitespace(draft.rest),
-                notes: normalizedWhitespace(draft.notes),
-                existingLog: normalizedWhitespace(draft.existingLog),
-                performance: normalizedWhitespace(draft.performance),
-                rpe: normalizedRPE,
-                noteEntry: normalizedWhitespace(draft.noteEntry)
-            )
-        }
-
-        return LoggerSessionState(
-            sheetName: normalizedWhitespace(session.sheetName),
-            dayLabel: normalizedWhitespace(session.dayLabel),
-            source: session.source,
-            drafts: drafts
-        )
     }
 
     private func severity(for message: String) -> StatusSeverity {
@@ -1500,7 +1110,6 @@ final class AppCoordinator: ObservableObject {
         loadOneRepMaxFields()
         Task {
             await refreshPlanSnapshot()
-            await refreshLoggerSession()
         }
     }
 

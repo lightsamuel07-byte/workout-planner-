@@ -29,19 +29,15 @@ final class WorkoutDesktopAppTests: XCTestCase {
         components.day = day
         return components.date ?? Date()
     }
-
     func testRouteParityIncludesAllTargets() {
         let expected: Set<AppRoute> = [
             .dashboard,
             .generatePlan,
             .viewPlan,
-            .logWorkout,
             .progress,
             .weeklyReview,
             .exerciseHistory,
             .settings,
-            .apiTestHarness, // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-            .dbStatus,
         ]
         XCTAssertEqual(Set(AppRoute.allCases), expected)
     }
@@ -229,53 +225,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertTrue(exported.contains("Weekly Plan (2/23/2026)"))
     }
 
-    func testLoggerHelpersValidateRPEAndBulkActions() {
-        let coordinator = makeCoordinator()
-        coordinator.loggerSession = LoggerSessionState(
-            sheetName: "Weekly Plan (2/23/2026)",
-            dayLabel: "Tuesday",
-            source: .googleSheets,
-            drafts: [
-                WorkoutLogDraft(
-                    sourceRow: 3,
-                    block: "A1",
-                    exercise: "Back Squat",
-                    sets: "5",
-                    reps: "3",
-                    load: "100",
-                    rest: "180",
-                    notes: "",
-                    existingLog: ""
-                ),
-                WorkoutLogDraft(
-                    sourceRow: 4,
-                    block: "B1",
-                    exercise: "Bench Press",
-                    sets: "4",
-                    reps: "6",
-                    load: "80",
-                    rest: "120",
-                    notes: "",
-                    existingLog: ""
-                ),
-            ]
-        )
-
-        coordinator.markDraftDone(draftID: coordinator.loggerSession.drafts[0].id)
-        XCTAssertEqual(coordinator.loggerSession.drafts[0].performance, "Done")
-        XCTAssertEqual(coordinator.loggerSession.drafts[0].rpe, "8")
-
-        coordinator.loggerSession.drafts[1].rpe = "11"
-        XCTAssertTrue(coordinator.hasInvalidLoggerEntries)
-        XCTAssertFalse(coordinator.isValidRPE("11"))
-        XCTAssertTrue(coordinator.isValidRPE("8,5"))
-
-        coordinator.markAllDraftsDone()
-        XCTAssertEqual(coordinator.loggerCompletionCount, 2)
-        coordinator.clearAllDraftEntries()
-        XCTAssertEqual(coordinator.loggerCompletionCount, 0)
-    }
-
     func testWeeklyReviewFilterAndSortModes() {
         let coordinator = makeCoordinator()
         coordinator.weeklyReviewSummaries = [
@@ -349,47 +298,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(coordinator.filteredPlanExercises.count, 1)
         XCTAssertEqual(coordinator.planDayCompletionCount, 1)
         XCTAssertEqual(Int(coordinator.planDayCompletionPercent.rounded()), 100)
-    }
-
-    func testLoggerBlockFilterAndSaveDisabledReason() {
-        let coordinator = makeCoordinator()
-        coordinator.loggerSession = LoggerSessionState(
-            sheetName: "Weekly Plan (2/23/2026)",
-            dayLabel: "Tuesday",
-            source: .googleSheets,
-            drafts: [
-                WorkoutLogDraft(
-                    sourceRow: 3,
-                    block: "A1",
-                    exercise: "Back Squat",
-                    sets: "5",
-                    reps: "3",
-                    load: "100",
-                    rest: "180",
-                    notes: "",
-                    existingLog: ""
-                ),
-                WorkoutLogDraft(
-                    sourceRow: 4,
-                    block: "B1",
-                    exercise: "Bench Press",
-                    sets: "4",
-                    reps: "6",
-                    load: "80",
-                    rest: "120",
-                    notes: "",
-                    existingLog: ""
-                ),
-            ]
-        )
-
-        coordinator.loggerBlockFilter = "B1"
-        XCTAssertEqual(coordinator.loggerBlockCatalog, ["All Blocks", "A1", "B1"])
-        XCTAssertFalse(coordinator.shouldShowDraft(coordinator.loggerSession.drafts[0]))
-        XCTAssertTrue(coordinator.shouldShowDraft(coordinator.loggerSession.drafts[1]))
-
-        coordinator.loggerSession.drafts[0].rpe = "15"
-        XCTAssertTrue(coordinator.loggerSaveDisabledReason.contains("invalid RPE"))
     }
 
     func testWeeklyReviewSummaryHelpersExposeAverageBestWorst() {
@@ -468,24 +376,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
         coordinator.selectedPlanDay = "Wednesday"
         XCTAssertEqual(coordinator.orderedPlanDays.map(\.dayLabel), ["Monday", "Wednesday", "Friday"])
         XCTAssertEqual(coordinator.selectedPlanDayPositionText, "Day 2 of 3")
-    }
-
-    func testLoggerSearchAndBlockProgressRows() {
-        let coordinator = makeCoordinator()
-        coordinator.loggerSession = LoggerSessionState(
-            sheetName: "Weekly Plan (2/23/2026)",
-            dayLabel: "Tuesday",
-            source: .googleSheets,
-            drafts: [
-                WorkoutLogDraft(sourceRow: 3, block: "A1", exercise: "Back Squat", sets: "5", reps: "3", load: "100", rest: "180", notes: "", existingLog: "Done"),
-                WorkoutLogDraft(sourceRow: 4, block: "B1", exercise: "Bench Press", sets: "4", reps: "6", load: "80", rest: "120", notes: "", existingLog: ""),
-            ]
-        )
-        coordinator.loggerSearchQuery = "bench"
-        XCTAssertEqual(coordinator.loggerVisibleCount, 1)
-        XCTAssertEqual(coordinator.loggerPendingVisibleCount, 1)
-        XCTAssertEqual(coordinator.loggerBlockProgressRows.count, 2)
-        XCTAssertEqual(coordinator.loggerBlockProgressRows.first(where: { $0.block == "A1" })?.completed, 1)
     }
 
     func testHistoryEmptyReasonAndDBRebuildFormattingHelpers() {
@@ -591,72 +481,6 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(NativeAppConfiguration.mainLifts, ["Back Squat", "Bench Press", "Deadlift"])
     }
 
-    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-    func testTestHarnessCanSendRequiresInput() {
-        let coordinator = makeCoordinator()
-        coordinator.setupState.anthropicAPIKey = "key"
-        coordinator.setupState.spreadsheetID = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
-        coordinator.completeSetup()
-
-        XCTAssertFalse(coordinator.testHarnessCanSend) // No input
-        coordinator.testHarnessFortInput = "MONDAY\nBack Squat"
-        XCTAssertTrue(coordinator.testHarnessCanSend)
-    }
-
-    func testTestHarnessTemplatePopulatesInput() {
-        let coordinator = makeCoordinator()
-        XCTAssertTrue(coordinator.testHarnessFortInput.isEmpty)
-        coordinator.applyTestHarnessTemplate()
-        XCTAssertTrue(coordinator.testHarnessFortInput.contains("Back Squat"))
-        XCTAssertTrue(coordinator.testHarnessFortInput.contains("MONDAY"))
-    }
-
-    func testTestHarnessClearResetsState() {
-        let coordinator = makeCoordinator()
-        coordinator.testHarnessFortInput = "test input"
-        coordinator.testHarnessShowPayload = true
-        coordinator.clearTestHarnessResult()
-        XCTAssertTrue(coordinator.testHarnessFortInput.isEmpty)
-        XCTAssertFalse(coordinator.testHarnessShowPayload)
-    }
-
-    func testTestHarnessPayloadPreviewContains1RM() {
-        let store = TestConfigStore()
-        let coordinator = AppCoordinator(gateway: InMemoryAppGateway(), configStore: store)
-        let entry = OneRepMaxEntry(valueKG: 140.0, lastUpdated: Date())
-        try! store.save(NativeAppConfiguration(
-            anthropicAPIKey: "key",
-            spreadsheetID: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU",
-            googleAuthHint: "",
-            localAppPassword: "",
-            oneRepMaxes: ["Back Squat": entry]
-        ))
-        coordinator.loadOneRepMaxFields()
-        coordinator.testHarnessFortInput = "MONDAY\nBack Squat"
-        let preview = coordinator.testHarnessPayloadPreview
-        XCTAssertTrue(preview.contains("Back Squat"))
-        XCTAssertTrue(preview.contains("140.0 kg"))
-    }
-
-    func testAPITestHarnessResultModel() {
-        let result = APITestHarnessResult(
-            prompt: "test prompt",
-            rawResponse: "## Monday\n### A1. Back Squat",
-            model: "claude-sonnet-4-6",
-            inputTokens: 500,
-            outputTokens: 200,
-            responseTimeSeconds: 2.5,
-            containsOneRepMax: true,
-            oneRepMaxExercises: ["Back Squat"],
-            errorMessage: ""
-        )
-        XCTAssertTrue(result.containsOneRepMax)
-        XCTAssertEqual(result.oneRepMaxExercises, ["Back Squat"])
-        XCTAssertEqual(result.inputTokens, 500)
-        XCTAssertEqual(result.model, "claude-sonnet-4-6")
-    }
-    // END TEMP: TEST HARNESS
-
     // MARK: - Progress Page & New Analytics Tests
 
     func testWeeklyVolumePointsLoadFromInMemoryGateway() {
@@ -718,8 +542,8 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(coordinator.route, .dashboard)
         coordinator.quickNavigate(to: .progress)
         XCTAssertEqual(coordinator.route, .progress)
-        coordinator.quickNavigate(to: .logWorkout)
-        XCTAssertEqual(coordinator.route, .logWorkout)
+        coordinator.quickNavigate(to: .settings)
+        XCTAssertEqual(coordinator.route, .settings)
     }
 
     func testMoveToAdjacentPlanDayNavigatesCorrectly() {

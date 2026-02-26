@@ -13,29 +13,19 @@ protocol NativeAppGateway {
     func dbStatusText() -> String
     func rebuildDatabaseCache() async throws -> DBRebuildReport
     func loadPlanSnapshot(forceRemote: Bool) async throws -> PlanSnapshot
-    func loadTodayLoggerSession() async throws -> LoggerSessionState
-    func saveLoggerSession(_ session: LoggerSessionState) async throws -> WorkoutDBSummary
     func loadProgressSummary() -> ProgressSummary
     func loadWeeklyReviewSummaries() -> [WeeklyReviewSummary]
     func loadTopExercises(limit: Int) -> [TopExerciseSummary]
     func loadRecentSessions(limit: Int) -> [RecentSessionSummary]
-    func loadDBHealthSnapshot() -> DBHealthSnapshot
     func loadWeeklyVolumePoints(limit: Int) -> [WeeklyVolumePoint]
     func loadWeeklyRPEPoints(limit: Int) -> [WeeklyRPEPoint]
     func loadMuscleGroupVolumes(limit: Int) -> [MuscleGroupVolume]
-    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-    func sendTestHarnessRequest(fortInput: String, oneRepMaxes: [String: Double]) async throws -> APITestHarnessResult
-    // END TEMP: TEST HARNESS
 }
 
 extension NativeAppGateway {
     func loadPlanSnapshot(forceRemote: Bool = false) async throws -> PlanSnapshot {
         let _ = forceRemote
         return PlanSnapshot.empty
-    }
-
-    func loadTodayLoggerSession() async throws -> LoggerSessionState {
-        .empty
     }
 
     func loadExerciseCatalog(limit: Int = 200) -> [String] {
@@ -53,11 +43,6 @@ extension NativeAppGateway {
             dbSessions: 0,
             dbExerciseLogs: 0
         )
-    }
-
-    func saveLoggerSession(_ session: LoggerSessionState) async throws -> WorkoutDBSummary {
-        let _ = session
-        return WorkoutDBSummary(exercises: 0, sessions: 0, exerciseLogs: 0, logsWithRPE: 0)
     }
 
     func loadProgressSummary() -> ProgressSummary {
@@ -78,10 +63,6 @@ extension NativeAppGateway {
         return []
     }
 
-    func loadDBHealthSnapshot() -> DBHealthSnapshot {
-        .empty
-    }
-
     func loadWeeklyVolumePoints(limit: Int = 12) -> [WeeklyVolumePoint] {
         let _ = limit
         return []
@@ -96,14 +77,6 @@ extension NativeAppGateway {
         let _ = limit
         return []
     }
-
-    // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-    func sendTestHarnessRequest(fortInput: String, oneRepMaxes: [String: Double]) async throws -> APITestHarnessResult {
-        let _ = fortInput
-        let _ = oneRepMaxes
-        return .empty
-    }
-    // END TEMP: TEST HARNESS
 }
 
 struct InMemoryAppGateway: NativeAppGateway {
@@ -181,15 +154,6 @@ struct InMemoryAppGateway: NativeAppGateway {
         )
     }
 
-    func loadTodayLoggerSession() async throws -> LoggerSessionState {
-        LoggerSessionState(
-            sheetName: "Weekly Plan (2/23/2026)",
-            dayLabel: "Tuesday",
-            source: .googleSheets,
-            drafts: []
-        )
-    }
-
     func loadTopExercises(limit: Int = 5) -> [TopExerciseSummary] {
         let _ = limit
         return [
@@ -205,23 +169,6 @@ struct InMemoryAppGateway: NativeAppGateway {
             RecentSessionSummary(sheetName: "Weekly Plan (2/23/2026)", dayLabel: "Monday", sessionDateISO: "2026-02-23", loggedRows: 6, totalRows: 8),
             RecentSessionSummary(sheetName: "Weekly Plan (2/23/2026)", dayLabel: "Tuesday", sessionDateISO: "2026-02-24", loggedRows: 7, totalRows: 8),
         ]
-    }
-
-    func loadDBHealthSnapshot() -> DBHealthSnapshot {
-        DBHealthSnapshot(
-            exerciseCount: 98,
-            sessionCount: 72,
-            logCount: 684,
-            nonEmptyLogCount: 241,
-            latestSessionDateISO: "2026-02-24",
-            topExercises: loadTopExercises(limit: 5),
-            recentSessions: loadRecentSessions(limit: 8),
-            weekdayCompletion: [
-                WeekdayCompletionSummary(dayName: "Monday", loggedRows: 62, totalRows: 80),
-                WeekdayCompletionSummary(dayName: "Tuesday", loggedRows: 44, totalRows: 60),
-                WeekdayCompletionSummary(dayName: "Wednesday", loggedRows: 58, totalRows: 76),
-            ]
-        )
     }
 
     func loadWeeklyVolumePoints(limit: Int = 12) -> [WeeklyVolumePoint] {

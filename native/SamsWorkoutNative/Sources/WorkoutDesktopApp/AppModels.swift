@@ -4,13 +4,10 @@ enum AppRoute: String, CaseIterable, Identifiable {
     case dashboard = "Dashboard"
     case generatePlan = "Generate Plan"
     case viewPlan = "View Plan"
-    case logWorkout = "Log Workout"
     case progress = "Progress"
     case weeklyReview = "Weekly Review"
     case exerciseHistory = "Exercise History"
     case settings = "Settings"
-    case apiTestHarness = "API Test Harness" // TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-    case dbStatus = "DB Status"
 
     var id: String { rawValue }
 }
@@ -186,80 +183,6 @@ struct PlanSnapshot: Equatable {
     )
 }
 
-struct WorkoutLogDraft: Equatable, Identifiable {
-    let id: UUID
-    let sourceRow: Int
-    let block: String
-    let exercise: String
-    let sets: String
-    let reps: String
-    let load: String
-    let rest: String
-    let notes: String
-    var existingLog: String
-    var performance: String
-    var rpe: String
-    var noteEntry: String
-
-    init(
-        id: UUID = UUID(),
-        sourceRow: Int,
-        block: String,
-        exercise: String,
-        sets: String,
-        reps: String,
-        load: String,
-        rest: String,
-        notes: String,
-        existingLog: String,
-        performance: String = "",
-        rpe: String = "",
-        noteEntry: String = ""
-    ) {
-        self.id = id
-        self.sourceRow = sourceRow
-        self.block = block
-        self.exercise = exercise
-        self.sets = sets
-        self.reps = reps
-        self.load = load
-        self.rest = rest
-        self.notes = notes
-        self.existingLog = existingLog
-        self.performance = performance
-        self.rpe = rpe
-        self.noteEntry = noteEntry
-    }
-}
-
-struct LoggerSessionState: Equatable {
-    var sheetName: String
-    var dayLabel: String
-    var source: DataSourceLabel
-    var drafts: [WorkoutLogDraft]
-
-    static let empty = LoggerSessionState(
-        sheetName: "",
-        dayLabel: "",
-        source: .googleSheets,
-        drafts: []
-    )
-}
-
-struct LoggerBlockProgress: Equatable, Identifiable {
-    let id: String
-    let block: String
-    let completed: Int
-    let total: Int
-
-    var completionPercent: Double {
-        if total == 0 {
-            return 0
-        }
-        return (Double(completed) / Double(total)) * 100
-    }
-}
-
 struct ProgressSummary: Equatable {
     var completionRateText: String
     var weeklyVolumeText: String
@@ -386,42 +309,6 @@ struct RecentSessionSummary: Equatable, Identifiable {
     }
 }
 
-struct WeekdayCompletionSummary: Equatable, Identifiable {
-    let id: UUID
-    let dayName: String
-    let loggedRows: Int
-    let totalRows: Int
-
-    init(id: UUID = UUID(), dayName: String, loggedRows: Int, totalRows: Int) {
-        self.id = id
-        self.dayName = dayName
-        self.loggedRows = loggedRows
-        self.totalRows = totalRows
-    }
-}
-
-struct DBHealthSnapshot: Equatable {
-    let exerciseCount: Int
-    let sessionCount: Int
-    let logCount: Int
-    let nonEmptyLogCount: Int
-    let latestSessionDateISO: String
-    let topExercises: [TopExerciseSummary]
-    let recentSessions: [RecentSessionSummary]
-    let weekdayCompletion: [WeekdayCompletionSummary]
-
-    static let empty = DBHealthSnapshot(
-        exerciseCount: 0,
-        sessionCount: 0,
-        logCount: 0,
-        nonEmptyLogCount: 0,
-        latestSessionDateISO: "",
-        topExercises: [],
-        recentSessions: [],
-        weekdayCompletion: []
-    )
-}
-
 struct WeeklyReviewSummary: Equatable, Identifiable {
     let id: UUID
     let sheetName: String
@@ -455,31 +342,6 @@ struct DBRebuildReport: Equatable {
     let dbExercises: Int
     let dbSessions: Int
     let dbExerciseLogs: Int
-}
-
-// TEMP: TEST HARNESS — REMOVE AFTER VERIFICATION
-struct APITestHarnessResult: Equatable {
-    let prompt: String
-    let rawResponse: String
-    let model: String
-    let inputTokens: Int
-    let outputTokens: Int
-    let responseTimeSeconds: Double
-    let containsOneRepMax: Bool
-    let oneRepMaxExercises: [String]
-    let errorMessage: String
-
-    static let empty = APITestHarnessResult(
-        prompt: "",
-        rawResponse: "",
-        model: "",
-        inputTokens: 0,
-        outputTokens: 0,
-        responseTimeSeconds: 0,
-        containsOneRepMax: false,
-        oneRepMaxExercises: [],
-        errorMessage: ""
-    )
 }
 // END TEMP: TEST HARNESS
 

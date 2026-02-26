@@ -74,23 +74,6 @@ final class WorkoutDesktopAppLiveE2ETests: XCTestCase {
 
         let snapshot = try await gateway.loadPlanSnapshot()
         XCTAssertFalse(snapshot.days.isEmpty)
-
-        var session = try await gateway.loadTodayLoggerSession()
-        guard !session.drafts.isEmpty else {
-            XCTFail("Logger returned no draft exercises after generation.")
-            return
-        }
-
-        session.drafts[0].performance = "Done"
-        session.drafts[0].rpe = "8"
-        session.drafts[0].noteEntry = "live-e2e-2099"
-
-        let dbSummary = try await gateway.saveLoggerSession(session)
-        XCTAssertGreaterThan(dbSummary.exerciseLogs, 0)
-
-        let refreshed = try await gateway.loadTodayLoggerSession()
-        let existing = refreshed.drafts.first?.existingLog ?? ""
-        XCTAssertTrue(existing.contains("live-e2e-2099") || existing.contains("Done"))
     }
 
     func testLiveRebuildImportsPriorHistoryFromSheets() async throws {
