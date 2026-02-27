@@ -44,6 +44,10 @@ final class AppCoordinator: ObservableObject {
     @Published var oneRepMaxFields: [OneRepMaxFieldState] = []
     @Published var oneRepMaxStatus = ""
 
+    @Published var inBodyScans: [InBodyScan] = []
+    @Published var showAddScanSheet = false
+    @Published var inBodyScanStatus = ""
+
 
     private let gateway: NativeAppGateway
     private let configStore: AppConfigurationStore
@@ -699,8 +703,33 @@ if !generationStatus.isEmpty {
         weeklyVolumePoints = gateway.loadWeeklyVolumePoints(limit: 12)
         weeklyRPEPoints = gateway.loadWeeklyRPEPoints(limit: 12)
         muscleGroupVolumes = gateway.loadMuscleGroupVolumes(limit: 12)
+        refreshInBodyScans()
         lastAnalyticsRefreshAt = Date()
         refreshExerciseCatalog()
+    }
+
+    func refreshInBodyScans() {
+        inBodyScans = gateway.loadInBodyScans()
+    }
+
+    func saveInBodyScan(_ scan: InBodyScan) {
+        do {
+            try gateway.saveInBodyScan(scan)
+            refreshInBodyScans()
+            inBodyScanStatus = "Scan saved."
+        } catch {
+            inBodyScanStatus = "Failed to save scan: \(error.localizedDescription)"
+        }
+    }
+
+    func deleteInBodyScan(scanDate: String) {
+        do {
+            try gateway.deleteInBodyScan(scanDate: scanDate)
+            refreshInBodyScans()
+            inBodyScanStatus = "Scan deleted."
+        } catch {
+            inBodyScanStatus = "Failed to delete scan: \(error.localizedDescription)"
+        }
     }
 
     func refreshExerciseCatalog() {

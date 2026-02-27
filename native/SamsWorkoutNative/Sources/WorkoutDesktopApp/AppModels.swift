@@ -344,6 +344,39 @@ struct DBRebuildReport: Equatable {
 }
 // END TEMP: TEST HARNESS
 
+struct InBodyScan: Equatable, Identifiable {
+    let id: String  // scanDate is the natural key
+    var scanDate: String
+    var weightKG: Double?
+    var smmKG: Double?      // Skeletal Muscle Mass
+    var bfmKG: Double?      // Body Fat Mass
+    var pbf: Double?        // Percent Body Fat %
+    var inbodyScore: Int?   // InBody Score /100
+    var vfaCM2: Double?     // Visceral Fat Area cm²
+    var notes: String
+
+    init(
+        scanDate: String,
+        weightKG: Double? = nil,
+        smmKG: Double? = nil,
+        bfmKG: Double? = nil,
+        pbf: Double? = nil,
+        inbodyScore: Int? = nil,
+        vfaCM2: Double? = nil,
+        notes: String = ""
+    ) {
+        self.id = scanDate
+        self.scanDate = scanDate
+        self.weightKG = weightKG
+        self.smmKG = smmKG
+        self.bfmKG = bfmKG
+        self.pbf = pbf
+        self.inbodyScore = inbodyScore
+        self.vfaCM2 = vfaCM2
+        self.notes = notes
+    }
+}
+
 struct OneRepMaxFieldState: Equatable, Identifiable {
     let id: String
     let liftName: String

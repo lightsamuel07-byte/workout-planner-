@@ -20,6 +20,9 @@ protocol NativeAppGateway {
     func loadWeeklyVolumePoints(limit: Int) -> [WeeklyVolumePoint]
     func loadWeeklyRPEPoints(limit: Int) -> [WeeklyRPEPoint]
     func loadMuscleGroupVolumes(limit: Int) -> [MuscleGroupVolume]
+    func loadInBodyScans() -> [InBodyScan]
+    func saveInBodyScan(_ scan: InBodyScan) throws
+    func deleteInBodyScan(scanDate: String) throws
 }
 
 extension NativeAppGateway {
@@ -77,6 +80,10 @@ extension NativeAppGateway {
         let _ = limit
         return []
     }
+
+    func loadInBodyScans() -> [InBodyScan] { [] }
+    func saveInBodyScan(_ scan: InBodyScan) throws { let _ = scan }
+    func deleteInBodyScan(scanDate: String) throws { let _ = scanDate }
 }
 
 struct InMemoryAppGateway: NativeAppGateway {

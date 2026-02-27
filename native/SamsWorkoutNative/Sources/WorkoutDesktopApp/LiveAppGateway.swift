@@ -357,6 +357,17 @@ struct LiveAppGateway: NativeAppGateway {
 
         let summary = try tempDatabase.countSummary()
 
+        // Preserve user-entered InBody scans before swapping — they're not in Sheets.
+        let existingScans: [PersistedInBodyScan]
+        if let mainDB = try? openDatabase() {
+            existingScans = (try? mainDB.fetchInBodyScans()) ?? []
+        } else {
+            existingScans = []
+        }
+        for scan in existingScans {
+            try? tempDatabase.upsertInBodyScan(scan)
+        }
+
         // Atomic swap: invalidate cached DB, replace old file with completed temp DB.
         invalidateDBCache()
         if fileManager.fileExists(atPath: dbPath) {
@@ -529,6 +540,48 @@ struct LiveAppGateway: NativeAppGateway {
         return volumes.map { row in
             MuscleGroupVolume(muscleGroup: row.muscleGroup, volume: row.volume, exerciseCount: row.exerciseCount)
         }
+    }
+
+    // MARK: - InBody Scans
+
+    func loadInBodyScans() -> [InBodyScan] {
+        guard let database = try? openDatabase(),
+              let scans = try? database.fetchInBodyScans()
+        else { return [] }
+
+        return scans.map { s in
+            InBodyScan(
+                scanDate: s.scanDate,
+                weightKG: s.weightKG,
+                smmKG: s.smmKG,
+                bfmKG: s.bfmKG,
+                pbf: s.pbf,
+                inbodyScore: s.inbodyScore,
+                vfaCM2: s.vfaCM2,
+                notes: s.notes
+            )
+        }
+    }
+
+    func saveInBodyScan(_ scan: InBodyScan) throws {
+        let database = try openDatabase()
+        let persisted = PersistedInBodyScan(
+            id: 0,
+            scanDate: scan.scanDate,
+            weightKG: scan.weightKG,
+            smmKG: scan.smmKG,
+            bfmKG: scan.bfmKG,
+            pbf: scan.pbf,
+            inbodyScore: scan.inbodyScore,
+            vfaCM2: scan.vfaCM2,
+            notes: scan.notes
+        )
+        try database.upsertInBodyScan(persisted)
+    }
+
+    func deleteInBodyScan(scanDate: String) throws {
+        let database = try openDatabase()
+        try database.deleteInBodyScan(scanDate: scanDate)
     }
 }
 

@@ -1016,6 +1016,117 @@ struct ProgressPageView: View {
 
                 StatusBannerView(banner: coordinator.statusBanner)
 
+                // MARK: - Body Composition (InBody)
+                VStack(alignment: .leading, spacing: 14) {
+                    HStack(alignment: .center) {
+                        SectionLabel("Body Composition")
+                        Spacer()
+                        Button {
+                            coordinator.inBodyScanStatus = ""
+                            coordinator.showAddScanSheet = true
+                        } label: {
+                            Label("Add Scan", systemImage: "plus.circle")
+                        }
+                        .buttonStyle(.borderless)
+                        .controlSize(.small)
+                    }
+
+                    if coordinator.inBodyScans.isEmpty {
+                        Text("No InBody scans yet. Tap Add Scan to log data from your InBody printout.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        // Delta summary cards (latest vs first)
+                        if coordinator.inBodyScans.count >= 2,
+                           let firstScan = coordinator.inBodyScans.first,
+                           let latestScan = coordinator.inBodyScans.last {
+                            HStack(spacing: 10) {
+                                inBodyDeltaCard(
+                                    title: "Weight", unit: "kg",
+                                    value: latestScan.weightKG, previous: firstScan.weightKG,
+                                    lowerIsBetter: false
+                                )
+                                inBodyDeltaCard(
+                                    title: "Muscle", unit: "kg",
+                                    value: latestScan.smmKG, previous: firstScan.smmKG,
+                                    lowerIsBetter: false
+                                )
+                                inBodyDeltaCard(
+                                    title: "Fat", unit: "kg",
+                                    value: latestScan.bfmKG, previous: firstScan.bfmKG,
+                                    lowerIsBetter: true
+                                )
+                                inBodyDeltaCard(
+                                    title: "Body Fat %", unit: "%",
+                                    value: latestScan.pbf, previous: firstScan.pbf,
+                                    lowerIsBetter: true
+                                )
+                                inBodyDeltaCard(
+                                    title: "Score", unit: "",
+                                    value: latestScan.inbodyScore.map(Double.init),
+                                    previous: firstScan.inbodyScore.map(Double.init),
+                                    lowerIsBetter: false
+                                )
+                            }
+                        }
+
+                        // Scan history table
+                        VStack(alignment: .leading, spacing: 0) {
+                            HStack(spacing: 0) {
+                                Text("DATE").font(.caption2.bold()).foregroundStyle(.secondary).kerning(0.4).frame(width: 96, alignment: .leading)
+                                Text("WEIGHT").font(.caption2.bold()).foregroundStyle(.secondary).kerning(0.4).frame(width: 62, alignment: .trailing)
+                                Text("SMM").font(.caption2.bold()).foregroundStyle(.blue).kerning(0.4).frame(width: 56, alignment: .trailing)
+                                Text("FAT").font(.caption2.bold()).foregroundStyle(.orange).kerning(0.4).frame(width: 56, alignment: .trailing)
+                                Text("BF%").font(.caption2.bold()).foregroundStyle(.secondary).kerning(0.4).frame(width: 50, alignment: .trailing)
+                                Text("VFA").font(.caption2.bold()).foregroundStyle(.secondary).kerning(0.4).frame(width: 50, alignment: .trailing)
+                                Text("SCORE").font(.caption2.bold()).foregroundStyle(.secondary).kerning(0.4).frame(width: 50, alignment: .trailing)
+                                Spacer()
+                            }
+                            .padding(.bottom, 6)
+                            Divider()
+                            ForEach(coordinator.inBodyScans.reversed()) { scan in
+                                HStack(spacing: 0) {
+                                    Text(formatScanDate(scan.scanDate))
+                                        .font(.caption)
+                                        .frame(width: 96, alignment: .leading)
+                                    Text(scan.weightKG.map { String(format: "%.1f", $0) } ?? "—")
+                                        .font(.caption)
+                                        .frame(width: 62, alignment: .trailing)
+                                    Text(scan.smmKG.map { String(format: "%.1f", $0) } ?? "—")
+                                        .font(.caption).foregroundStyle(.blue)
+                                        .frame(width: 56, alignment: .trailing)
+                                    Text(scan.bfmKG.map { String(format: "%.1f", $0) } ?? "—")
+                                        .font(.caption).foregroundStyle(.orange)
+                                        .frame(width: 56, alignment: .trailing)
+                                    Text(scan.pbf.map { String(format: "%.1f%%", $0) } ?? "—")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .frame(width: 50, alignment: .trailing)
+                                    Text(scan.vfaCM2.map { String(format: "%.0f", $0) } ?? "—")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                        .frame(width: 50, alignment: .trailing)
+                                    Text(scan.inbodyScore.map { String($0) } ?? "—")
+                                        .font(.caption.bold())
+                                        .frame(width: 50, alignment: .trailing)
+                                    Spacer()
+                                    Button {
+                                        coordinator.deleteInBodyScan(scanDate: scan.scanDate)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    .buttonStyle(.borderless)
+                                    .help("Delete this scan")
+                                }
+                                .padding(.vertical, 5)
+                                Divider()
+                            }
+                        }
+                    }
+                }
+                .sheet(isPresented: $coordinator.showAddScanSheet) {
+                    AddInBodyScanSheet(coordinator: coordinator)
+                }
+
                 // MARK: - Summary Cards
                 HStack(spacing: 12) {
                     MetricCardView(title: "Completion", value: coordinator.progressSummary.completionRateText)
@@ -1177,6 +1288,173 @@ struct ProgressPageView: View {
         if rpe >= 7.5 { return .orange }
         if rpe >= 6.0 { return .yellow }
         return .green
+    }
+
+    private func formatScanDate(_ iso: String) -> String {
+        let parser = DateFormatter()
+        parser.calendar = Calendar(identifier: .gregorian)
+        parser.locale = Locale(identifier: "en_US_POSIX")
+        parser.dateFormat = "yyyy-MM-dd"
+        guard let date = parser.date(from: iso) else { return iso }
+        let display = DateFormatter()
+        display.calendar = Calendar(identifier: .gregorian)
+        display.locale = Locale(identifier: "en_US_POSIX")
+        display.dateFormat = "MMM d, yyyy"
+        return display.string(from: date)
+    }
+
+    @ViewBuilder
+    private func inBodyDeltaCard(
+        title: String,
+        unit: String,
+        value: Double?,
+        previous: Double?,
+        lowerIsBetter: Bool
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title.uppercased())
+                .font(.caption2.bold())
+                .foregroundStyle(.secondary)
+                .kerning(0.4)
+            if let v = value {
+                let fmt = unit == "%" || unit == "" ? "%.1f" : "%.1f"
+                Text(String(format: fmt, v) + unit)
+                    .font(.system(.title3, design: .rounded, weight: .bold))
+                    .minimumScaleFactor(0.7)
+                    .lineLimit(1)
+            } else {
+                Text("—").font(.title3).foregroundStyle(.tertiary)
+            }
+            if let v = value, let p = previous {
+                let delta = v - p
+                let isPositive = delta >= 0
+                let isGood = lowerIsBetter ? !isPositive : isPositive
+                let sign = isPositive ? "+" : ""
+                Text("\(sign)\(String(format: "%.1f", delta))\(unit)")
+                    .font(.caption2)
+                    .foregroundStyle(isGood ? .green : .red)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.primary.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+    }
+}
+
+struct AddInBodyScanSheet: View {
+    @ObservedObject var coordinator: AppCoordinator
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var scanDate = Date()
+    @State private var weightText = ""
+    @State private var smmText = ""
+    @State private var bfmText = ""
+    @State private var pbfText = ""
+    @State private var scoreText = ""
+    @State private var vfaText = ""
+    @State private var notes = ""
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 24) {
+            Text("Add InBody Scan")
+                .font(.title2.bold())
+
+            HStack(spacing: 12) {
+                Text("Scan Date")
+                    .font(.callout)
+                    .frame(width: 90, alignment: .leading)
+                DatePicker("", selection: $scanDate, displayedComponents: .date)
+                    .labelsHidden()
+            }
+
+            VStack(alignment: .leading, spacing: 12) {
+                SectionLabel("Measurements")
+                LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: 12) {
+                    scanField("Weight (kg)", text: $weightText, placeholder: "e.g. 102.5")
+                    scanField("InBody Score", text: $scoreText, placeholder: "e.g. 89")
+                    scanField("Skeletal Muscle Mass (kg)", text: $smmText, placeholder: "SMM")
+                    scanField("Body Fat Mass (kg)", text: $bfmText, placeholder: "BFM")
+                    scanField("Body Fat % (PBF)", text: $pbfText, placeholder: "e.g. 22.8")
+                    scanField("Visceral Fat Area (cm²)", text: $vfaText, placeholder: "VFA")
+                }
+            }
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Notes")
+                    .font(.caption.bold())
+                    .foregroundStyle(.secondary)
+                TextField("Optional notes", text: $notes, axis: .vertical)
+                    .textFieldStyle(.roundedBorder)
+                    .lineLimit(3)
+            }
+
+            if !coordinator.inBodyScanStatus.isEmpty {
+                Text(coordinator.inBodyScanStatus)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack {
+                Button("Cancel") { dismiss() }
+                    .buttonStyle(.bordered)
+                Spacer()
+                Button("Save Scan") {
+                    saveScan()
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(!canSave)
+            }
+        }
+        .padding(28)
+        .frame(minWidth: 440, minHeight: 460)
+    }
+
+    private var canSave: Bool {
+        !weightText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ||
+        !smmText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
+
+    private func saveScan() {
+        let formatter = DateFormatter()
+        formatter.calendar = Calendar(identifier: .gregorian)
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.dateFormat = "yyyy-MM-dd"
+        let dateStr = formatter.string(from: scanDate)
+
+        coordinator.saveInBodyScan(InBodyScan(
+            scanDate: dateStr,
+            weightKG: parseDouble(weightText),
+            smmKG: parseDouble(smmText),
+            bfmKG: parseDouble(bfmText),
+            pbf: parseDouble(pbfText),
+            inbodyScore: parseInt(scoreText),
+            vfaCM2: parseDouble(vfaText),
+            notes: notes.trimmingCharacters(in: .whitespacesAndNewlines)
+        ))
+    }
+
+    private func parseDouble(_ text: String) -> Double? {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ",", with: ".")
+        return t.isEmpty ? nil : Double(t)
+    }
+
+    private func parseInt(_ text: String) -> Int? {
+        Int(text.trimmingCharacters(in: .whitespacesAndNewlines))
+    }
+
+    @ViewBuilder
+    private func scanField(_ label: String, text: Binding<String>, placeholder: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(label)
+                .font(.caption.bold())
+                .foregroundStyle(.secondary)
+            TextField(placeholder, text: text)
+                .textFieldStyle(.roundedBorder)
+        }
     }
 }
 

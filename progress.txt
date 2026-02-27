@@ -1,4 +1,42 @@
 Progress Snapshot
+Date: 2026-02-26
+
+Current Phase
+- Native macOS app bug-scan pass completed (scan-only, no fixes applied).
+
+Built (Complete)
+- Ran full native validation pass from `native/SamsWorkoutNative`:
+  - `swift test --filter WorkoutDesktopAppTests --disable-index-store`
+  - `swift test --filter WorkoutPersistenceTests --disable-index-store`
+  - `swift test --disable-index-store`
+  - `RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests --disable-index-store`
+  - `./scripts/build_local_app.sh`
+- Captured bug findings and review notes in:
+  - `/Users/samuellight/Desktop/Sam's Workout App/tasks/todo_2026-02-26_bug_scan.md`
+
+Validation Run
+- Native tests passed:
+  - `137` tests executed, `3` skipped, `0` failures.
+- Live E2E passed:
+  - `testLiveGenerateWriteLogAndSync` passed (`118.167s`)
+  - `testLiveRebuildImportsPriorHistoryFromSheets` passed (`5.245s`)
+  - `testLiveWeeklySheetNamesContainNo2099Tabs` passed (`0.229s`)
+- Production build/sign passed:
+  - `/Users/samuellight/Desktop/Sam's Workout App/native/SamsWorkoutNative/dist/SamsWorkoutNative.app`
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Patch local-plan fallback bug in `LiveAppGateway.loadLocalPlanSnapshot()` and add regression test.
+2. Patch OAuth expired-token fallback bug in `AuthSessionManager.refreshOAuthAccessToken()` and add regression test.
+
+---
+
+Progress Snapshot
 Date: 2026-02-22
 
 Current Phase

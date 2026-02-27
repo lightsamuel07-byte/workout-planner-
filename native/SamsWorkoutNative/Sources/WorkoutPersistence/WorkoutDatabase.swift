@@ -256,6 +256,40 @@ public struct WorkoutSyncSessionInput: Equatable, Sendable {
     }
 }
 
+public struct PersistedInBodyScan: Equatable, Sendable {
+    public let id: Int64
+    public let scanDate: String
+    public let weightKG: Double?
+    public let smmKG: Double?
+    public let bfmKG: Double?
+    public let pbf: Double?
+    public let inbodyScore: Int?
+    public let vfaCM2: Double?
+    public let notes: String
+
+    public init(
+        id: Int64,
+        scanDate: String,
+        weightKG: Double?,
+        smmKG: Double?,
+        bfmKG: Double?,
+        pbf: Double?,
+        inbodyScore: Int?,
+        vfaCM2: Double?,
+        notes: String
+    ) {
+        self.id = id
+        self.scanDate = scanDate
+        self.weightKG = weightKG
+        self.smmKG = smmKG
+        self.bfmKG = bfmKG
+        self.pbf = pbf
+        self.inbodyScore = inbodyScore
+        self.vfaCM2 = vfaCM2
+        self.notes = notes
+    }
+}
+
 public enum WorkoutPersistenceError: Error, Equatable {
     case emptyExerciseName
 }
@@ -329,6 +363,21 @@ public struct WorkoutDatabase: Sendable {
             }
 
             try db.create(index: "idx_workout_sessions_date", on: "workout_sessions", columns: ["session_date"], ifNotExists: true)
+        }
+
+        migrator.registerMigration("v2_inbody_scans") { db in
+            try db.create(table: "inbody_scans", ifNotExists: true) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("scan_date", .text).notNull().unique()
+                t.column("weight_kg", .double)
+                t.column("smm_kg", .double)
+                t.column("bfm_kg", .double)
+                t.column("pbf", .double)
+                t.column("inbody_score", .integer)
+                t.column("vfa_cm2", .double)
+                t.column("notes", .text)
+                t.column("created_at", .text).notNull().defaults(sql: "CURRENT_TIMESTAMP")
+            }
         }
 
         try migrator.migrate(dbQueue)
@@ -816,6 +865,70 @@ public struct WorkoutDatabase: Sendable {
                     exerciseCount: row["exercise_count"]
                 )
             }
+        }
+    }
+
+    // MARK: - InBody Scans
+
+    public func fetchInBodyScans() throws -> [PersistedInBodyScan] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT id, scan_date, weight_kg, smm_kg, bfm_kg, pbf, inbody_score, vfa_cm2,
+                       COALESCE(notes, '') AS notes
+                FROM inbody_scans
+                ORDER BY scan_date ASC
+                """
+            )
+            return rows.map { row in
+                PersistedInBodyScan(
+                    id: row["id"],
+                    scanDate: row["scan_date"],
+                    weightKG: row["weight_kg"],
+                    smmKG: row["smm_kg"],
+                    bfmKG: row["bfm_kg"],
+                    pbf: row["pbf"],
+                    inbodyScore: row["inbody_score"],
+                    vfaCM2: row["vfa_cm2"],
+                    notes: row["notes"]
+                )
+            }
+        }
+    }
+
+    public func upsertInBodyScan(_ scan: PersistedInBodyScan) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO inbody_scans (scan_date, weight_kg, smm_kg, bfm_kg, pbf, inbody_score, vfa_cm2, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(scan_date) DO UPDATE SET
+                    weight_kg = excluded.weight_kg,
+                    smm_kg = excluded.smm_kg,
+                    bfm_kg = excluded.bfm_kg,
+                    pbf = excluded.pbf,
+                    inbody_score = excluded.inbody_score,
+                    vfa_cm2 = excluded.vfa_cm2,
+                    notes = excluded.notes
+                """,
+                arguments: [
+                    scan.scanDate,
+                    scan.weightKG,
+                    scan.smmKG,
+                    scan.bfmKG,
+                    scan.pbf,
+                    scan.inbodyScore,
+                    scan.vfaCM2,
+                    scan.notes.isEmpty ? nil : scan.notes,
+                ]
+            )
+        }
+    }
+
+    public func deleteInBodyScan(scanDate: String) throws {
+        try dbQueue.write { db in
+            try db.execute(sql: "DELETE FROM inbody_scans WHERE scan_date = ?", arguments: [scanDate])
         }
     }
 
