@@ -838,6 +838,17 @@ private extension LiveAppGateway {
         Friday input:
         \(input.friday)
 
+        CYCLE STATUS: \(input.isNewCycle ? "NEW CYCLE START" : "MID-CYCLE")
+        \(input.isNewCycle ? """
+        This is Week 1 of a new 4-week Fort cycle. The Fort exercises have changed.
+        For supplemental days (Tue/Thu/Sat): you MAY rotate in fresh exercise selections that complement the new Fort structure.
+        You are NOT required to continue the same supplemental exercises from the previous cycle.
+        Still apply progression signals from prior logs for any exercises you choose to keep.
+        """ : """
+        This is a mid-cycle week. Keep the same supplemental exercises as prior weeks unless a progression directive explicitly requires a swap.
+        Apply PROGRESS / HOLD_LOCK / NEUTRAL signals from prior logs.
+        """)
+
         CORE PRINCIPLES:
         - Supplemental days (Tue/Thu/Sat) support Fort work with arm/shoulder/upper chest/back detail.
         - Preserve explicit keep/stay-here progression constraints from prior logs.

@@ -65,9 +65,9 @@ goals:
 # REFERENCE 1RMs
 # ============================================================================
 reference_1rms:
-  back_squat: 129  # kg
-  bench_press: 94  # kg (chest press)
-  deadlift: 168    # kg
+  back_squat: 133  # kg
+  bench_press: 97  # kg (chest press)
+  deadlift: 170    # kg
 
 # ============================================================================
 # WEEKLY STRUCTURE

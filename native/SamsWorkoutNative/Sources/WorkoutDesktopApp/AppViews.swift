@@ -688,6 +688,17 @@ struct GeneratePlanPageView: View {
                     }
                 }
 
+                Toggle(isOn: $coordinator.generationInput.isNewCycle) {
+                    HStack(spacing: 6) {
+                        Text("New Fort Cycle")
+                            .font(.callout.weight(.medium))
+                        Text("— signals Claude to rotate supplemental exercises")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .help("Enable for the first week of a new 4-week Fort cycle. Tells Claude it may choose fresh exercises for Tue/Thu/Sat rather than continuing prior-cycle selections.")
+
                 HStack {
                     Button(coordinator.isGenerating ? "Generating..." : "Generate") {
                         Task { await coordinator.runGeneration() }

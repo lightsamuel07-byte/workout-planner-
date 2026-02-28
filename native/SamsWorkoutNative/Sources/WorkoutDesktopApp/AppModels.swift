@@ -61,6 +61,7 @@ struct PlanGenerationInput: Equatable {
     var monday: String = ""
     var wednesday: String = ""
     var friday: String = ""
+    var isNewCycle: Bool = false
 
     var canGenerate: Bool {
         !monday.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
