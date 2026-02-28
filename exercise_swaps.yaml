@@ -3,10 +3,8 @@
 # Hard swaps - always applied
 exercise_swaps:
   "Seated Calf Raise": "Standing Calf Raise"
-  "Bulgarian Split Squat": "Heel-Elevated Goblet Squat"
-  "Split Squat": "Heel-Elevated Goblet Squat"
-  "Rear-Foot Elevated Split Squat": "Heel-Elevated Goblet Squat"
-  "Forward Split Squat": "Leg Extension"
+  # Split squat variants are NOT auto-swapped — Fort days (Mon/Wed/Fri) may include trainer-programmed split squats.
+  # Supplemental days (Tue/Thu/Sat) are forbidden from split squats via prompt instruction only.
   "Ab Rollout": "Dead Bug or Pallof Press"
   "Hamstring Slider": "Physioball Leg Curl"
   "Machine Lateral Raise": "Cable Lateral Raise"
@@ -38,7 +36,7 @@ recovery:
 hard_preferences:
   - "No belt on pulls"
   - "Standing calf raises only (never seated)"
-  - "No split squats (any variant)"
+  - "No split squats on supplemental days (Tue/Thu/Sat) — Fort-trainer-programmed split squats on Mon/Wed/Fri are permitted"
   - "Carries on Tuesday by default; load = moderate to preserve Friday deadlift grip"
   - "American spelling only"
 

@@ -855,7 +855,7 @@ private extension LiveAppGateway {
         - Never increase both reps and load in the same week for the same exercise.
 
         MANDATORY HARD RULES:
-        - Equipment: No belt on pulls, standing calves only, no split squats.
+        - Equipment: No belt on pulls, standing calves only. No split squats on supplemental days (Tue/Thu/Sat). Fort-trainer-programmed split squats on Mon/Wed/Fri are permitted and must not be swapped.
         - Dumbbells: even-number loads only (no odd DB loads except main barbell lifts).
         - Biceps: rotate grips (supinated -> neutral -> pronated), no repeated adjacent supplemental-day grip.
         - Triceps: vary attachments Tue/Fri/Sat, no single-arm D-handle triceps on Saturday.
