@@ -1,4 +1,61 @@
 Progress Snapshot
+Date: 2026-02-28
+
+Current Phase
+- IMPLEMENTATION_PLAN Phase 3 - Data and Reliability (Partially Complete), with Phase 4 governance artifacts updated for this session.
+
+Built (Complete)
+- Fort compiler robustness hardening for cycle-to-cycle alias churn (Swift + Python parity):
+  - Dynamic unknown-section normalization to canonical section IDs based on header cues, exercise semantics, and positional priors.
+  - Expanded known section aliases for Breakthrough-style labels.
+  - Improved metadata/noise filtering (e.g., table labels, examples, interval instruction lines).
+  - COMPLETE-boundary-aware parsing and empty-section rank stabilization.
+- Supplemental-day reliability guardrails:
+  - Added plan validation violations for missing supplemental days (Tue/Thu/Sat) and underfilled supplemental days (`<3` exercises).
+  - Added explicit `fort_header_as_exercise` violation when section headers/noise lines leak into exercise slots (e.g., `PREPARE TO ENGAGE`, `THE PAY OFF`, `THAW`, `METERS`, `EXAMPLES`).
+  - Updated generation prompt constraints to enforce minimum supplemental exercise count.
+- SSE streaming + UX improvements in native app:
+  - Anthropic SSE parser now handles `event:`/`data:` frame buffering and flushes on frame boundaries.
+  - Added streaming lifecycle/progress events (request started, message started, text delta, token delta, message stopped).
+  - Added live generation state in coordinator + UI (stage, streamed chars, token counts, preview tail, progress log).
+- Added regression coverage for:
+  - Dynamic unknown Fort section inference.
+  - Supplemental-day underfill detection.
+  - Generation progress callback state updates.
+  - Anthropic streaming event emission.
+
+Validation Run
+- Focused Swift suites passed:
+  - `swift test --filter FortCompilerParityTests`
+  - `swift test --filter PlanValidatorParityTests`
+  - `swift test --filter WorkoutDesktopAppTests`
+  - `swift test --filter WorkoutIntegrationsTests`
+- Focused Python suites passed:
+  - `python3 -m unittest tests.test_fort_compiler -v`
+  - `python3 -m unittest tests.test_plan_validator -v`
+- Broad Swift package run passed:
+  - `swift test` (`145` tests, `3` skipped, `0` failures).
+- Live native E2E passed:
+  - `RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveGenerateWriteLogAndSync` (passed, `42.983s`).
+  - `RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests` (passed, all 3 live checks).
+- Broad Python discover run:
+  - `python3 -m unittest discover -s tests -p 'test_*.py' -v`
+  - Result: `1` failing test (`test_split_squat_maps_to_goblet`) in `tests/test_exercise_normalizer.py` (unrelated/pre-existing parity expectation mismatch).
+
+In Progress
+- None.
+
+Blocked
+- No technical blocker for this session scope.
+
+Next
+1. Run one live native generation against production credentials and confirm corrected Fort anchors + supplemental-day density in the written weekly sheet.
+2. Decide and document expected split-squat swap parity for Python (`tests/test_exercise_normalizer.py`) versus native behavior, then align whichever side is canonical.
+3. Optional UX follow-up: add compact per-stage timing metrics to generation progress panel.
+
+---
+
+Progress Snapshot
 Date: 2026-02-26
 
 Current Phase

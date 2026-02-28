@@ -70,6 +70,23 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertTrue(coordinator.generationStatus.contains("Plan generation wiring complete"))
     }
 
+    func testGenerationProgressStateUpdatesFromGatewayCallbacks() async {
+        let coordinator = makeCoordinator()
+        coordinator.generationInput.monday = "MONDAY\nIGNITION\nDeadbug"
+        coordinator.generationInput.wednesday = "WEDNESDAY\nPREP\nHip Airplane"
+        coordinator.generationInput.friday = "FRIDAY\nIGNITION\nMcGill Big-3"
+        coordinator.setupState.anthropicAPIKey = "key"
+        coordinator.setupState.spreadsheetID = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+        coordinator.setupState.googleAuthHint = "/tmp/token.json"
+
+        await coordinator.runGeneration()
+        for _ in 0..<5 where coordinator.generationProgressLog.isEmpty {
+            await Task.yield()
+        }
+        XCTAssertEqual(coordinator.generationStage, .completed)
+        XCTAssertFalse(coordinator.generationProgressLog.isEmpty)
+    }
+
     func testRebuildDBCacheUpdatesStatus() async {
         let coordinator = makeCoordinator()
         await coordinator.triggerRebuildDBCache()
@@ -129,6 +146,35 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(parsed.0, "Done")
         XCTAssertEqual(parsed.1, "8")
         XCTAssertEqual(parsed.2, "steady")
+    }
+
+    func testMarkdownDayParserHandlesFlexiblePrescriptionSyntax() {
+        let plan = """
+        ## MONDAY
+        ### A1. Face Pull
+        - 3 x 15 reps @ 18 kg
+        - **Rest:** 1:00
+        - **Notes:** Controlled.
+        ### A2. Farmer Carry
+        - 3 x 30 meters @ 32 kg (per hand)
+        - **Rest:** 1:30
+        - **Notes:** Brace.
+        ### A3. McGill Big-3
+        - 1 x See Notes @ Bodyweight
+        - **Rest:** 0:45
+        - **Notes:** Hold durations in notes.
+        """
+
+        let days = LiveAppGateway.testMarkdownDaysToPlanDays(plan)
+        XCTAssertEqual(days.count, 1)
+        XCTAssertEqual(days[0].exercises.count, 3)
+        XCTAssertEqual(days[0].exercises[0].sets, "3")
+        XCTAssertEqual(days[0].exercises[0].reps, "15")
+        XCTAssertEqual(days[0].exercises[0].load, "18")
+        XCTAssertEqual(days[0].exercises[1].reps, "30")
+        XCTAssertEqual(days[0].exercises[1].load, "32")
+        XCTAssertEqual(days[0].exercises[2].reps, "See Notes")
+        XCTAssertEqual(days[0].exercises[2].load, "Bodyweight")
     }
 
     func testLoggerWorkoutSelectionFallsBackToFirstNonEmptyDay() {

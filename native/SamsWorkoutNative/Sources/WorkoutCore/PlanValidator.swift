@@ -95,6 +95,23 @@ private let dayRegex = makeRegex("^\\s*##\\s+([A-Z]+DAY)\\b", options: [.caseIns
 private let exerciseRegex = makeRegex("^\\s*###\\s+[A-Z]\\d+\\.\\s*(.+)$", options: [.caseInsensitive])
 private let prescriptionRegex = makeRegex("^\\s*-\\s*(\\d+)\\s*x\\s*([\\d:]+)\\s*@\\s*([\\d]+(?:\\.\\d+)?)\\s*kg\\b", options: [.caseInsensitive])
 private let rangeRegex = makeRegex("(\\d+)\\s*[-–]\\s*(\\d+)")
+private let fortPseudoExercisePatterns: [NSRegularExpression] = [
+    makeRegex("^PREPARE\\s+TO\\s+ENGAGE\\b", options: [.caseInsensitive]),
+    makeRegex("^PULL[\\s\\-]*UPS?\\s+EVERY\\s+DAY\\b", options: [.caseInsensitive]),
+    makeRegex("^THE\\s+REPLACEMENTS\\b", options: [.caseInsensitive]),
+    makeRegex("^THE\\s+SWEAT\\s+BANK\\b", options: [.caseInsensitive]),
+    makeRegex("^THE\\s+PAY\\s+OFF\\b", options: [.caseInsensitive]),
+    makeRegex("^THAW\\b", options: [.caseInsensitive]),
+    makeRegex("^ENGINE\\s+BUILDER\\b", options: [.caseInsensitive]),
+    makeRegex("^SPARK\\s+ZONE\\b", options: [.caseInsensitive]),
+    makeRegex("^VERTICAL\\s+LADDER\\b", options: [.caseInsensitive]),
+    makeRegex("^PRIMARY\\s+DRIVER\\b", options: [.caseInsensitive]),
+    makeRegex("^SUPPORT\\s+BUILDER\\b", options: [.caseInsensitive]),
+    makeRegex("^EXAMPLES?\\b", options: [.caseInsensitive]),
+    makeRegex("^METERS\\b", options: [.caseInsensitive]),
+    makeRegex("^DIST\\.?\\s*\\((M|MI|MILES)\\)\\b", options: [.caseInsensitive]),
+    makeRegex("^\\d+\\s*SECONDS?\\s+AT\\s+\\d+(?:\\.\\d+)?\\b", options: [.caseInsensitive]),
+]
 
 private func normalizeText(_ value: String?) -> String {
     getNormalizer().canonicalKey(value)
@@ -106,6 +123,17 @@ private func extractDayName(_ value: String?) -> String? {
         return day
     }
     return nil
+}
+
+private func isFortPseudoExercise(_ value: String) -> Bool {
+    let normalized = value.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard !normalized.isEmpty else {
+        return false
+    }
+    for pattern in fortPseudoExercisePatterns where pattern.firstMatch(in: normalized, options: [], range: fullRange(of: normalized)) != nil {
+        return true
+    }
+    return false
 }
 
 private func parsePlanEntries(_ planText: String) -> [PlanEntry] {
@@ -305,6 +333,16 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
         let day = entry.day
         let prescription = entry.prescriptionLine
 
+        if isFortPseudoExercise(exercise) {
+            addViolation(
+                &violations,
+                code: "fort_header_as_exercise",
+                message: "Fort section header/noise appeared as an exercise entry: \(exercise)",
+                day: day,
+                exercise: exercise
+            )
+        }
+
         if !prescription.isEmpty && rangeRegex.firstMatch(in: prescription, options: [], range: fullRange(of: prescription)) != nil {
             addViolation(
                 &violations,
@@ -348,6 +386,28 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
                 message: "Carry exercise appears outside Tuesday.",
                 day: day,
                 exercise: exercise
+            )
+        }
+    }
+
+    let supplementalDays = ["TUESDAY", "THURSDAY", "SATURDAY"]
+    for day in supplementalDays {
+        let dayEntries = entries.filter { $0.day == day }
+        if dayEntries.isEmpty {
+            addViolation(
+                &violations,
+                code: "supplemental_day_missing",
+                message: "Supplemental day \(day) is missing from generated plan.",
+                day: day
+            )
+            continue
+        }
+        if dayEntries.count < 3 {
+            addViolation(
+                &violations,
+                code: "supplemental_day_underfilled",
+                message: "Supplemental day \(day) has only \(dayEntries.count) exercise(s); minimum expected is 3.",
+                day: day
             )
         }
     }

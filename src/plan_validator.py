@@ -14,6 +14,23 @@ PRESCRIPTION_RE = re.compile(
     re.IGNORECASE,
 )
 RANGE_RE = re.compile(r"(\d+)\s*[-–]\s*(\d+)")
+FORT_PSEUDO_EXERCISE_PATTERNS = [
+    re.compile(r"^PREPARE\s+TO\s+ENGAGE\b", re.IGNORECASE),
+    re.compile(r"^PULL[\s\-]*UPS?\s+EVERY\s+DAY\b", re.IGNORECASE),
+    re.compile(r"^THE\s+REPLACEMENTS\b", re.IGNORECASE),
+    re.compile(r"^THE\s+SWEAT\s+BANK\b", re.IGNORECASE),
+    re.compile(r"^THE\s+PAY\s+OFF\b", re.IGNORECASE),
+    re.compile(r"^THAW\b", re.IGNORECASE),
+    re.compile(r"^ENGINE\s+BUILDER\b", re.IGNORECASE),
+    re.compile(r"^SPARK\s+ZONE\b", re.IGNORECASE),
+    re.compile(r"^VERTICAL\s+LADDER\b", re.IGNORECASE),
+    re.compile(r"^PRIMARY\s+DRIVER\b", re.IGNORECASE),
+    re.compile(r"^SUPPORT\s+BUILDER\b", re.IGNORECASE),
+    re.compile(r"^EXAMPLES?\b", re.IGNORECASE),
+    re.compile(r"^METERS\b", re.IGNORECASE),
+    re.compile(r"^DIST\.?\s*\((M|MI|MILES)\)\b", re.IGNORECASE),
+    re.compile(r"^\d+\s*SECONDS?\s+AT\s+\d+(?:\.\d+)?\b", re.IGNORECASE),
+]
 
 
 def _normalize_text(value):
@@ -26,6 +43,13 @@ def _extract_day_name(value):
         if day in upper:
             return day
     return None
+
+
+def _is_fort_pseudo_exercise(value):
+    normalized = (value or "").strip()
+    if not normalized:
+        return False
+    return any(pattern.search(normalized) for pattern in FORT_PSEUDO_EXERCISE_PATTERNS)
 
 
 def _parse_plan_entries(plan_text):
@@ -167,6 +191,15 @@ def validate_plan(plan_text, progression_directives=None):
         day = entry["day"]
         prescription = entry["prescription_line"]
 
+        if _is_fort_pseudo_exercise(exercise):
+            _add_violation(
+                violations,
+                "fort_header_as_exercise",
+                f"Fort section header/noise appeared as an exercise entry: {exercise}",
+                day=day,
+                exercise=exercise,
+            )
+
         if prescription and RANGE_RE.search(prescription):
             _add_violation(
                 violations,
@@ -203,6 +236,25 @@ def validate_plan(plan_text, progression_directives=None):
                 "Carry exercise appears outside Tuesday.",
                 day=day,
                 exercise=exercise,
+            )
+
+    supplemental_days = ["TUESDAY", "THURSDAY", "SATURDAY"]
+    for supplemental_day in supplemental_days:
+        day_entries = [entry for entry in entries if entry["day"] == supplemental_day]
+        if not day_entries:
+            _add_violation(
+                violations,
+                "supplemental_day_missing",
+                f"Supplemental day {supplemental_day} is missing from generated plan.",
+                day=supplemental_day,
+            )
+            continue
+        if len(day_entries) < 3:
+            _add_violation(
+                violations,
+                "supplemental_day_underfilled",
+                f"Supplemental day {supplemental_day} has only {len(day_entries)} exercise(s); minimum expected is 3.",
+                day=supplemental_day,
             )
 
     # Triceps attachment variation across Tue/Fri/Sat.

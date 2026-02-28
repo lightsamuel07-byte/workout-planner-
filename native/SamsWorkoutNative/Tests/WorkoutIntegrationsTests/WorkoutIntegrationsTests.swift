@@ -64,6 +64,23 @@ final class MockURLProtocol: URLProtocol {
     override func stopLoading() {}
 }
 
+final class LockedEventBuffer: @unchecked Sendable {
+    private var events: [AnthropicStreamEvent] = []
+    private let lock = NSLock()
+
+    func append(_ event: AnthropicStreamEvent) {
+        lock.lock()
+        defer { lock.unlock() }
+        events.append(event)
+    }
+
+    func snapshot() -> [AnthropicStreamEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return events
+    }
+}
+
 final class WorkoutIntegrationsTests: XCTestCase {
     private func makeMockURLSession(responseData: Data, statusCode: Int, headers: [String: String] = [:]) -> URLSession {
         MockURLProtocol.responseData = responseData
@@ -395,6 +412,64 @@ final class WorkoutIntegrationsTests: XCTestCase {
         XCTAssertEqual(result.stopReason, "end_turn")
         XCTAssertEqual(result.inputTokens, 10)
         XCTAssertEqual(result.outputTokens, 12)
+    }
+
+    func testAnthropicClientEmitsStreamingEvents() async throws {
+        let sseBody = """
+        event: message_start
+        data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":11,"output_tokens":0}}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"## MONDAY"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\\n### A1. Split Squat"}}
+
+        event: message_delta
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":13}}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+
+        """.data(using: .utf8)!
+
+        let mockSession = makeMockURLSession(
+            responseData: sseBody,
+            statusCode: 200,
+            headers: ["Content-Type": "text/event-stream"]
+        )
+
+        let client = AnthropicClient(
+            apiKey: "api_test",
+            model: "claude-sonnet-4-6",
+            maxTokens: 2048,
+            session: mockSession,
+            baseURL: URL(string: "https://mock.anthropic.test")!
+        )
+
+        let events = LockedEventBuffer()
+        let result = try await client.generatePlan(
+            systemPrompt: "system",
+            userPrompt: "user",
+            onEvent: { event in
+                events.append(event)
+            }
+        )
+        let snapshot = events.snapshot()
+
+        XCTAssertTrue(result.text.contains("## MONDAY"))
+        XCTAssertTrue(snapshot.contains(where: {
+            if case .requestStarted = $0 { return true }
+            return false
+        }))
+        XCTAssertTrue(snapshot.contains(where: {
+            if case .messageStarted(_, 11) = $0 { return true }
+            return false
+        }))
+        XCTAssertTrue(snapshot.contains(where: {
+            if case .messageDelta("end_turn", 13) = $0 { return true }
+            return false
+        }))
     }
 
     func testResolveOAuthAccessTokenReturnsExistingTokenWhenNotExpired() async throws {

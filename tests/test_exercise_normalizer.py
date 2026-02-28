@@ -310,10 +310,11 @@ class TestSwapIntegration(unittest.TestCase):
             self.n.are_same_exercise("Seated Calf Raise", "Standing Calf Raise")
         )
 
-    def test_split_squat_maps_to_goblet(self):
-        # exercise_swaps.yaml: "Bulgarian Split Squat" -> "Heel-Elevated Goblet Squat"
+    def test_split_squat_is_not_auto_swapped(self):
+        # Split squats are no longer auto-swapped. Fort-trainer-programmed
+        # split squats must be preserved on Mon/Wed/Fri.
         canonical = self.n.canonical_name("Bulgarian Split Squat")
-        self.assertEqual(canonical, "Heel-Elevated Goblet Squat")
+        self.assertEqual(canonical, "Bulgarian Split Squat")
 
 
 class TestRegisterAlias(unittest.TestCase):

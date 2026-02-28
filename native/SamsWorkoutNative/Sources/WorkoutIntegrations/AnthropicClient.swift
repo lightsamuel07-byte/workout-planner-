@@ -16,6 +16,14 @@ public struct AnthropicGenerationResult: Equatable, Sendable {
     }
 }
 
+public enum AnthropicStreamEvent: Equatable, Sendable {
+    case requestStarted
+    case messageStarted(model: String, inputTokens: Int)
+    case textDelta(chunk: String, totalCharacters: Int)
+    case messageDelta(stopReason: String?, outputTokens: Int?)
+    case messageStopped
+}
+
 private struct AnthropicMessagesRequest: Encodable {
     struct Message: Encodable {
         let role: String
@@ -56,6 +64,14 @@ public struct AnthropicClient: Sendable {
     }
 
     public func generatePlan(systemPrompt: String?, userPrompt: String) async throws -> AnthropicGenerationResult {
+        try await generatePlan(systemPrompt: systemPrompt, userPrompt: userPrompt, onEvent: nil)
+    }
+
+    public func generatePlan(
+        systemPrompt: String?,
+        userPrompt: String,
+        onEvent: (@Sendable (AnthropicStreamEvent) -> Void)?
+    ) async throws -> AnthropicGenerationResult {
         let payload = AnthropicMessagesRequest(
             model: model,
             max_tokens: maxTokens,
@@ -70,6 +86,7 @@ public struct AnthropicClient: Sendable {
         urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         urlRequest.setValue("application/json", forHTTPHeaderField: "content-type")
         urlRequest.httpBody = try JSONEncoder().encode(payload)
+        onEvent?(.requestStarted)
 
         let (bytes, response) = try await session.bytes(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -86,16 +103,18 @@ public struct AnthropicClient: Sendable {
         var outputTokens = 0
         var responseModel = model
         var stopReason: String?
+        var pendingEvent: String?
+        var pendingData: [String] = []
 
-        for try await line in bytes.lines {
-            guard line.hasPrefix("data: ") else { continue }
-            let jsonStr = String(line.dropFirst(6))
-            guard jsonStr != "[DONE]",
-                  let data = jsonStr.data(using: .utf8),
-                  let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                  let eventType = event["type"] as? String
-            else { continue }
+        func handleEventPayload(_ payload: String, hintedEvent: String?) {
+            guard payload != "[DONE]",
+                  let data = payload.data(using: .utf8),
+                  let event = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            else {
+                return
+            }
 
+            let eventType = (event["type"] as? String) ?? hintedEvent ?? ""
             switch eventType {
             case "message_start":
                 if let message = event["message"] as? [String: Any] {
@@ -104,11 +123,13 @@ public struct AnthropicClient: Sendable {
                         inputTokens = (usage["input_tokens"] as? Int) ?? 0
                     }
                 }
+                onEvent?(.messageStarted(model: responseModel, inputTokens: inputTokens))
             case "content_block_delta":
                 if let delta = event["delta"] as? [String: Any],
                    delta["type"] as? String == "text_delta",
                    let text = delta["text"] as? String {
                     fullText += text
+                    onEvent?(.textDelta(chunk: text, totalCharacters: fullText.count))
                 }
             case "message_delta":
                 if let delta = event["delta"] as? [String: Any] {
@@ -117,10 +138,48 @@ public struct AnthropicClient: Sendable {
                 if let usage = event["usage"] as? [String: Any] {
                     outputTokens = (usage["output_tokens"] as? Int) ?? 0
                 }
+                onEvent?(.messageDelta(stopReason: stopReason, outputTokens: outputTokens == 0 ? nil : outputTokens))
+            case "message_stop":
+                onEvent?(.messageStopped)
             default:
                 break
             }
         }
+
+        func flushPendingEvent() {
+            guard !pendingData.isEmpty else {
+                pendingEvent = nil
+                return
+            }
+            let payload = pendingData.joined(separator: "\n")
+            handleEventPayload(payload, hintedEvent: pendingEvent)
+            pendingData = []
+            pendingEvent = nil
+        }
+
+        for try await rawLine in bytes.lines {
+            let line = rawLine.trimmingCharacters(in: .newlines)
+            if line.isEmpty {
+                flushPendingEvent()
+                continue
+            }
+            if line.hasPrefix(":") {
+                continue
+            }
+            if line.hasPrefix("event:") {
+                flushPendingEvent()
+                pendingEvent = String(line.dropFirst(6)).trimmingCharacters(in: .whitespaces)
+                continue
+            }
+            if line.hasPrefix("data:") {
+                var dataPart = String(line.dropFirst(5))
+                if dataPart.hasPrefix(" ") {
+                    dataPart = String(dataPart.dropFirst())
+                }
+                pendingData.append(dataPart)
+            }
+        }
+        flushPendingEvent()
 
         if fullText.isEmpty {
             throw AnthropicClientError.emptyResponse

@@ -162,6 +162,54 @@ BULGARIAN SPLIT SQUAT (CONTRALATERAL)
 15° DB BENCH PRESS
 """
 
+BREAKTHROUGH_SAMPLE = """
+MONDAY 3.02.26
+Breakthrough Season #1
+THAW:
+This week we focus on aerobic power.
+PREPARE TO ENGAGE
+CROSSOVER SYMMETRY W/Y NEGATIVE
+TERMINAL KNEE EXTENSION
+COMPLETE
+PULL UPS EVERY DAY
+PULL UP
+COMPLETE
+THE REPLACEMENTS
+SPLIT SQUAT
+COMPLETE
+THE PAY OFF
+60 DEGREE INCLINE BENCH PRESS
+OFFSET DB RDL CONTRALATERAL
+SINGLE ARM DB ROW
+COMPLETE
+THAW - AEROBIC POWER
+ROWERG
+Examples
+30 seconds at 392
+Meters
+"""
+
+DYNAMIC_ALIAS_SAMPLE = """
+MONDAY 3.09.26
+New Season #1
+SPARK ZONE
+CROSSOVER SYMMETRY W/Y NEGATIVE
+TERMINAL KNEE EXTENSION
+COMPLETE
+VERTICAL LADDER
+PULL UP
+COMPLETE
+PRIMARY DRIVER
+SPLIT SQUAT
+COMPLETE
+SUPPORT BUILDER
+SINGLE ARM DB ROW
+ZOTTMAN CURL
+COMPLETE
+ENGINE BUILDER
+ROWERG
+"""
+
 
 class FortCompilerTests(unittest.TestCase):
     def test_find_first_section_index_skips_narrative_lines(self):
@@ -169,6 +217,12 @@ class FortCompilerTests(unittest.TestCase):
         index = find_first_section_index(lines)
         self.assertIsNotNone(index)
         self.assertIn("IGNITION - KOT WARM-UP", lines[index])
+
+    def test_find_first_section_index_detects_dynamic_unknown_headers(self):
+        lines = DYNAMIC_ALIAS_SAMPLE.splitlines()
+        index = find_first_section_index(lines)
+        self.assertIsNotNone(index)
+        self.assertIn("SPARK ZONE", lines[index])
 
     def test_parse_fort_day_handles_non_cluster_program(self):
         parsed = parse_fort_day("Monday", DEVIL_DAY_SAMPLE)
@@ -507,6 +561,46 @@ class FortCompilerTests(unittest.TestCase):
         )
         codes = {violation["code"] for violation in fidelity["violations"]}
         self.assertNotIn("fort_missing_anchor", codes)
+
+    def test_parse_fort_day_recognizes_breakthrough_sections_and_filters_table_noise(self):
+        parsed = parse_fort_day("Monday", BREAKTHROUGH_SAMPLE)
+        section_ids = [section["section_id"] for section in parsed["sections"]]
+        self.assertIn("prep_mobility", section_ids)
+        self.assertIn("strength_build", section_ids)
+        self.assertIn("strength_work", section_ids)
+        self.assertIn("auxiliary_hypertrophy", section_ids)
+        self.assertIn("conditioning", section_ids)
+
+        all_exercises = {
+            exercise
+            for section in parsed["sections"]
+            for exercise in section["exercises"]
+        }
+        self.assertIn("PULL UP", all_exercises)
+        self.assertIn("SPLIT SQUAT", all_exercises)
+        self.assertIn("ROWERG", all_exercises)
+        self.assertNotIn("PREPARE TO ENGAGE", all_exercises)
+        self.assertNotIn("METERS", all_exercises)
+        self.assertNotIn("EXAMPLES", all_exercises)
+        self.assertNotIn("30 seconds at 392", all_exercises)
+
+    def test_parse_fort_day_infers_dynamic_unknown_section_aliases(self):
+        parsed = parse_fort_day("Monday", DYNAMIC_ALIAS_SAMPLE)
+        section_ids = [section["section_id"] for section in parsed["sections"]]
+        self.assertIn("prep_mobility", section_ids)
+        self.assertIn("strength_build", section_ids)
+        self.assertIn("strength_work", section_ids)
+        self.assertIn("auxiliary_hypertrophy", section_ids)
+        self.assertIn("conditioning", section_ids)
+
+        all_exercises = {
+            exercise
+            for section in parsed["sections"]
+            for exercise in section["exercises"]
+        }
+        self.assertIn("PULL UP", all_exercises)
+        self.assertIn("SPLIT SQUAT", all_exercises)
+        self.assertIn("ROWERG", all_exercises)
 
 
 if __name__ == "__main__":

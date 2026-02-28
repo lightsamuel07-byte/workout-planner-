@@ -31,6 +31,46 @@ struct StatusBanner: Equatable {
     static let empty = StatusBanner(text: "", severity: .info)
 }
 
+enum GenerationProgressStage: String, Equatable {
+    case preparing = "Preparing"
+    case normalizingFort = "Normalizing Fort Input"
+    case requestingModel = "Requesting Model"
+    case streamingResponse = "Streaming Response"
+    case validating = "Validating Plan"
+    case correcting = "Applying Corrections"
+    case writingOutputs = "Writing Outputs"
+    case syncingDatabase = "Syncing Database"
+    case completed = "Completed"
+}
+
+struct GenerationProgressUpdate: Equatable {
+    let stage: GenerationProgressStage
+    let message: String
+    let streamedCharacters: Int?
+    let inputTokens: Int?
+    let outputTokens: Int?
+    let previewTail: String?
+    let correctionAttempt: Int?
+
+    init(
+        stage: GenerationProgressStage,
+        message: String,
+        streamedCharacters: Int? = nil,
+        inputTokens: Int? = nil,
+        outputTokens: Int? = nil,
+        previewTail: String? = nil,
+        correctionAttempt: Int? = nil
+    ) {
+        self.stage = stage
+        self.message = message
+        self.streamedCharacters = streamedCharacters
+        self.inputTokens = inputTokens
+        self.outputTokens = outputTokens
+        self.previewTail = previewTail
+        self.correctionAttempt = correctionAttempt
+    }
+}
+
 struct SetupState: Equatable {
     var anthropicAPIKey: String = ""
     var spreadsheetID: String = ""
@@ -72,7 +112,7 @@ struct PlanGenerationInput: Equatable {
 
 struct GenerationReadinessReport: Equatable {
     let missingDays: [String]
-    let missingHeaders: [String]
+    let missingHeaders: [String]  // retained for ABI compat; no longer counted as an issue
     let lowSignalDays: [String]
     let duplicatedDayPairs: [String]
 
@@ -80,9 +120,6 @@ struct GenerationReadinessReport: Equatable {
         var rows: [String] = []
         if !missingDays.isEmpty {
             rows.append("Missing day input: \(missingDays.joined(separator: ", ")).")
-        }
-        if !missingHeaders.isEmpty {
-            rows.append("Missing explicit day header in: \(missingHeaders.joined(separator: ", ")).")
         }
         if !lowSignalDays.isEmpty {
             rows.append("Too little signal (<3 non-empty lines): \(lowSignalDays.joined(separator: ", ")).")

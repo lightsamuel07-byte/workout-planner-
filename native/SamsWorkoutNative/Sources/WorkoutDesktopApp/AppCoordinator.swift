@@ -12,6 +12,12 @@ final class AppCoordinator: ObservableObject {
     @Published var generationInput = PlanGenerationInput()
     @Published var generationStatus = ""
     @Published var isGenerating = false
+    @Published var generationStage: GenerationProgressStage?
+    @Published var generationStreamedCharacters: Int = 0
+    @Published var generationInputTokenCount: Int?
+    @Published var generationOutputTokenCount: Int?
+    @Published var generationPreviewTail = ""
+    @Published var generationProgressLog: [String] = []
     @Published var planSnapshot = PlanSnapshot.empty
     @Published var selectedPlanDay = ""
     @Published var viewPlanError = ""
@@ -650,6 +656,13 @@ if !generationStatus.isEmpty {
 
         isGenerating = true
         defer { isGenerating = false }
+        generationStage = .preparing
+        generationStatus = "Preparing generation inputs..."
+        generationStreamedCharacters = 0
+        generationInputTokenCount = nil
+        generationOutputTokenCount = nil
+        generationPreviewTail = ""
+        generationProgressLog = []
 
         generationInput = PlanGenerationInput(
             monday: normalizedMultiline(generationInput.monday),
@@ -658,11 +671,46 @@ if !generationStatus.isEmpty {
         )
 
         do {
-            generationStatus = try await gateway.generatePlan(input: generationInput)
+            generationStatus = try await gateway.generatePlan(
+                input: generationInput,
+                onProgress: { [weak self] update in
+                    Task { @MainActor in
+                        self?.applyGenerationProgress(update)
+                    }
+                }
+            )
+            generationStage = .completed
             await refreshPlanSnapshot()
             refreshAnalytics()
         } catch {
+            generationStage = nil
             generationStatus = "Generation failed: \(error.localizedDescription)"
+        }
+    }
+
+    func applyGenerationProgress(_ update: GenerationProgressUpdate) {
+        generationStage = update.stage
+        generationStatus = update.message
+
+        if let streamed = update.streamedCharacters {
+            generationStreamedCharacters = max(generationStreamedCharacters, streamed)
+        }
+        if let inputTokens = update.inputTokens {
+            generationInputTokenCount = inputTokens
+        }
+        if let outputTokens = update.outputTokens {
+            generationOutputTokenCount = outputTokens
+        }
+        if let previewTail = update.previewTail, !previewTail.isEmpty {
+            generationPreviewTail = previewTail
+        }
+
+        let logLine = "[\(update.stage.rawValue)] \(update.message)"
+        if generationProgressLog.last != logLine {
+            generationProgressLog.append(logLine)
+            if generationProgressLog.count > 12 {
+                generationProgressLog = Array(generationProgressLog.suffix(12))
+            }
         }
     }
 
@@ -872,6 +920,12 @@ if !generationStatus.isEmpty {
 
     func clearGenerationInput() {
         generationInput = PlanGenerationInput()
+        generationStage = nil
+        generationStreamedCharacters = 0
+        generationInputTokenCount = nil
+        generationOutputTokenCount = nil
+        generationPreviewTail = ""
+        generationProgressLog = []
     }
 
     func resetPlanFilters() {

@@ -687,8 +687,70 @@ struct GeneratePlanPageView: View {
                 .buttonStyle(.borderedProminent)
                 .disabled(!coordinator.canGenerateNow)
 
-                if coordinator.isGenerating {
-                    ProgressView("Generating and syncing weekly plan...")
+                if coordinator.isGenerating || coordinator.generationStage != nil {
+                    GroupBox("Live Generation") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack {
+                                Text("Stage")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                Text((coordinator.generationStage ?? .preparing).rawValue)
+                                    .font(.callout.weight(.semibold))
+                                Spacer()
+                                if coordinator.isGenerating {
+                                    ProgressView()
+                                        .controlSize(.small)
+                                }
+                            }
+
+                            HStack(spacing: 14) {
+                                Label("\(coordinator.generationStreamedCharacters)", systemImage: "text.badge.plus")
+                                    .font(.caption)
+                                if let inputTokens = coordinator.generationInputTokenCount {
+                                    Label("in \(inputTokens)", systemImage: "arrow.down.circle")
+                                        .font(.caption)
+                                }
+                                if let outputTokens = coordinator.generationOutputTokenCount {
+                                    Label("out \(outputTokens)", systemImage: "arrow.up.circle")
+                                        .font(.caption)
+                                }
+                            }
+                            .foregroundStyle(.secondary)
+
+                            if !coordinator.generationPreviewTail.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Stream preview")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    ScrollView {
+                                        Text(coordinator.generationPreviewTail)
+                                            .font(.system(.caption, design: .monospaced))
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                            .textSelection(.enabled)
+                                    }
+                                    .frame(height: 90)
+                                    .padding(8)
+                                    .background(.thinMaterial)
+                                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                                }
+                            }
+
+                            if !coordinator.generationProgressLog.isEmpty {
+                                VStack(alignment: .leading, spacing: 4) {
+                                    Text("Progress log")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    ForEach(Array(coordinator.generationProgressLog.suffix(4).enumerated()), id: \.offset) { _, line in
+                                        Text("• \(line)")
+                                            .font(.caption2)
+                                            .foregroundStyle(.secondary)
+                                            .frame(maxWidth: .infinity, alignment: .leading)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
                 }
 
                 if !coordinator.generationDisabledReason.isEmpty {
@@ -2001,4 +2063,3 @@ struct SettingsPageView: View {
         }
     }
 }
-

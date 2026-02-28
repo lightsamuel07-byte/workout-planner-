@@ -1,6 +1,6 @@
 # LESSONS
 
-Last updated: 2026-02-21
+Last updated: 2026-02-28
 
 ## Core Lessons to Preserve
 
@@ -87,3 +87,16 @@ Last updated: 2026-02-21
 
 - Correction received: planning and scan scope was initially framed as mixed-stack while project runtime had already moved to native macOS.
 - New rule: before creating any plan or running checks, confirm active runtime scope from latest progress/context and constrain execution to that runtime (native Swift modules first when native track is active).
+
+## Session Corrections (2026-02-28)
+
+- Correction received: Fort section aliases change every 4 weeks, so static alias lists alone are insufficient.
+- New rule: Fort parsing must include deterministic dynamic-header inference (header semantics + exercise cues + section position), not just hardcoded section names.
+- Correction received: conditioning inference overmatched accessory rows because `ROW` was treated as a generic cardio cue.
+- New rule: conditioning cues must be machine/cardio-specific (`ROWERG`, `SKIERG`, etc.); avoid ambiguous tokens that overlap accessory lift names.
+- Correction received: generated plans can still look superficially valid while leaking section headers/table labels as exercises.
+- New rule: validator must hard-fail Fort pseudo-exercises (`PREPARE TO ENGAGE`, `THE PAY OFF`, `THAW`, `METERS`, `EXAMPLES`, etc.) so correction loop is forced.
+- Correction received: SSE streaming fixtures can fail if parser assumes blank-line frame separators only.
+- New rule: SSE parser must flush pending `data:` on both blank-line boundaries and when a new `event:` line begins.
+- Correction received: stream callback propagation can fail strict Swift concurrency checks.
+- New rule: callbacks crossing actor boundaries must be `@Sendable`, and UI updates from stream callbacks must hop explicitly to `MainActor`.

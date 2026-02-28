@@ -39,6 +39,7 @@ SECTION_RULE_DEFS = [
             r"\bBUILD\s*UP\b",
             r"\bRAMP\b",
             r"\bCALIBRATION\b",
+            r"\bPULL[\s\-]*UPS?\s+EVERY\s+DAY\b",
         ],
     },
     {
@@ -62,6 +63,8 @@ SECTION_RULE_DEFS = [
             r"\bACCESSORY\b",
             r"\bUPPER\s+BODY\s+AUX\b",
             r"\bLOWER\s+BODY\s+AUX\b",
+            r"\bTHE\s+PAY\s+OFF\b",
+            r"\bPAY\s*OFF\b",
         ],
     },
     {
@@ -79,6 +82,8 @@ SECTION_RULE_DEFS = [
             r"\b(?:1|3)\s*RM\s+TEST\b",
             r"\bMAX\s+PULL[\s\-]*UP\s+TEST\b",
             r"\bMAX\s+PUSH[\s\-]*UP\s+TEST\b",
+            r"\bTHE\s+REPLACEMENTS\b",
+            r"\bTHE\s+SWEAT\s+BANK\b",
         ],
     },
     {
@@ -92,6 +97,7 @@ SECTION_RULE_DEFS = [
             r"\bTARGETED\s+WARM[\s\-]*UP\b",
             r"\bACTIVATION\b",
             r"\bKOT\s+WARM[\s\-]*UP\b",
+            r"\bPREPARE\s+TO\s+ENGAGE\b",
         ],
     },
 ]
@@ -116,9 +122,15 @@ METADATA_EXACT = {
     "TIME (MM:SS)",
     "HEIGHT (IN)",
     "DIST. (M)",
+    "DIST. (MILES)",
+    "DIST (MILES)",
+    "DISTANCE (MILES)",
+    "DIST. (MI)",
+    "METERS",
     "WATTS",
     "OTHER NUMBER",
     "SETS",
+    "EXAMPLES",
 }
 
 METADATA_RE = [
@@ -126,15 +138,16 @@ METADATA_RE = [
     re.compile(r"^\d+(?:\.\d+)?%$", re.IGNORECASE),
     re.compile(r"^\d+(?:\.\d+)?$", re.IGNORECASE),
     re.compile(r"^\d{1,2}:\d{2}(?:\.\d+)?$", re.IGNORECASE),
-    re.compile(r"^(REPS?|WEIGHT|TIME|TIME\s*\(MM:SS\)|HEIGHT\s*\(IN\)|DIST\.?\s*\(M\)|WATTS|OTHER NUMBER|RX)$", re.IGNORECASE),
+    re.compile(r"^(REPS?|WEIGHT|TIME|TIME\s*\(MM:SS\)|HEIGHT\s*\(IN\)|DIST\.?\s*\((M|MI|MILES)\)|DISTANCE\s*\(MILES\)|WATTS|OTHER NUMBER|METERS|RX)$", re.IGNORECASE),
 ]
 
 PLAN_DAY_RE = re.compile(r"^\s*##\s+([A-Z]+DAY)\b", re.IGNORECASE)
 PLAN_EXERCISE_RE = re.compile(r"^\s*###\s+([A-Z]\d+)\.\s*(.+)$", re.IGNORECASE)
 PLAN_PRESCRIPTION_RE = re.compile(
-    r"^\s*-\s*(\d+)\s*x\s*([\d:]+)\s*@\s*([\d]+(?:\.\d+)?)\s*kg\b",
+    r"^\s*-\s*(\d+)\s*x\s*(.+?)\s*@\s*(.+)$",
     re.IGNORECASE,
 )
+NUMERIC_TOKEN_RE = re.compile(r"[-+]?\d+(?:\.\d+)?")
 
 NON_EXERCISE_PATTERNS = [
     re.compile(r"^TIPS?\b", re.IGNORECASE),
@@ -148,6 +161,7 @@ NON_EXERCISE_PATTERNS = [
     re.compile(r"^NUMBER\s+OF\s+REPS\b", re.IGNORECASE),
     re.compile(r"^WRITE\s+NOTES\b", re.IGNORECASE),
     re.compile(r"^HIP\s+CIRCLE\s+IS\s+OPTIONAL\b", re.IGNORECASE),
+    re.compile(r"^\d+\s*SECONDS?\s+AT\s+\d+(?:\.\d+)?\b", re.IGNORECASE),
 ]
 
 
@@ -189,13 +203,125 @@ def _match_section_rule(value):
     return None
 
 
+def _canonical_section_definition(section_id):
+    mapping = {
+        "prep_mobility": ("Prep/Mobility", "A"),
+        "power_activation": ("Power/Activation", "B"),
+        "strength_build": ("Strength Build-Up/Warm-Up", "B"),
+        "strength_work": ("Main Strength/Breakpoint", "C"),
+        "strength_backoff": ("Strength Back-Offs", "D"),
+        "auxiliary_hypertrophy": ("Auxiliary/Hypertrophy", "E"),
+        "conditioning": ("Conditioning/THAW", "F"),
+    }
+    return mapping.get(section_id, ("Dynamic Section", "Z"))
+
+
+def _is_potential_section_header(value):
+    normalized = _normalize_space(value)
+    if not normalized:
+        return False
+    if _match_section_rule(normalized):
+        return True
+    if _is_metadata_line(normalized) or _is_narrative_line(normalized):
+        return False
+    if any(pattern.search(normalized) for pattern in NON_EXERCISE_PATTERNS):
+        return False
+
+    words = normalized.split()
+    if len(words) < 2 or len(words) > 8:
+        return False
+    if not _is_mostly_upper(normalized):
+        return False
+
+    upper = normalized.upper()
+    if re.search(r"\b(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)\b", upper) and re.search(r"\d", normalized):
+        return False
+    return True
+
+
+def _infer_dynamic_section_id(header, exercises, index, total, used_ids):
+    joined_upper = " ".join([header] + list(exercises or [])).upper()
+    normalized_exercises = [_normalize_exercise_name(exercise) for exercise in (exercises or [])]
+
+    has_conditioning_cue = bool(
+        re.search(
+            r"\b(ROWERG|SKIERG|BIKEERG|FAN\s*BIKE|AIR\s*BIKE|ASSAULT\s*BIKE|TREADMILL|RUN|ERG|AEROBIC|THAW|CONDITIONING|REDEMPTION|MILE|METCON|\d+\s*K\s*ROW)\b",
+            joined_upper,
+        )
+    )
+    has_pullup_cue = bool(re.search(r"\b(PULL\s*UP|CHIN\s*UP|SCAP\s*PULL)\b", joined_upper))
+    has_mobility_cue = bool(
+        re.search(r"\b(SYMMETRY|ROTATION|MOBILITY|TKE|TERMINAL\s*KNEE|ACTIVATION|WARM\s*UP|PREP|THORACIC|DEADBUG|ARCHER)\b", joined_upper)
+    )
+    has_main_lift_cue = any(
+        ("squat" in name) or ("deadlift" in name) or ("bench press" in name) or ("strict press" in name)
+        for name in normalized_exercises
+    )
+    has_accessory_cue = (
+        any(
+            ("row" in name) or ("curl" in name) or ("press" in name) or ("rdl" in name) or ("raise" in name) or ("rollout" in name)
+            for name in normalized_exercises
+        )
+        or len(normalized_exercises) >= 2
+    )
+
+    if has_conditioning_cue:
+        return "conditioning"
+    if has_main_lift_cue:
+        return "strength_work"
+    if has_pullup_cue:
+        return "strength_build"
+    if has_mobility_cue and not has_accessory_cue:
+        return "prep_mobility"
+    if has_accessory_cue and not has_mobility_cue:
+        return "auxiliary_hypertrophy"
+
+    denominator = max(total - 1, 1)
+    relative_position = index / denominator
+    if relative_position <= 0.25 and "prep_mobility" not in used_ids:
+        return "prep_mobility"
+    if relative_position >= 0.75 and "conditioning" not in used_ids:
+        return "conditioning"
+    if "strength_work" not in used_ids:
+        return "strength_work"
+    if "auxiliary_hypertrophy" not in used_ids:
+        return "auxiliary_hypertrophy"
+    return "strength_build"
+
+
+def _normalize_dynamic_sections(sections):
+    if not sections:
+        return []
+
+    normalized_sections = [dict(section) for section in sections]
+    used_ids = {section.get("section_id") for section in normalized_sections if section.get("section_id") != "dynamic_unknown"}
+
+    for index, section in enumerate(normalized_sections):
+        if section.get("section_id") != "dynamic_unknown":
+            continue
+        inferred_id = _infer_dynamic_section_id(
+            section.get("raw_header", ""),
+            section.get("exercises", []),
+            index,
+            len(normalized_sections),
+            used_ids,
+        )
+        section_label, block_hint = _canonical_section_definition(inferred_id)
+        section["section_id"] = inferred_id
+        section["section_label"] = section_label
+        section["block_hint"] = block_hint
+        used_ids.add(inferred_id)
+
+    return normalized_sections
+
+
 def find_first_section_index(lines):
     """Return index of the first recognized Fort section header line."""
     if not lines:
         return None
 
     for idx, line in enumerate(lines[:400]):
-        if _match_section_rule(line):
+        if _match_section_rule(line) or _is_potential_section_header(line):
             return idx
     return None
 
@@ -285,15 +411,20 @@ def parse_fort_day(day_name, workout_text):
     sections = []
     warnings = []
     current_section = None
+    saw_complete_boundary = False
 
     for raw_line in lines:
         line = _normalize_space(raw_line)
         if not line:
             continue
 
+        if line.upper() == "COMPLETE":
+            saw_complete_boundary = True
+            continue
+
         if line.upper().startswith("COMPLETE "):
             maybe_section = _normalize_space(line[9:])
-            if _match_section_rule(maybe_section):
+            if _match_section_rule(maybe_section) or _is_potential_section_header(maybe_section):
                 line = maybe_section
 
         section_rule = _match_section_rule(line)
@@ -308,6 +439,19 @@ def parse_fort_day(day_name, workout_text):
             if _should_seed_section_header_as_exercise(section_rule["section_id"], line):
                 current_section["exercises"].append(line)
             sections.append(current_section)
+            saw_complete_boundary = False
+            continue
+
+        if _is_potential_section_header(line) and (not current_section or saw_complete_boundary):
+            current_section = {
+                "section_id": "dynamic_unknown",
+                "section_label": "Dynamic Section",
+                "block_hint": "Z",
+                "raw_header": line,
+                "exercises": [],
+            }
+            sections.append(current_section)
+            saw_complete_boundary = False
             continue
 
         if not current_section:
@@ -321,10 +465,13 @@ def parse_fort_day(day_name, workout_text):
             dedupe_key = _normalize_space(line).upper()
             if dedupe_key not in existing:
                 current_section["exercises"].append(line)
+                saw_complete_boundary = False
 
-    section_count = len(sections)
-    total_exercises = sum(len(section["exercises"]) for section in sections)
-    present_section_ids = {section["section_id"] for section in sections}
+    normalized_sections = _normalize_dynamic_sections(sections)
+
+    section_count = len(normalized_sections)
+    total_exercises = sum(len(section["exercises"]) for section in normalized_sections)
+    present_section_ids = {section["section_id"] for section in normalized_sections}
     core_ids = {
         "prep_mobility",
         "strength_work",
@@ -346,7 +493,7 @@ def parse_fort_day(day_name, workout_text):
         "day": day_name,
         "date_line": date_line,
         "title_line": title_line,
-        "sections": sections,
+        "sections": normalized_sections,
         "total_exercises": total_exercises,
         "confidence": confidence,
         "warnings": warnings,
@@ -405,6 +552,10 @@ def _build_compiled_templates(parsed_day, max_exercises_per_section):
     current_rank = 1
 
     for section in parsed_day.get("sections", []):
+        exercises = section["exercises"][:max_exercises_per_section]
+        if not exercises:
+            continue
+
         desired_rank = _section_base_rank(section["section_id"])
         rank = max(desired_rank, current_rank)
         while rank in used_ranks and rank <= 26:
@@ -415,8 +566,6 @@ def _build_compiled_templates(parsed_day, max_exercises_per_section):
         used_ranks.add(rank)
         current_rank = rank
         letter = _rank_to_letter(rank)
-
-        exercises = section["exercises"][:max_exercises_per_section]
         exercise_blocks = []
         for idx, exercise_name in enumerate(exercises, start=1):
             exercise_blocks.append(
@@ -511,6 +660,32 @@ def _matches_expected_exercise(expected_name, actual_name, alias_map):
     return False
 
 
+def _parse_prescription_line(raw_line):
+    stripped = (raw_line or "").strip()
+    match = PLAN_PRESCRIPTION_RE.match(stripped)
+    if not match:
+        return None
+
+    sets_raw, reps_raw, load_raw = match.groups()
+    sets = int(sets_raw) if sets_raw.isdigit() else None
+
+    normalized_reps = re.sub(
+        r"\b(reps?|seconds?|secs?|minutes?|mins?|meters?|miles?)\b",
+        "",
+        reps_raw,
+        flags=re.IGNORECASE,
+    )
+    normalized_reps = re.sub(r"\s+", " ", normalized_reps).strip()
+    reps = normalized_reps or reps_raw.strip()
+
+    load = None
+    load_match = NUMERIC_TOKEN_RE.search(load_raw or "")
+    if load_match:
+        load = float(load_match.group(0))
+
+    return sets, reps, load
+
+
 def parse_plan_fort_entries(plan_text):
     """Parse generated markdown plan entries by day for Fort fidelity checks."""
     entries_by_day = {}
@@ -545,11 +720,11 @@ def parse_plan_fort_entries(plan_text):
         if not current_entry:
             continue
 
-        prescription_match = PLAN_PRESCRIPTION_RE.match(line.strip())
-        if prescription_match:
-            _sets, reps, load = prescription_match.groups()
+        parsed_prescription = _parse_prescription_line(line)
+        if parsed_prescription:
+            _sets, reps, load = parsed_prescription
             current_entry["reps"] = reps
-            current_entry["load"] = float(load)
+            current_entry["load"] = load
             continue
 
         notes_line = line.strip()

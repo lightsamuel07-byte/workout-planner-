@@ -67,6 +67,58 @@ class PlanValidatorTests(unittest.TestCase):
         codes = {v["code"] for v in result["violations"]}
         self.assertNotIn("biceps_grip_repeat", codes)
 
+    def test_detects_underfilled_supplemental_day(self):
+        plan = """## TUESDAY
+### D1. Incline DB Curl (Supinated)
+- 3 x 12 @ 14 kg
+- **Rest:** 60 seconds
+- **Notes:** Supinated grip.
+### D2. Rope Pressdown
+- 3 x 12 @ 22 kg
+- **Rest:** 60 seconds
+- **Notes:** Triceps.
+### D3. Face Pull
+- 3 x 15 @ 18 kg
+- **Rest:** 60 seconds
+- **Notes:** Upper back.
+## THURSDAY
+### D1. Cable Curl (Pronated Grip)
+- 3 x 10 @ 20 kg
+- **Rest:** 60 seconds
+- **Notes:** Pronated grip.
+### D2. Floor Press
+- 3 x 10 @ 24 kg
+- **Rest:** 90 seconds
+- **Notes:** Control.
+### D3. Rear Delt Raise
+- 3 x 15 @ 8 kg
+- **Rest:** 60 seconds
+- **Notes:** Tempo.
+## SATURDAY
+### D1. Triceps Pushdown (V-Bar)
+- 3 x 12 @ 22 kg
+- **Rest:** 60 seconds
+- **Notes:** Single exercise day.
+"""
+        result = validate_plan(plan, progression_directives=[])
+        codes = {v["code"] for v in result["violations"]}
+        self.assertIn("supplemental_day_underfilled", codes)
+
+    def test_detects_fort_header_as_exercise_noise(self):
+        plan = """## MONDAY
+### F1. PREPARE TO ENGAGE
+- 1 x 60 @ 0 kg
+- **Rest:** None
+- **Notes:** Header leaked into exercise list.
+### F2. Meters
+- 1 x 60 @ 0 kg
+- **Rest:** None
+- **Notes:** Table label leaked into exercise list.
+"""
+        result = validate_plan(plan, progression_directives=[])
+        codes = {v["code"] for v in result["violations"]}
+        self.assertIn("fort_header_as_exercise", codes)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -208,7 +208,7 @@ private struct WorkingDayEntry {
 
 private let planDayRegex = makeRegex("^\\s*##\\s+([A-Z]+DAY)\\b", options: [.caseInsensitive])
 private let planExerciseRegex = makeRegex("^\\s*###\\s+([A-Z]\\d+)\\.\\s*(.+)$", options: [.caseInsensitive])
-private let planPrescriptionRegex = makeRegex("^\\s*-\\s*(\\d+)\\s*x\\s*([\\d:]+)\\s*@\\s*([\\d]+(?:\\.\\d+)?)\\s*kg\\b", options: [.caseInsensitive])
+private let planPrescriptionRegex = makeRegex("^\\s*-\\s*(\\d+)\\s*x\\s*(.+?)\\s*@\\s*(.+)$", options: [.caseInsensitive])
 
 private let nonExercisePatterns: [NSRegularExpression] = [
     makeRegex("^TIPS?\\b", options: [.caseInsensitive]),
@@ -222,11 +222,14 @@ private let nonExercisePatterns: [NSRegularExpression] = [
     makeRegex("^NUMBER\\s+OF\\s+REPS\\b", options: [.caseInsensitive]),
     makeRegex("^WRITE\\s+NOTES\\b", options: [.caseInsensitive]),
     makeRegex("^HIP\\s+CIRCLE\\s+IS\\s+OPTIONAL\\b", options: [.caseInsensitive]),
+    makeRegex("^\\d+\\s*SECONDS?\\s+AT\\s+\\d+(?:\\.\\d+)?\\b", options: [.caseInsensitive]),
 ]
 
 private let metadataExact: Set<String> = [
     "TIPS", "TIPS HISTORY", "HISTORY", "COMPLETE", "RX", "REPS", "WEIGHT", "TIME",
-    "TIME (MM:SS)", "HEIGHT (IN)", "DIST. (M)", "WATTS", "OTHER NUMBER", "SETS",
+    "TIME (MM:SS)", "HEIGHT (IN)", "DIST. (M)", "DIST. (MILES)", "DIST (MILES)",
+    "DISTANCE (MILES)", "DIST. (MI)", "METERS", "WATTS", "OTHER NUMBER", "SETS",
+    "EXAMPLES",
 ]
 
 private let metadataRegexes: [NSRegularExpression] = [
@@ -234,7 +237,7 @@ private let metadataRegexes: [NSRegularExpression] = [
     makeRegex("^\\d+(?:\\.\\d+)?%$", options: [.caseInsensitive]),
     makeRegex("^\\d+(?:\\.\\d+)?$", options: [.caseInsensitive]),
     makeRegex("^\\d{1,2}:\\d{2}(?:\\.\\d+)?$", options: [.caseInsensitive]),
-    makeRegex("^(REPS?|WEIGHT|TIME|TIME\\s*\\(MM:SS\\)|HEIGHT\\s*\\(IN\\)|DIST\\.?\\s*\\(M\\)|WATTS|OTHER NUMBER|RX)$", options: [.caseInsensitive]),
+    makeRegex("^(REPS?|WEIGHT|TIME|TIME\\s*\\(MM:SS\\)|HEIGHT\\s*\\(IN\\)|DIST\\.?\\s*\\((M|MI|MILES)\\)|DISTANCE\\s*\\(MILES\\)|WATTS|OTHER NUMBER|METERS|RX)$", options: [.caseInsensitive]),
 ]
 
 private let sectionRules: [SectionRule] = [
@@ -269,6 +272,7 @@ private let sectionRules: [SectionRule] = [
             "\\bBUILD\\s*UP\\b",
             "\\bRAMP\\b",
             "\\bCALIBRATION\\b",
+            "\\bPULL[\\s\\-]*UPS?\\s+EVERY\\s+DAY\\b",
         ].map { makeRegex($0, options: [.caseInsensitive]) }
     ),
     SectionRule(
@@ -293,6 +297,8 @@ private let sectionRules: [SectionRule] = [
             "\\bUPPER\\s+BODY\\s+AUX\\b",
             "\\bLOWER\\s+BODY\\s+AUX\\b",
             "\\bAUXILIARY/RECOVERY\\b",
+            "\\bTHE\\s+PAY\\s+OFF\\b",
+            "\\bPAY\\s*OFF\\b",
         ].map { makeRegex($0, options: [.caseInsensitive]) }
     ),
     SectionRule(
@@ -310,6 +316,8 @@ private let sectionRules: [SectionRule] = [
             "\\b(?:1|3)\\s*RM\\s+TEST\\b",
             "\\bMAX\\s+PULL[\\s\\-]*UP\\s+TEST\\b",
             "\\bMAX\\s+PUSH[\\s\\-]*UP\\s+TEST\\b",
+            "\\bTHE\\s+REPLACEMENTS\\b",
+            "\\bTHE\\s+SWEAT\\s+BANK\\b",
         ].map { makeRegex($0, options: [.caseInsensitive]) }
     ),
     SectionRule(
@@ -323,9 +331,45 @@ private let sectionRules: [SectionRule] = [
             "\\bTARGETED\\s+WARM[\\s\\-]*UP\\b",
             "\\bACTIVATION\\b",
             "\\bKOT\\s+WARM[\\s\\-]*UP\\b",
+            "\\bPREPARE\\s+TO\\s+ENGAGE\\b",
         ].map { makeRegex($0, options: [.caseInsensitive]) }
     ),
 ]
+
+private let numericTokenRegex = makeRegex("[-+]?\\d+(?:\\.\\d+)?")
+
+private func parsePrescriptionLine(_ line: String) -> (sets: Int?, reps: String?, load: Double?)? {
+    let stripped = line.trimmingCharacters(in: .whitespacesAndNewlines)
+    guard let match = planPrescriptionRegex.firstMatch(in: stripped, options: [], range: fullRange(of: stripped)),
+          let setsRange = Range(match.range(at: 1), in: stripped),
+          let repsRange = Range(match.range(at: 2), in: stripped),
+          let loadRange = Range(match.range(at: 3), in: stripped)
+    else {
+        return nil
+    }
+
+    let sets = Int(stripped[setsRange])
+    let repsRaw = String(stripped[repsRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+    let loadRaw = String(stripped[loadRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+    let normalizedReps = repsRaw
+        .replacingOccurrences(
+            of: "\\b(reps?|seconds?|secs?|minutes?|mins?|meters?|miles?)\\b",
+            with: "",
+            options: [.regularExpression, .caseInsensitive]
+        )
+        .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+        .trimmingCharacters(in: .whitespacesAndNewlines)
+
+    var parsedLoad: Double?
+    if let loadMatch = numericTokenRegex.firstMatch(in: loadRaw, options: [], range: fullRange(of: loadRaw)),
+       let numberRange = Range(loadMatch.range(at: 0), in: loadRaw) {
+        parsedLoad = Double(loadRaw[numberRange])
+    }
+
+    let reps = normalizedReps.isEmpty ? repsRaw : normalizedReps
+    return (sets, reps.isEmpty ? nil : reps, parsedLoad)
+}
 
 private func fcCollapseWhitespace(_ value: String) -> String {
     value.replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
@@ -375,13 +419,165 @@ private func matchSectionRule(_ value: String) -> SectionRule? {
     return nil
 }
 
+private func canonicalSectionDefinition(_ sectionID: String) -> (sectionLabel: String, blockHint: String) {
+    switch sectionID {
+    case "prep_mobility":
+        return ("Prep/Mobility", "A")
+    case "power_activation":
+        return ("Power/Activation", "B")
+    case "strength_build":
+        return ("Strength Build-Up/Warm-Up", "B")
+    case "strength_work":
+        return ("Main Strength/Breakpoint", "C")
+    case "strength_backoff":
+        return ("Strength Back-Offs", "D")
+    case "auxiliary_hypertrophy":
+        return ("Auxiliary/Hypertrophy", "E")
+    case "conditioning":
+        return ("Conditioning/THAW", "F")
+    default:
+        return ("Dynamic Section", "Z")
+    }
+}
+
+private func isPotentialSectionHeader(_ value: String) -> Bool {
+    let normalized = normalizeSpace(value)
+    guard !normalized.isEmpty else {
+        return false
+    }
+    if matchSectionRule(normalized) != nil {
+        return true
+    }
+    if isMetadataLine(normalized) || isNarrativeLine(normalized) {
+        return false
+    }
+    if nonExercisePatterns.contains(where: { $0.firstMatch(in: normalized, options: [], range: fullRange(of: normalized)) != nil }) {
+        return false
+    }
+
+    let words = normalized.split(separator: " ")
+    if words.count < 2 || words.count > 8 {
+        return false
+    }
+    if !isMostlyUpper(normalized) {
+        return false
+    }
+
+    let upper = normalized.uppercased()
+    if makeRegex("\\b(MONDAY|TUESDAY|WEDNESDAY|THURSDAY|FRIDAY|SATURDAY|SUNDAY)\\b", options: [.caseInsensitive]).firstMatch(in: upper, options: [], range: fullRange(of: upper)) != nil,
+       makeRegex("\\d").firstMatch(in: normalized, options: [], range: fullRange(of: normalized)) != nil {
+        return false
+    }
+
+    return true
+}
+
+private func inferDynamicSectionID(header: String, exercises: [String], index: Int, total: Int, usedIDs: Set<String>) -> String {
+    let joinedUpper = ([header] + exercises).joined(separator: " ").uppercased()
+    let normalizedExercises = exercises.map(normalizeExerciseName)
+
+    let hasConditioningCue = makeRegex("\\b(ROWERG|SKIERG|BIKEERG|FAN\\s*BIKE|AIR\\s*BIKE|ASSAULT\\s*BIKE|TREADMILL|RUN|ERG|AEROBIC|THAW|CONDITIONING|REDEMPTION|MILE|METCON|\\d+\\s*K\\s*ROW)\\b", options: [.caseInsensitive]).firstMatch(
+        in: joinedUpper,
+        options: [],
+        range: fullRange(of: joinedUpper)
+    ) != nil
+
+    let hasPullUpCue = makeRegex("\\b(PULL\\s*UP|CHIN\\s*UP|SCAP\\s*PULL)\\b", options: [.caseInsensitive]).firstMatch(
+        in: joinedUpper,
+        options: [],
+        range: fullRange(of: joinedUpper)
+    ) != nil
+
+    let hasMobilityCue = makeRegex("\\b(SYMMETRY|ROTATION|MOBILITY|TKE|TERMINAL\\s*KNEE|ACTIVATION|WARM\\s*UP|PREP|THORACIC|DEADBUG|ARCHER)\\b", options: [.caseInsensitive]).firstMatch(
+        in: joinedUpper,
+        options: [],
+        range: fullRange(of: joinedUpper)
+    ) != nil
+
+    let hasMainLiftCue = normalizedExercises.contains(where: { name in
+        name.contains("squat") || name.contains("deadlift") || name.contains("bench press") || name.contains("strict press")
+    })
+
+    let hasAccessoryCue = normalizedExercises.contains(where: { name in
+        name.contains("row") || name.contains("curl") || name.contains("press") || name.contains("rdl") || name.contains("raise") || name.contains("rollout")
+    }) || exercises.count >= 2
+
+    if hasConditioningCue {
+        return "conditioning"
+    }
+    if hasMainLiftCue {
+        return "strength_work"
+    }
+    if hasPullUpCue {
+        return "strength_build"
+    }
+    if hasMobilityCue, !hasAccessoryCue {
+        return "prep_mobility"
+    }
+    if hasAccessoryCue, !hasMobilityCue {
+        return "auxiliary_hypertrophy"
+    }
+
+    let denominator = max(total - 1, 1)
+    let relativePosition = Double(index) / Double(denominator)
+    if relativePosition <= 0.25, !usedIDs.contains("prep_mobility") {
+        return "prep_mobility"
+    }
+    if relativePosition >= 0.75, !usedIDs.contains("conditioning") {
+        return "conditioning"
+    }
+    if !usedIDs.contains("strength_work") {
+        return "strength_work"
+    }
+    if !usedIDs.contains("auxiliary_hypertrophy") {
+        return "auxiliary_hypertrophy"
+    }
+    return "strength_build"
+}
+
+private func normalizeDynamicSections(_ sections: [MutableSection]) -> [MutableSection] {
+    guard !sections.isEmpty else {
+        return []
+    }
+
+    var normalized = sections
+    var usedIDs = Set(
+        normalized
+            .map(\.sectionID)
+            .filter { $0 != "dynamic_unknown" }
+    )
+
+    for index in normalized.indices where normalized[index].sectionID == "dynamic_unknown" {
+        let inferredID = inferDynamicSectionID(
+            header: normalized[index].rawHeader,
+            exercises: normalized[index].exercises,
+            index: index,
+            total: normalized.count,
+            usedIDs: usedIDs
+        )
+        let canonical = canonicalSectionDefinition(inferredID)
+        normalized[index] = MutableSection(
+            sectionID: inferredID,
+            sectionLabel: canonical.sectionLabel,
+            blockHint: canonical.blockHint,
+            rawHeader: normalized[index].rawHeader,
+            exercises: normalized[index].exercises
+        )
+        usedIDs.insert(inferredID)
+    }
+
+    return normalized
+}
+
 public func findFirstSectionIndex(lines: [String]) -> Int? {
     guard !lines.isEmpty else {
         return nil
     }
     let maxCount = min(lines.count, 400)
-    for index in 0..<maxCount where matchSectionRule(lines[index]) != nil {
-        return index
+    for index in 0..<maxCount {
+        if matchSectionRule(lines[index]) != nil || isPotentialSectionHeader(lines[index]) {
+            return index
+        }
     }
     return nil
 }
@@ -553,6 +749,11 @@ private func buildCompiledTemplates(_ sections: [FortParsedSection], maxExercise
     var currentRank = 1
 
     for section in sections {
+        let selected = Array(section.exercises.prefix(maxExercisesPerSection))
+        if selected.isEmpty {
+            continue
+        }
+
         let desiredRank = sectionBaseRank(section.sectionID)
         var rank = max(desiredRank, currentRank)
         while usedRanks.contains(rank), rank <= 26 {
@@ -564,8 +765,6 @@ private func buildCompiledTemplates(_ sections: [FortParsedSection], maxExercise
         usedRanks.insert(rank)
         currentRank = rank
         let letter = rankToLetter(rank)
-
-        let selected = Array(section.exercises.prefix(maxExercisesPerSection))
         let exerciseBlocks = selected.enumerated().map { index, exerciseName in
             FortSectionExercise(
                 block: "\(letter)\(index + 1)",
@@ -618,6 +817,7 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
     var sections: [MutableSection] = []
     var warnings: [String] = []
     var currentSectionIndex: Int?
+    var sawCompleteBoundary = false
 
     for raw in lines {
         var line = normalizeSpace(raw)
@@ -625,9 +825,14 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
             continue
         }
 
+        if line.uppercased() == "COMPLETE" {
+            sawCompleteBoundary = true
+            continue
+        }
+
         if line.uppercased().hasPrefix("COMPLETE ") {
             let maybeSection = normalizeSpace(String(line.dropFirst(9)))
-            if matchSectionRule(maybeSection) != nil {
+            if matchSectionRule(maybeSection) != nil || isPotentialSectionHeader(maybeSection) {
                 line = maybeSection
             }
         }
@@ -647,6 +852,21 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
 
             sections.append(section)
             currentSectionIndex = sections.count - 1
+            sawCompleteBoundary = false
+            continue
+        }
+
+        if isPotentialSectionHeader(line), (currentSectionIndex == nil || sawCompleteBoundary) {
+            let section = MutableSection(
+                sectionID: "dynamic_unknown",
+                sectionLabel: "Dynamic Section",
+                blockHint: "Z",
+                rawHeader: line,
+                exercises: []
+            )
+            sections.append(section)
+            currentSectionIndex = sections.count - 1
+            sawCompleteBoundary = false
             continue
         }
 
@@ -661,11 +881,13 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
             if !existing.contains(dedupeKey) {
                 section.exercises.append(line)
                 sections[currentSectionIndex] = section
+                sawCompleteBoundary = false
             }
         }
     }
 
-    let parsedSections = sections.map {
+    let normalizedSections = normalizeDynamicSections(sections)
+    let parsedSections = normalizedSections.map {
         FortParsedSection(
             sectionID: $0.sectionID,
             sectionLabel: $0.sectionLabel,
@@ -815,13 +1037,17 @@ public func parsePlanFortEntries(planText: String) -> [String: [PlanFortEntry]] 
 
         let stripped = line.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        if let match = planPrescriptionRegex.firstMatch(in: stripped, options: [], range: fullRange(of: stripped)),
-           let repsRange = Range(match.range(at: 2), in: stripped),
-           let loadRange = Range(match.range(at: 3), in: stripped) {
-            let reps = String(stripped[repsRange])
-            let load = Double(String(stripped[loadRange]))
+        if let parsedPrescription = parsePrescriptionLine(stripped) {
             if let index = dayEntries.lastIndex(where: { $0.block == current.block && $0.exercise == current.exercise }) {
-                let updated = PlanFortEntry(day: current.day, block: current.block, blockRank: current.blockRank, exercise: current.exercise, load: load, reps: reps, notes: current.notes)
+                let updated = PlanFortEntry(
+                    day: current.day,
+                    block: current.block,
+                    blockRank: current.blockRank,
+                    exercise: current.exercise,
+                    load: parsedPrescription.load,
+                    reps: parsedPrescription.reps,
+                    notes: current.notes
+                )
                 dayEntries[index] = updated
                 entriesByDay[current.day] = dayEntries
                 currentEntry = updated

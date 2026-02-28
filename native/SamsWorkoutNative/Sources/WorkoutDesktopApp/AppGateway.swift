@@ -7,7 +7,10 @@ import WorkoutPersistence
 protocol NativeAppGateway {
     func initialRoute() -> AppRoute
     func loadDashboardDays() -> [DayPlanSummary]
-    func generatePlan(input: PlanGenerationInput) async throws -> String
+    func generatePlan(
+        input: PlanGenerationInput,
+        onProgress: ((GenerationProgressUpdate) -> Void)?
+    ) async throws -> String
     func loadExerciseHistory(exerciseName: String) -> [ExerciseHistoryPoint]
     func loadExerciseCatalog(limit: Int) -> [String]
     func dbStatusText() -> String
@@ -26,6 +29,10 @@ protocol NativeAppGateway {
 }
 
 extension NativeAppGateway {
+    func generatePlan(input: PlanGenerationInput) async throws -> String {
+        try await generatePlan(input: input, onProgress: nil)
+    }
+
     func loadPlanSnapshot(forceRemote: Bool = false) async throws -> PlanSnapshot {
         let _ = forceRemote
         return PlanSnapshot.empty
@@ -104,8 +111,18 @@ struct InMemoryAppGateway: NativeAppGateway {
         ]
     }
 
-    func generatePlan(input: PlanGenerationInput) async throws -> String {
+    func generatePlan(
+        input: PlanGenerationInput,
+        onProgress: ((GenerationProgressUpdate) -> Void)?
+    ) async throws -> String {
         let _ = input
+        onProgress?(
+            GenerationProgressUpdate(
+                stage: .completed,
+                message: "In-memory gateway completed generation.",
+                streamedCharacters: 0
+            )
+        )
         return "Plan generation wiring complete. Anthropic + validator flow will execute through integrations in runtime setup."
     }
 

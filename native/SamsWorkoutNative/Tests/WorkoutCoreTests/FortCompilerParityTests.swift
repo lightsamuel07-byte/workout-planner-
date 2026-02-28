@@ -154,11 +154,66 @@ final class FortCompilerParityTests: XCTestCase {
     15 DEGREE DB BENCH PRESS
     """
 
+    private let breakthroughSample = """
+    MONDAY 3.02.26
+    Breakthrough Season #1
+    THAW:
+    This week we focus on aerobic power.
+    PREPARE TO ENGAGE
+    CROSSOVER SYMMETRY W/Y NEGATIVE
+    TERMINAL KNEE EXTENSION
+    COMPLETE
+    PULL UPS EVERY DAY
+    PULL UP
+    COMPLETE
+    THE REPLACEMENTS
+    SPLIT SQUAT
+    COMPLETE
+    THE PAY OFF
+    60 DEGREE INCLINE BENCH PRESS
+    OFFSET DB RDL CONTRALATERAL
+    SINGLE ARM DB ROW
+    COMPLETE
+    THAW - AEROBIC POWER
+    ROWERG
+    Examples
+    30 seconds at 392
+    Meters
+    """
+
+    private let dynamicAliasSample = """
+    MONDAY 3.09.26
+    New Season #1
+    SPARK ZONE
+    CROSSOVER SYMMETRY W/Y NEGATIVE
+    TERMINAL KNEE EXTENSION
+    COMPLETE
+    VERTICAL LADDER
+    PULL UP
+    COMPLETE
+    PRIMARY DRIVER
+    SPLIT SQUAT
+    COMPLETE
+    SUPPORT BUILDER
+    SINGLE ARM DB ROW
+    ZOTTMAN CURL
+    COMPLETE
+    ENGINE BUILDER
+    ROWERG
+    """
+
     func testFindFirstSectionIndexSkipsNarrativeLines() {
         let lines = devilDaySample.components(separatedBy: .newlines)
         let index = findFirstSectionIndex(lines: lines)
         XCTAssertNotNil(index)
         XCTAssertTrue(lines[index ?? 0].contains("IGNITION - KOT WARM-UP"))
+    }
+
+    func testFindFirstSectionIndexDetectsDynamicUnknownHeaders() {
+        let lines = dynamicAliasSample.components(separatedBy: .newlines)
+        let index = findFirstSectionIndex(lines: lines)
+        XCTAssertNotNil(index)
+        XCTAssertTrue(lines[index ?? 0].contains("SPARK ZONE"))
     }
 
     func testParseFortDayHandlesNonClusterProgram() {
@@ -390,6 +445,42 @@ final class FortCompilerParityTests: XCTestCase {
         )
         let codes = Set(fidelity.violations.map(\.code))
         XCTAssertFalse(codes.contains("fort_missing_anchor"))
+    }
+
+    func testParseFortDayRecognizesBreakthroughSectionsAndFiltersTableNoise() {
+        let parsed = parseFortDay(dayName: "Monday", workoutText: breakthroughSample)
+        let sectionIDs = Set(parsed.sections.map(\.sectionID))
+
+        XCTAssertTrue(sectionIDs.contains("prep_mobility"))
+        XCTAssertTrue(sectionIDs.contains("strength_build"))
+        XCTAssertTrue(sectionIDs.contains("strength_work"))
+        XCTAssertTrue(sectionIDs.contains("auxiliary_hypertrophy"))
+        XCTAssertTrue(sectionIDs.contains("conditioning"))
+
+        let allExercises = Set(parsed.sections.flatMap(\.exercises))
+        XCTAssertTrue(allExercises.contains("PULL UP"))
+        XCTAssertTrue(allExercises.contains("SPLIT SQUAT"))
+        XCTAssertTrue(allExercises.contains("ROWERG"))
+        XCTAssertFalse(allExercises.contains("PREPARE TO ENGAGE"))
+        XCTAssertFalse(allExercises.contains("METERS"))
+        XCTAssertFalse(allExercises.contains("EXAMPLES"))
+        XCTAssertFalse(allExercises.contains("30 seconds at 392"))
+    }
+
+    func testParseFortDayInfersDynamicUnknownSectionAliases() {
+        let parsed = parseFortDay(dayName: "Monday", workoutText: dynamicAliasSample)
+        let sectionIDs = Set(parsed.sections.map(\.sectionID))
+
+        XCTAssertTrue(sectionIDs.contains("prep_mobility"))
+        XCTAssertTrue(sectionIDs.contains("strength_build"))
+        XCTAssertTrue(sectionIDs.contains("strength_work"))
+        XCTAssertTrue(sectionIDs.contains("auxiliary_hypertrophy"))
+        XCTAssertTrue(sectionIDs.contains("conditioning"))
+
+        let allExercises = Set(parsed.sections.flatMap(\.exercises))
+        XCTAssertTrue(allExercises.contains("PULL UP"))
+        XCTAssertTrue(allExercises.contains("SPLIT SQUAT"))
+        XCTAssertTrue(allExercises.contains("ROWERG"))
     }
 
     func testRepairPlanFortAnchorsRebuildsDayAndDropsNoiseRows() {

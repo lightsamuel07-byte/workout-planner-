@@ -91,6 +91,10 @@ struct LiveAppGateway: NativeAppGateway {
         .dashboard
     }
 
+    func generatePlan(input: PlanGenerationInput) async throws -> String {
+        try await generatePlan(input: input, onProgress: nil)
+    }
+
     func loadDashboardDays() -> [DayPlanSummary] {
         if let snapshot = try? loadLocalPlanSnapshot(), !snapshot.days.isEmpty {
             return snapshot.days.map { day in
@@ -114,8 +118,39 @@ struct LiveAppGateway: NativeAppGateway {
         ]
     }
 
-    func generatePlan(input: PlanGenerationInput) async throws -> String {
+    func generatePlan(
+        input: PlanGenerationInput,
+        onProgress: ((GenerationProgressUpdate) -> Void)?
+    ) async throws -> String {
         let config = try requireGenerationSetup()
+        let progressCallback = ThreadSafeBox(onProgress)
+        let emitFromStream: @Sendable (GenerationProgressUpdate) -> Void = { update in
+            Task { @MainActor in
+                progressCallback.get()?(update)
+            }
+        }
+        func emit(
+            _ stage: GenerationProgressStage,
+            _ message: String,
+            streamedCharacters: Int? = nil,
+            inputTokens: Int? = nil,
+            outputTokens: Int? = nil,
+            previewTail: String? = nil,
+            correctionAttempt: Int? = nil
+        ) {
+            progressCallback.get()?(
+                GenerationProgressUpdate(
+                    stage: stage,
+                    message: message,
+                    streamedCharacters: streamedCharacters,
+                    inputTokens: inputTokens,
+                    outputTokens: outputTokens,
+                    previewTail: previewTail,
+                    correctionAttempt: correctionAttempt
+                )
+            )
+        }
+        emit(.preparing, "Preparing generation inputs and setup checks.")
 
         let fortInputMap = [
             "Monday": input.monday,
@@ -123,6 +158,7 @@ struct LiveAppGateway: NativeAppGateway {
             "Friday": input.friday,
         ]
         let (fortContext, fortMetadata) = buildFortCompilerContext(dayTextMap: fortInputMap)
+        emit(.normalizingFort, "Fort input normalized locally before model request.")
         let aliases = loadExerciseAliases()
         let priorSupplemental = try await loadPriorSupplementalForProgression(config: config)
         let progressionRules = buildProgressionDirectives(priorSupplemental: priorSupplemental)
@@ -144,10 +180,81 @@ struct LiveAppGateway: NativeAppGateway {
             maxTokens: 4096
         )
 
+        emit(.requestingModel, "Requesting plan from Anthropic.")
+        let streamedCharsBox = ThreadSafeBox(0)
+        let latestInputTokensBox = ThreadSafeBox<Int?>(nil)
+        let latestOutputTokensBox = ThreadSafeBox<Int?>(nil)
+        let latestPreviewTailBox = ThreadSafeBox("")
         let generation = try await anthropic.generatePlan(
             systemPrompt: "You generate deterministic weekly workout plans in strict markdown format.",
-            userPrompt: prompt
+            userPrompt: prompt,
+            onEvent: { event in
+                switch event {
+                case .requestStarted:
+                    emitFromStream(
+                        GenerationProgressUpdate(
+                            stage: .streamingResponse,
+                            message: "Model stream opened."
+                        )
+                    )
+                case .messageStarted(_, let inputTokens):
+                    latestInputTokensBox.set(inputTokens)
+                    emitFromStream(
+                        GenerationProgressUpdate(
+                            stage: .streamingResponse,
+                            message: "Model response started.",
+                            streamedCharacters: streamedCharsBox.get(),
+                            inputTokens: latestInputTokensBox.get()
+                        )
+                    )
+                case .textDelta(let chunk, let totalCharacters):
+                    streamedCharsBox.set(totalCharacters)
+                    var previewTail = latestPreviewTailBox.get() + chunk
+                    if previewTail.count > 320 {
+                        previewTail = String(previewTail.suffix(320))
+                    }
+                    latestPreviewTailBox.set(previewTail)
+                    emitFromStream(
+                        GenerationProgressUpdate(
+                            stage: .streamingResponse,
+                            message: "Streaming model response…",
+                            streamedCharacters: streamedCharsBox.get(),
+                            inputTokens: latestInputTokensBox.get(),
+                            outputTokens: latestOutputTokensBox.get(),
+                            previewTail: previewTail
+                        )
+                    )
+                case .messageDelta(_, let outputTokens):
+                    if let outputTokens {
+                        latestOutputTokensBox.set(outputTokens)
+                    }
+                    emitFromStream(
+                        GenerationProgressUpdate(
+                            stage: .streamingResponse,
+                            message: "Streaming model response…",
+                            streamedCharacters: streamedCharsBox.get(),
+                            inputTokens: latestInputTokensBox.get(),
+                            outputTokens: latestOutputTokensBox.get(),
+                            previewTail: latestPreviewTailBox.get()
+                        )
+                    )
+                case .messageStopped:
+                    emitFromStream(
+                        GenerationProgressUpdate(
+                            stage: .validating,
+                            message: "Model stream complete. Running deterministic repairs and validation.",
+                            streamedCharacters: streamedCharsBox.get(),
+                            inputTokens: latestInputTokensBox.get(),
+                            outputTokens: latestOutputTokensBox.get(),
+                            previewTail: latestPreviewTailBox.get()
+                        )
+                    )
+                }
+            }
         )
+        let streamedChars = streamedCharsBox.get()
+        let latestInputTokens = latestInputTokensBox.get()
+        let latestOutputTokens = latestOutputTokensBox.get()
         var plan = generation.text
         var repairResult = applyDeterministicRepairs(
             planText: plan,
@@ -167,6 +274,14 @@ struct LiveAppGateway: NativeAppGateway {
         var unresolved: [any ViolationDescribing] = validation.violations + fidelity.violations
         var correctionAttempts = 0
         while !unresolved.isEmpty, correctionAttempts < 2 {
+            emit(
+                .correcting,
+                "Applying correction pass \(correctionAttempts + 1) for \(unresolved.count) unresolved issue(s).",
+                streamedCharacters: streamedChars,
+                inputTokens: latestInputTokens ?? generation.inputTokens,
+                outputTokens: latestOutputTokens ?? generation.outputTokens,
+                correctionAttempt: correctionAttempts + 1
+            )
             let correctionPrompt = buildCorrectionPrompt(
                 plan: plan,
                 unresolvedViolations: unresolved,
@@ -175,7 +290,8 @@ struct LiveAppGateway: NativeAppGateway {
             )
             let correction = try await anthropic.generatePlan(
                 systemPrompt: nil,
-                userPrompt: correctionPrompt
+                userPrompt: correctionPrompt,
+                onEvent: nil
             )
             plan = correction.text
             let correctionRepair = applyDeterministicRepairs(
@@ -199,6 +315,13 @@ struct LiveAppGateway: NativeAppGateway {
             correctionAttempts += 1
         }
 
+        emit(
+            .writingOutputs,
+            "Writing local output and preparing Google Sheets rows.",
+            streamedCharacters: streamedChars,
+            inputTokens: latestInputTokens ?? generation.inputTokens,
+            outputTokens: latestOutputTokens ?? generation.outputTokens
+        )
         let validationSummary = """
         \(validation.summary) \(fidelity.summary) \
         Locked directives applied: \(repairResult.lockedApplied). \
@@ -227,6 +350,7 @@ struct LiveAppGateway: NativeAppGateway {
         switch planWriteMode {
         case .normal:
             if let sheetsClient = try? await makeSheetsClient(config: config) {
+                emit(.syncingDatabase, "Writing plan to Google Sheets.")
                 do {
                     try await sheetsClient.writeWeeklyPlanRows(
                         sheetName: sheetName,
@@ -241,6 +365,14 @@ struct LiveAppGateway: NativeAppGateway {
         case .localOnly:
             sheetStatus = "Google Sheets write skipped (local-only mode)."
         }
+
+        emit(
+            .completed,
+            "Generation completed successfully.",
+            streamedCharacters: streamedChars,
+            inputTokens: latestInputTokens ?? generation.inputTokens,
+            outputTokens: latestOutputTokens ?? generation.outputTokens
+        )
 
         return """
         Generated \(sheetName).
@@ -588,7 +720,12 @@ struct LiveAppGateway: NativeAppGateway {
 private extension LiveAppGateway {
     static let dayHeaderRegex = try! NSRegularExpression(pattern: "^##\\s+(.+)$", options: [])
     static let exerciseHeaderRegex = try! NSRegularExpression(pattern: "^###\\s+([A-Z]\\d+)\\.\\s+(.+)$", options: [.caseInsensitive])
-    static let prescriptionRegex = try! NSRegularExpression(pattern: "^-\\s*(\\d+)\\s*x\\s*([\\d:]+)\\s*@\\s*([\\d]+(?:\\.\\d+)?)\\s*kg\\b", options: [.caseInsensitive])
+    static let prescriptionRegex = try! NSRegularExpression(pattern: "^-\\s*(\\d+)\\s*x\\s*(.+?)\\s*@\\s*(.+)$", options: [.caseInsensitive])
+    static let prescriptionRepsUnitRegex = try! NSRegularExpression(
+        pattern: "\\b(reps?|seconds?|secs?|minutes?|mins?|meters?|miles?)\\b",
+        options: [.caseInsensitive]
+    )
+    static let numericTokenRegex = try! NSRegularExpression(pattern: "[-+]?\\d+(?:\\.\\d+)?", options: [])
     static let rangeRegex = try! NSRegularExpression(pattern: "(\\d+)\\s*[-–]\\s*(\\d+)", options: [])
 
     struct RepairOutcome {
@@ -854,6 +991,7 @@ private extension LiveAppGateway {
 
         CORE PRINCIPLES:
         - Supplemental days (Tue/Thu/Sat) support Fort work with arm/shoulder/upper chest/back detail.
+        - Supplemental days must be substantive: minimum 3 exercises on each of Tue, Thu, and Sat.
         - Preserve explicit keep/stay-here progression constraints from prior logs.
         - Never increase both reps and load in the same week for the same exercise.
 
@@ -902,7 +1040,8 @@ private extension LiveAppGateway {
         - Respect explicit keep/stay-here progression constraints from prior logs.
         - Never emit section labels or instructional lines as exercises.
 
-        Return the full corrected plan in the same markdown format.
+        Return ONLY the full corrected plan in the same markdown format.
+        Do not include analysis, reasoning, or any text before or after the plan markdown.
 
         PLAN:
         \(plan)
@@ -1460,13 +1599,10 @@ private extension LiveAppGateway {
                         break
                     }
 
-                    if let rx = firstMatch(Self.prescriptionRegex, text: probe),
-                       let pSets = rx[0],
-                       let pReps = rx[1],
-                       let pLoad = rx[2] {
-                        sets = pSets
-                        reps = pReps
-                        load = pLoad
+                    if let parsed = parsePrescriptionLine(probe) {
+                        sets = parsed.sets
+                        reps = parsed.reps
+                        load = parsed.load
                     } else if probe.lowercased().hasPrefix("- **rest:**") {
                         rest = probe.replacingOccurrences(of: "- **Rest:**", with: "", options: [.caseInsensitive]).trimmingCharacters(in: .whitespaces)
                     } else if probe.lowercased().hasPrefix("- **notes:**") {
@@ -1620,6 +1756,41 @@ private extension LiveAppGateway {
         return captures
     }
 
+    func parsePrescriptionLine(_ line: String) -> (sets: String, reps: String, load: String)? {
+        guard let match = Self.prescriptionRegex.firstMatch(in: line, options: [], range: nsRange(line)),
+              let setsRange = Range(match.range(at: 1), in: line),
+              let repsRange = Range(match.range(at: 2), in: line),
+              let loadRange = Range(match.range(at: 3), in: line)
+        else {
+            return nil
+        }
+
+        let sets = String(line[setsRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let repsRaw = String(line[repsRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+        let loadRaw = String(line[loadRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+
+        let repsSansUnits = Self.prescriptionRepsUnitRegex.stringByReplacingMatches(
+            in: repsRaw,
+            options: [],
+            range: nsRange(repsRaw),
+            withTemplate: ""
+        )
+        let cleanedReps = repsSansUnits
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        let reps = cleanedReps.isEmpty ? repsRaw : cleanedReps
+
+        let load: String
+        if let loadMatch = Self.numericTokenRegex.firstMatch(in: loadRaw, options: [], range: nsRange(loadRaw)),
+           let tokenRange = Range(loadMatch.range(at: 0), in: loadRaw) {
+            load = String(loadRaw[tokenRange])
+        } else {
+            load = loadRaw
+        }
+
+        return (sets, reps, load)
+    }
+
     func normalizedPlanTitle(_ raw: String) -> String {
         raw
             .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
@@ -1667,5 +1838,10 @@ extension LiveAppGateway {
         let gateway = LiveAppGateway(nowProvider: { nowDate }, planWriteMode: .localOnly)
         let result = gateway.sanitizedSheetReferenceDate(referenceDate)
         return (result.date, result.wasSanitized)
+    }
+
+    static func testMarkdownDaysToPlanDays(_ planText: String) -> [PlanDayDetail] {
+        let gateway = LiveAppGateway(planWriteMode: .localOnly)
+        return gateway.markdownDaysToPlanDays(planText: planText, source: .localCache)
     }
 }
