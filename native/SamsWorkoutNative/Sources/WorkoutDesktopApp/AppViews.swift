@@ -1,5 +1,6 @@
 import SwiftUI
 import AppKit
+import WorkoutCore
 
 struct NativeWorkoutRootView: View {
     @StateObject private var coordinator = AppCoordinator(gateway: LiveAppGateway())
@@ -669,6 +670,9 @@ struct GeneratePlanPageView: View {
                             .foregroundStyle(.tertiary)
                     }
                 }
+
+                // Fort Parsing Preview — lets you verify section detection before spending tokens
+                FortPreviewPanel(coordinator: coordinator)
 
                 Toggle(isOn: $coordinator.generationInput.isNewCycle) {
                     HStack(spacing: 6) {
@@ -2061,5 +2065,263 @@ struct SettingsPageView: View {
         .onAppear {
             coordinator.loadOneRepMaxFields()
         }
+    }
+}
+
+// MARK: - Fort Normalization Preview
+
+/// Collapsible panel showing what the Fort compiler extracted from the three input days.
+/// Shows per-section breakdown with exercises and block letters.
+/// Inferred (dynamically-classified) sections get a section-type picker so you can correct them.
+struct FortPreviewPanel: View {
+    @ObservedObject var coordinator: AppCoordinator
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $coordinator.showFortPreview) {
+            VStack(alignment: .leading, spacing: 16) {
+                ForEach(["Monday", "Wednesday", "Friday"], id: \.self) { day in
+                    if let parsed = coordinator.fortParsedDays[day] {
+                        FortDayPreviewView(
+                            dayName: day,
+                            parsed: parsed,
+                            overrides: coordinator.generationInput.fortSectionOverrides[day] ?? [:],
+                            onOverride: { header, sectionID in
+                                coordinator.setFortSectionOverride(day: day, rawHeader: header, sectionID: sectionID)
+                            }
+                        )
+                    } else {
+                        Text("\(day): no input parsed yet")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Button("Clear All Saved Section Overrides") {
+                    UserDefaults.standard.removeObject(forKey: "fortSectionOverrides")
+                    for dayName in ["Monday", "Wednesday", "Friday"] {
+                        coordinator.generationInput.fortSectionOverrides[dayName] = nil
+                    }
+                    coordinator.refreshFortPreview()
+                }
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            }
+            .padding(.top, 8)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "wand.and.sparkles")
+                    .foregroundStyle(.purple)
+                Text("Fort Parsing Preview")
+                    .font(.callout.weight(.medium))
+                Spacer()
+                Button("Parse Now") {
+                    coordinator.refreshFortPreview()
+                    coordinator.showFortPreview = true
+                }
+                .font(.caption)
+                .buttonStyle(.bordered)
+                .controlSize(.mini)
+            }
+        }
+        .padding(12)
+        .background(Color(NSColor.controlBackgroundColor).opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+/// Per-day breakdown of parsed sections with block letters, exercise lists, and type pickers.
+struct FortDayPreviewView: View {
+    let dayName: String
+    let parsed: FortParsedDay
+    let overrides: [String: String]
+    let onOverride: (String, String) -> Void
+
+    private var confidenceColor: Color {
+        parsed.confidence >= 0.75 ? .green : parsed.confidence >= 0.5 ? .orange : .red
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 6) {
+                Text(dayName.uppercased())
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.primary)
+                if !parsed.titleLine.isEmpty {
+                    Text("— \(parsed.titleLine)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+                let excCount = parsed.compiledSections.reduce(0) { $0 + $1.exercises.count }
+                Text("\(parsed.compiledSections.count) sections · \(excCount) anchors")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Circle()
+                    .fill(confidenceColor)
+                    .frame(width: 8, height: 8)
+            }
+
+            if parsed.compiledSections.isEmpty {
+                Text("No sections detected — check input text")
+                    .font(.caption)
+                    .foregroundStyle(.orange)
+                    .padding(.leading, 4)
+            } else {
+                ForEach(parsed.sections, id: \.rawHeader) { section in
+                    FortSectionRowView(
+                        section: section,
+                        compiledSection: parsed.compiledSections.first(where: { $0.rawHeader == section.rawHeader }),
+                        onOverride: onOverride
+                    )
+                }
+            }
+
+            if !parsed.warnings.isEmpty {
+                ForEach(parsed.warnings, id: \.self) { warning in
+                    Label(warning, systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+        }
+        .padding(10)
+        .background(Color(NSColor.windowBackgroundColor))
+        .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+/// Single section row: block letter badge, raw header, section type label, exercise pills.
+/// Inferred sections show a dropdown picker to correct the type.
+struct FortSectionRowView: View {
+    let section: FortParsedSection
+    let compiledSection: FortCompiledSection?
+    let onOverride: (String, String) -> Void
+
+    private static let sectionOptions: [(id: String, label: String)] = [
+        ("prep_mobility",         "Warmup / Mobility [A]"),
+        ("strength_build",        "Pull Practice / Build-Up [B]"),
+        ("strength_work",         "Main Lift / Strength [C]"),
+        ("strength_backoff",      "Back-Offs [D]"),
+        ("auxiliary_hypertrophy", "Auxiliary / Hypertrophy [E]"),
+        ("conditioning",          "Conditioning / THAW [F]"),
+    ]
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 8) {
+            // Block letter badge
+            Text(compiledSection?.blockLetter ?? "?")
+                .font(.system(.caption2, design: .monospaced).weight(.bold))
+                .foregroundStyle(section.isInferred ? .orange : .secondary)
+                .frame(width: 18, height: 18)
+                .background(
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(section.isInferred ? Color.orange.opacity(0.15) : Color(NSColor.controlBackgroundColor))
+                )
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    // Raw header
+                    Text(section.rawHeader)
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    if section.isInferred {
+                        Image(systemName: "questionmark.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.orange)
+                    }
+
+                    Spacer()
+
+                    // Section type: picker for inferred, label for confirmed
+                    if section.isInferred {
+                        Picker("", selection: Binding(
+                            get: { section.sectionID },
+                            set: { onOverride(section.rawHeader, $0) }
+                        )) {
+                            ForEach(Self.sectionOptions, id: \.id) { option in
+                                Text(option.label).tag(option.id)
+                            }
+                        }
+                        .labelsHidden()
+                        .font(.caption2)
+                        .controlSize(.mini)
+                        .frame(maxWidth: 200)
+                    } else {
+                        Text("→ \(section.sectionLabel)")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Exercise pills
+                if !section.exercises.isEmpty {
+                    FlowLayout(spacing: 4) {
+                        ForEach(section.exercises, id: \.self) { exercise in
+                            Text(exercise)
+                                .font(.system(size: 10))
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 2)
+                                .background(Color(NSColor.controlBackgroundColor))
+                                .clipShape(Capsule())
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } else {
+                    Text("no exercises extracted")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .italic()
+                }
+            }
+        }
+    }
+}
+
+/// Simple horizontal wrapping layout for exercise pills.
+struct FlowLayout: Layout {
+    var spacing: CGFloat = 4
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) -> CGSize {
+        let maxWidth = proposal.width ?? 400
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var rowHeight: CGFloat = 0
+        var totalHeight: CGFloat = 0
+
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x + size.width > maxWidth, x > 0 {
+                y += rowHeight + spacing
+                x = 0
+                rowHeight = 0
+                totalHeight = y
+            }
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        totalHeight += rowHeight
+        return CGSize(width: maxWidth, height: totalHeight)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout Void) {
+        let maxWidth = bounds.width
+        var x = bounds.minX
+        var y = bounds.minY
+        var rowHeight: CGFloat = 0
+
+        for view in subviews {
+            let size = view.sizeThatFits(.unspecified)
+            if x + size.width > bounds.maxX, x > bounds.minX {
+                y += rowHeight + spacing
+                x = bounds.minX
+                rowHeight = 0
+            }
+            view.place(at: CGPoint(x: x, y: y), proposal: .unspecified)
+            x += size.width + spacing
+            rowHeight = max(rowHeight, size.height)
+        }
+        _ = maxWidth  // suppress unused warning
     }
 }

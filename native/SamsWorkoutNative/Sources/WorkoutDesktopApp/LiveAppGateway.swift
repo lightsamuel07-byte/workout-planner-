@@ -157,7 +157,7 @@ struct LiveAppGateway: NativeAppGateway {
             "Wednesday": input.wednesday,
             "Friday": input.friday,
         ]
-        let (fortContext, fortMetadata) = buildFortCompilerContext(dayTextMap: fortInputMap)
+        let (fortContext, fortMetadata) = buildFortCompilerContext(dayTextMap: fortInputMap, sectionOverrides: input.fortSectionOverrides)
         emit(.normalizingFort, "Fort input normalized locally before model request.")
         let aliases = loadExerciseAliases()
         let priorSupplemental = try await loadPriorSupplementalForProgression(config: config)

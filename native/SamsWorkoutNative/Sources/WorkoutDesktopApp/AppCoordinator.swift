@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 import SwiftUI
+import WorkoutCore
 
 @MainActor
 final class AppCoordinator: ObservableObject {
@@ -54,6 +55,9 @@ final class AppCoordinator: ObservableObject {
     @Published var showAddScanSheet = false
     @Published var inBodyScanStatus = ""
 
+    // Fort Normalization Preview
+    @Published var showFortPreview = false
+    @Published var fortParsedDays: [String: FortParsedDay] = [:]
 
     private let gateway: NativeAppGateway
     private let configStore: AppConfigurationStore
@@ -926,6 +930,47 @@ if !generationStatus.isEmpty {
         generationOutputTokenCount = nil
         generationPreviewTail = ""
         generationProgressLog = []
+        fortParsedDays = [:]
+    }
+
+    /// Parse the current Fort text fields and populate fortParsedDays for the preview panel.
+    func refreshFortPreview() {
+        let overrides = generationInput.fortSectionOverrides
+        for dayName in ["Monday", "Wednesday", "Friday"] {
+            let text: String
+            switch dayName {
+            case "Monday": text = generationInput.monday
+            case "Wednesday": text = generationInput.wednesday
+            case "Friday": text = generationInput.friday
+            default: text = ""
+            }
+            let dayOverrides = overrides[dayName] ?? [:]
+            fortParsedDays[dayName] = parseFortDay(dayName: dayName, workoutText: text, sectionOverrides: dayOverrides)
+        }
+    }
+
+    /// Save a user-confirmed section type override and re-parse the preview.
+    func setFortSectionOverride(day: String, rawHeader: String, sectionID: String) {
+        var dayOverrides = generationInput.fortSectionOverrides[day] ?? [:]
+        dayOverrides[rawHeader.uppercased()] = sectionID
+        generationInput.fortSectionOverrides[day] = dayOverrides
+
+        // Persist globally in UserDefaults so it survives across sessions
+        var global = (UserDefaults.standard.dictionary(forKey: "fortSectionOverrides") as? [String: String]) ?? [:]
+        global[rawHeader.uppercased()] = sectionID
+        UserDefaults.standard.set(global, forKey: "fortSectionOverrides")
+
+        refreshFortPreview()
+    }
+
+    /// Load any globally saved section overrides into the current generation input.
+    func loadSavedFortSectionOverrides() {
+        guard let global = UserDefaults.standard.dictionary(forKey: "fortSectionOverrides") as? [String: String],
+              !global.isEmpty else { return }
+        // Apply saved overrides to all three days
+        for dayName in ["Monday", "Wednesday", "Friday"] {
+            generationInput.fortSectionOverrides[dayName] = global
+        }
     }
 
     func resetPlanFilters() {
@@ -1099,6 +1144,7 @@ if !generationStatus.isEmpty {
         )
         isSetupComplete = true
         loadOneRepMaxFields()
+        loadSavedFortSectionOverrides()
         Task {
             await refreshPlanSnapshot()
             // Rebuild DB cache in the background so log data is always fresh on launch.

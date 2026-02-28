@@ -38,13 +38,16 @@ public struct FortParsedSection: Equatable, Sendable {
     public let blockHint: String
     public let rawHeader: String
     public let exercises: [String]
+    /// True when the section type was inferred dynamically (not matched by a static rule).
+    public let isInferred: Bool
 
-    public init(sectionID: String, sectionLabel: String, blockHint: String, rawHeader: String, exercises: [String]) {
+    public init(sectionID: String, sectionLabel: String, blockHint: String, rawHeader: String, exercises: [String], isInferred: Bool = false) {
         self.sectionID = sectionID
         self.sectionLabel = sectionLabel
         self.blockHint = blockHint
         self.rawHeader = rawHeader
         self.exercises = exercises
+        self.isInferred = isInferred
     }
 }
 
@@ -183,6 +186,7 @@ private struct MutableSection {
     let blockHint: String
     let rawHeader: String
     var exercises: [String]
+    var isInferred: Bool = false
 }
 
 private struct DaySegment {
@@ -561,7 +565,8 @@ private func normalizeDynamicSections(_ sections: [MutableSection]) -> [MutableS
             sectionLabel: canonical.sectionLabel,
             blockHint: canonical.blockHint,
             rawHeader: normalized[index].rawHeader,
-            exercises: normalized[index].exercises
+            exercises: normalized[index].exercises,
+            isInferred: true  // Mark as dynamically inferred — user may want to correct
         )
         usedIDs.insert(inferredID)
     }
@@ -809,7 +814,10 @@ private func renderDayTemplate(day: String, titleLine: String, sections: [FortCo
     return lines.joined(separator: "\n")
 }
 
-public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay {
+/// Parse a single Fort workout day.
+/// - Parameter sectionOverrides: Maps rawHeader (uppercased) → sectionID for user-confirmed section types.
+///   Overrides take priority over both static regex rules and dynamic inference.
+public func parseFortDay(dayName: String, workoutText: String, sectionOverrides: [String: String] = [:]) -> FortParsedDay {
     let text = workoutText.trimmingCharacters(in: .whitespacesAndNewlines)
     let lines = text.components(separatedBy: .newlines)
     let (dateLine, titleLine) = extractDayHeader(lines)
@@ -835,6 +843,24 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
             if matchSectionRule(maybeSection) != nil || isPotentialSectionHeader(maybeSection) {
                 line = maybeSection
             }
+        }
+
+        // User-confirmed overrides take priority over everything else
+        if let overrideSectionID = sectionOverrides[line.uppercased()],
+           matchSectionRule(line) == nil || true {  // always prefer override
+            let canonical = canonicalSectionDefinition(overrideSectionID)
+            let section = MutableSection(
+                sectionID: overrideSectionID,
+                sectionLabel: canonical.sectionLabel,
+                blockHint: canonical.blockHint,
+                rawHeader: line,
+                exercises: [],
+                isInferred: false  // user-confirmed
+            )
+            sections.append(section)
+            currentSectionIndex = sections.count - 1
+            sawCompleteBoundary = false
+            continue
         }
 
         if let rule = matchSectionRule(line) {
@@ -893,7 +919,8 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
             sectionLabel: $0.sectionLabel,
             blockHint: $0.blockHint,
             rawHeader: $0.rawHeader,
-            exercises: $0.exercises
+            exercises: $0.exercises,
+            isInferred: $0.isInferred
         )
     }
 
@@ -931,12 +958,15 @@ public func parseFortDay(dayName: String, workoutText: String) -> FortParsedDay 
     )
 }
 
-public func buildFortCompilerContext(dayTextMap: [String: String], maxExercisesPerSection: Int = 4) -> (String, FortCompilerMetadata) {
+/// Build the full Fort compiler context string and metadata for generation.
+/// - Parameter sectionOverrides: day → (rawHeader → sectionID) user-confirmed mappings.
+public func buildFortCompilerContext(dayTextMap: [String: String], sectionOverrides: [String: [String: String]] = [:], maxExercisesPerSection: Int = 4) -> (String, FortCompilerMetadata) {
     var parsedDays: [FortParsedDay] = []
     let orderedDays = ["Monday", "Wednesday", "Friday"]
 
     for dayName in orderedDays {
-        let parsed = parseFortDay(dayName: dayName, workoutText: dayTextMap[dayName] ?? "")
+        let dayOverrides = sectionOverrides[dayName] ?? [:]
+        let parsed = parseFortDay(dayName: dayName, workoutText: dayTextMap[dayName] ?? "", sectionOverrides: dayOverrides)
         let compiledSections = buildCompiledTemplates(parsed.sections, maxExercisesPerSection: maxExercisesPerSection)
         let compiledTemplate = renderDayTemplate(day: parsed.day, titleLine: parsed.titleLine, sections: compiledSections)
 

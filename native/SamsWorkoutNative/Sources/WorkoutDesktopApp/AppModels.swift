@@ -102,6 +102,9 @@ struct PlanGenerationInput: Equatable {
     var wednesday: String = ""
     var friday: String = ""
     var isNewCycle: Bool = false
+    /// User-confirmed section type overrides: day → rawHeader.uppercased() → sectionID.
+    /// Applied by parseFortDay to fix misclassified dynamic sections.
+    var fortSectionOverrides: [String: [String: String]] = [:]
 
     var canGenerate: Bool {
         !monday.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty &&
