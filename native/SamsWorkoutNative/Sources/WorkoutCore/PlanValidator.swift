@@ -402,11 +402,24 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
             )
             continue
         }
-        if dayEntries.count < 3 {
+        if dayEntries.count < 5 {
             addViolation(
                 &violations,
                 code: "supplemental_day_underfilled",
-                message: "Supplemental day \(day) has only \(dayEntries.count) exercise(s); minimum expected is 3.",
+                message: "Supplemental day \(day) has only \(dayEntries.count) exercise(s); minimum expected is 5.",
+                day: day
+            )
+        }
+
+        let hasMcGill = dayEntries.contains { entry in
+            let n = normalizeText(entry.exercise)
+            return n.contains("mcgill") || (n.contains("big") && n.contains("3"))
+        }
+        if !hasMcGill {
+            addViolation(
+                &violations,
+                code: "missing_mcgill_big3",
+                message: "Supplemental day \(day) is missing McGill Big-3 (curl-up, side bridge, bird-dog).",
                 day: day
             )
         }

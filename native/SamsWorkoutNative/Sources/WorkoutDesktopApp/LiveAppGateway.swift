@@ -255,7 +255,7 @@ struct LiveAppGateway: NativeAppGateway {
         let streamedChars = streamedCharsBox.get()
         let latestInputTokens = latestInputTokensBox.get()
         let latestOutputTokens = latestOutputTokensBox.get()
-        var plan = generation.text
+        var plan = stripPlanPreamble(generation.text)
         var repairResult = applyDeterministicRepairs(
             planText: plan,
             progressionDirectives: planDirectives,
@@ -293,7 +293,7 @@ struct LiveAppGateway: NativeAppGateway {
                 userPrompt: correctionPrompt,
                 onEvent: nil
             )
-            plan = correction.text
+            plan = stripPlanPreamble(correction.text)
             let correctionRepair = applyDeterministicRepairs(
                 planText: plan,
                 progressionDirectives: planDirectives,
@@ -991,7 +991,8 @@ private extension LiveAppGateway {
 
         CORE PRINCIPLES:
         - Supplemental days (Tue/Thu/Sat) support Fort work with arm/shoulder/upper chest/back detail.
-        - Supplemental days must be substantive: minimum 3 exercises on each of Tue, Thu, and Sat.
+        - Supplemental days must be substantive: minimum 5 exercises on each of Tue, Thu, and Sat.
+        - Every supplemental day (Tue, Thu, Sat) MUST include McGill Big-3 (curl-up, side bridge, bird-dog). Label it as one block entry "McGill Big-3" with coaching cues in the Notes field.
         - Preserve explicit keep/stay-here progression constraints from prior logs.
         - Never increase both reps and load in the same week for the same exercise.
 
@@ -1039,9 +1040,11 @@ private extension LiveAppGateway {
         - Keep dumbbell parity rule (even DB loads, except main barbell lifts).
         - Respect explicit keep/stay-here progression constraints from prior logs.
         - Never emit section labels or instructional lines as exercises.
+        - Each supplemental day (Tue, Thu, Sat) must have at least 5 exercises.
+        - Each supplemental day must include McGill Big-3 (curl-up, side bridge, bird-dog).
 
-        Return ONLY the full corrected plan in the same markdown format.
-        Do not include analysis, reasoning, or any text before or after the plan markdown.
+        Return ONLY the full corrected plan in the same markdown format, starting directly with the first markdown header (# or ##).
+        Do not include analysis, reasoning, preamble, or any text before the plan markdown.
 
         PLAN:
         \(plan)
@@ -1092,6 +1095,19 @@ private extension LiveAppGateway {
             return joined
         }
         return String(joined.prefix(maxChars))
+    }
+
+    /// Strip any reasoning preamble Claude may have emitted before the plan begins.
+    /// Keeps everything from the first `# ` or `## ` header onward.
+    func stripPlanPreamble(_ text: String) -> String {
+        let lines = text.components(separatedBy: "\n")
+        for (index, line) in lines.enumerated() {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.hasPrefix("# ") || trimmed.hasPrefix("## ") {
+                return lines[index...].joined(separator: "\n")
+            }
+        }
+        return text
     }
 
     func applyDeterministicRepairs(

@@ -528,4 +528,124 @@ final class FortCompilerParityTests: XCTestCase {
         XCTAssertTrue(repaired.contains("### A1. AIR SQUAT"))
         XCTAssertTrue(repaired.contains("### F1. GARAGE - 2K BIKEERG"))
     }
+
+    // Real full-fidelity Fort app text (includes intro paragraph, table noise, set numbers, percentages)
+    private let breakthroughRealFortText = """
+    Monday 3.02.26Breakthrough Season #1
+    Prepare To Engage: A very brief mobility warm-up designed to get our joints prepared for our main strength section as well as providing some recovery from the heavy lifts we've done the past few training phases/test week.  Pull-Ups Every Day: As the name implies, we will be working on pull-ups each day of the program. On this Day One of the week we will be working on capacity and rep endurance with sets starting every minute.  The Replacements: This is our main strength work and will focus on building our squat strength while taking a break from bi-lateral back squats. Focus on full range of motion, balance and core stability here with each rep.  The Pay Off:  A giant set of auxiliary exercises that are designed to work at more challenging joint angles that will, once again, help us improve some of the typically weaker components of our main lifts. Really pay attention to rep control and tempo here. You should own every rep with the goal of maintaining perfect positions.  THAW: This week we will be focusing on Aerobic Power utilizing your test week numbers as targets for 8 minutes alternating between 30 seconds of fast and 30 seconds of slightly slower work. Sounds easier than it is.
+      PREPARE TO ENGAGE
+    1 Set
+    1
+    CROSSOVER SYMMETRY W/Y NEGATIVE
+    TIPS HISTORY
+    Reps
+    TERMINAL KNEE EXTENSION
+    HISTORY
+    Number of reps is per side
+    Reps
+    COMPLETE
+      PULL UPS EVERY DAY
+    PULL UP
+    TIPS HISTORY
+    Perform as an EMOM doing 4-8 reps per set. The only people doing 8 reps are those who can do them bodyweight. Otherwise use the lightest band possible that allows you to get at least 4 reps (prioritize less assistance even if that means less reps)
+    3 Sets
+    Reps
+    1
+    2
+    3
+    COMPLETE
+      THE REPLACEMENTS
+    SPLIT SQUAT
+    TIPS HISTORY
+    Barbell back racked split squats. Number of reps is per side. Complete all reps on one side prior to switching. Weight guidance is based on Back Squat 1RM
+    3 Sets
+    Reps
+    Weight
+    1
+    40%
+    2
+    40%
+    3
+    40%
+    COMPLETE
+      THE PAY OFF
+    Perform one set every 4 minutes
+    3 Sets
+    1
+    2
+    3
+    60 DEGREE INCLINE BENCH PRESS
+    HISTORY
+    Set Bench at 60 degrees. Take a brief pause at the chest (eliminate the bounce)
+    Reps
+    Weight
+    OFFSET DB RDL CONTRALATERAL
+    TIPS HISTORY
+    Controlled eccentric tempo, 1 second pause at the stretch. Number of reps is per side.
+    Reps
+    Weight
+    SINGLE ARM DB ROW
+    TIPS HISTORY
+    Controlled eccentric tempo, 1 second pause at the stretch. Number of reps is per side.
+    Reps
+    Weight
+    COMPLETE
+      THAW -  AEROBIC POWER
+    ROWERG
+    TIPS HISTORY
+    8 rounds of 30 seconds at 0-5 seconds slower than your 2k pace, 30 seconds at 15-20 seconds slower than your 2k pace. Track your overall 500m pace and your individual paces on each of the faster 8 efforts. If you can accumulate over 2k meters here you are doing well.
+    8 Sets
+    Time (mm:ss)
+    Other Number
+    1
+    2
+    3
+    4
+    5
+    6
+    7
+    8
+    Meters
+    Rx
+    """
+
+    func testParseFortDayRealBreakthroughTextExtractsAllSections() {
+        let parsed = parseFortDay(dayName: "Monday", workoutText: breakthroughRealFortText)
+        let sectionIDs = Set(parsed.sections.map(\.sectionID))
+        let allExercises = Set(parsed.sections.flatMap(\.exercises))
+
+        // All five section types must be present
+        XCTAssertTrue(sectionIDs.contains("prep_mobility"), "Missing prep_mobility (PREPARE TO ENGAGE)")
+        XCTAssertTrue(sectionIDs.contains("strength_build"), "Missing strength_build (PULL UPS EVERY DAY)")
+        XCTAssertTrue(sectionIDs.contains("strength_work"), "Missing strength_work (THE REPLACEMENTS)")
+        XCTAssertTrue(sectionIDs.contains("auxiliary_hypertrophy"), "Missing auxiliary_hypertrophy (THE PAY OFF)")
+        XCTAssertTrue(sectionIDs.contains("conditioning"), "Missing conditioning (THAW)")
+
+        // Core exercises must be extracted
+        XCTAssertTrue(allExercises.contains("CROSSOVER SYMMETRY W/Y NEGATIVE"), "Missing CROSSOVER SYMMETRY")
+        XCTAssertTrue(allExercises.contains("TERMINAL KNEE EXTENSION"), "Missing TERMINAL KNEE EXTENSION")
+        XCTAssertTrue(allExercises.contains("PULL UP"), "Missing PULL UP")
+        XCTAssertTrue(allExercises.contains("SPLIT SQUAT"), "Missing SPLIT SQUAT (main lift)")
+        XCTAssertTrue(allExercises.contains("60 DEGREE INCLINE BENCH PRESS"), "Missing INCLINE BENCH PRESS")
+        XCTAssertTrue(allExercises.contains("OFFSET DB RDL CONTRALATERAL"), "Missing OFFSET DB RDL")
+        XCTAssertTrue(allExercises.contains("SINGLE ARM DB ROW"), "Missing SINGLE ARM DB ROW")
+        XCTAssertTrue(allExercises.contains("ROWERG"), "Missing ROWERG")
+
+        // Section headers / noise must NOT appear as exercises
+        XCTAssertFalse(allExercises.contains("PREPARE TO ENGAGE"), "Section header leaked as exercise")
+        XCTAssertFalse(allExercises.contains("PULL UPS EVERY DAY"), "Section header leaked as exercise")
+        XCTAssertFalse(allExercises.contains("THE REPLACEMENTS"), "Section header leaked as exercise")
+        XCTAssertFalse(allExercises.contains("THE PAY OFF"), "Section header leaked as exercise")
+        XCTAssertFalse(allExercises.contains("METERS"), "Table header leaked as exercise")
+        XCTAssertFalse(allExercises.contains("Meters"), "Table header leaked as exercise")
+
+        // Compiled sections should have correct block letters (A, B, C, E, F — not F, G)
+        let compiled = parsed.compiledSections
+        let prepSection = compiled.first(where: { $0.sectionID == "prep_mobility" })
+        let strengthSection = compiled.first(where: { $0.sectionID == "strength_work" })
+        XCTAssertNotNil(prepSection, "No compiled prep_mobility section")
+        XCTAssertNotNil(strengthSection, "No compiled strength_work section")
+        XCTAssertEqual(prepSection?.blockLetter, "A", "prep_mobility should be block A, got \(prepSection?.blockLetter ?? "nil")")
+        XCTAssertEqual(strengthSection?.blockLetter, "C", "strength_work should be block C, got \(strengthSection?.blockLetter ?? "nil")")
+    }
 }
