@@ -328,11 +328,14 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
             }
         }
 
-        if normalizeText(exercise).contains("split squat") {
+        // Split squats are forbidden on supplemental days only.
+        // Fort-trainer-programmed split squats on Mon/Wed/Fri are permitted.
+        let isFortDay = ["MONDAY", "WEDNESDAY", "FRIDAY"].contains(where: { day?.contains($0) == true })
+        if normalizeText(exercise).contains("split squat"), !isFortDay {
             addViolation(
                 &violations,
                 code: "forbidden_split_squat",
-                message: "Split squat detected but it is forbidden.",
+                message: "Split squat detected on supplemental day — forbidden.",
                 day: day,
                 exercise: exercise
             )
