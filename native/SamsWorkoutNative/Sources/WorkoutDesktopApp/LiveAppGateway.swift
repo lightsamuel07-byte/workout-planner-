@@ -777,8 +777,11 @@ private extension LiveAppGateway {
         let safeReference = sanitizedSheetReferenceDate(referenceDate).date
         let calendar = Calendar(identifier: .gregorian)
         let weekday = calendar.component(.weekday, from: safeReference)
-        let mondayOffset = (weekday + 5) % 7
-        let monday = calendar.date(byAdding: .day, value: -mondayOffset, to: safeReference) ?? safeReference
+        // On weekends (Sat=7, Sun=1) we're planning ahead — advance to next week's Monday.
+        // On Mon–Fri, back up to this week's Monday.
+        let rawOffset = (weekday + 5) % 7  // 0=Mon, 1=Tue, …, 5=Sat, 6=Sun
+        let mondayOffset = (weekday == 7 || weekday == 1) ? (7 - rawOffset) : -rawOffset
+        let monday = calendar.date(byAdding: .day, value: mondayOffset, to: safeReference) ?? safeReference
         let formatter = DateFormatter()
         formatter.calendar = calendar
         formatter.locale = Locale(identifier: "en_US_POSIX")
