@@ -292,7 +292,7 @@ struct SetupFlowView: View {
                 GroupBox("Auth Quick Help") {
                     VStack(alignment: .leading, spacing: 6) {
                         Text("Use either a token file path or a bearer token in Google Auth Hint.")
-                        Text("If token refresh fails, click Re-auth, update token.json, then retry.")
+                        Text("If the token expires it will auto-refresh using the stored refresh token.")
                     }
                     .font(.callout)
                     .foregroundStyle(.secondary)
@@ -313,11 +313,6 @@ struct SetupFlowView: View {
                         coordinator.completeSetup()
                     }
                     .buttonStyle(.borderedProminent)
-
-                    Button("Re-auth") {
-                        coordinator.triggerReauth()
-                    }
-                    .buttonStyle(.bordered)
 
                     Button("Copy Auth Hint") {
                         let hint = coordinator.setupState.googleAuthHint.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -699,28 +694,11 @@ struct GeneratePlanPageView: View {
                 }
                 .help("Enable for the first week of a new 4-week Fort cycle. Tells Claude it may choose fresh exercises for Tue/Thu/Sat rather than continuing prior-cycle selections.")
 
-                HStack {
-                    Button(coordinator.isGenerating ? "Generating..." : "Generate") {
-                        Task { await coordinator.runGeneration() }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(!coordinator.canGenerateNow)
-
-                    Button("Re-auth") {
-                        coordinator.triggerReauth()
-                    }
-                    .buttonStyle(.bordered)
-
-                    Button("Copy Status") {
-                        let text = coordinator.copyStatusText()
-                        if !text.isEmpty {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(text, forType: .string)
-                        }
-                    }
-                    .buttonStyle(.bordered)
-                    .disabled(coordinator.copyStatusText().isEmpty)
+                Button(coordinator.isGenerating ? "Generating..." : "Generate") {
+                    Task { await coordinator.runGeneration() }
                 }
+                .buttonStyle(.borderedProminent)
+                .disabled(!coordinator.canGenerateNow)
 
                 if coordinator.isGenerating {
                     ProgressView("Generating and syncing weekly plan...")

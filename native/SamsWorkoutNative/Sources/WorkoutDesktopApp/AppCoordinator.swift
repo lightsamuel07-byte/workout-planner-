@@ -611,15 +611,6 @@ if !generationStatus.isEmpty {
         planSnapshot = .empty
     }
 
-    func triggerReauth() {
-        let hint = setupState.googleAuthHint.trimmingCharacters(in: .whitespacesAndNewlines)
-        if hint.isEmpty {
-            generationStatus = "Re-auth flow requested. In Setup, set Google auth hint to your token.json path, then retry."
-        } else {
-            generationStatus = "Re-auth flow requested. Verify token at: \(hint)"
-        }
-    }
-
     func triggerRebuildDBCache() async {
         if isRebuildingDBCache {
             return
@@ -940,10 +931,6 @@ if !generationStatus.isEmpty {
         showPlanLogs = false
         showPlanLoggedOnly = false
         planBlockFilter = "All Blocks"
-    }
-
-    func copyStatusText() -> String {
-        statusBanner.text
     }
 
     func copyGenerationInputsText() -> String {
