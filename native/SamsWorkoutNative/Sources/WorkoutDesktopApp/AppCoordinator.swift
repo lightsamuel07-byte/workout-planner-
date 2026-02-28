@@ -870,59 +870,8 @@ if !generationStatus.isEmpty {
         return ""
     }
 
-    func applyGenerationTemplate(day: String) {
-        switch day.lowercased() {
-        case "monday":
-            generationInput.monday = """
-            MONDAY
-            IGNITION
-            Deadbug
-            CLUSTER SET
-            Back Squat
-            AUXILIARY
-            Reverse Pec Deck
-            THAW
-            BikeErg
-            """
-        case "wednesday":
-            generationInput.wednesday = """
-            WEDNESDAY
-            PREP
-            Hip Airplane
-            WORKING SET
-            Bench Press
-            AUXILIARY
-            Rope Pressdown
-            THAW
-            Incline Walk
-            """
-        case "friday":
-            generationInput.friday = """
-            FRIDAY
-            IGNITION
-            McGill Big-3
-            BREAKPOINT
-            Deadlift
-            AUXILIARY
-            DB Hammer Curl
-            THAW
-            Rower
-            """
-        default:
-            break
-        }
-    }
-
     func clearGenerationInput() {
         generationInput = PlanGenerationInput()
-    }
-
-    func normalizeGenerationInput() {
-        generationInput = PlanGenerationInput(
-            monday: normalizedMultiline(generationInput.monday),
-            wednesday: normalizedMultiline(generationInput.wednesday),
-            friday: normalizedMultiline(generationInput.friday)
-        )
     }
 
     func resetPlanFilters() {
@@ -931,19 +880,6 @@ if !generationStatus.isEmpty {
         showPlanLogs = false
         showPlanLoggedOnly = false
         planBlockFilter = "All Blocks"
-    }
-
-    func copyGenerationInputsText() -> String {
-        [
-            "MONDAY INPUT",
-            normalizedMultiline(generationInput.monday),
-            "",
-            "WEDNESDAY INPUT",
-            normalizedMultiline(generationInput.wednesday),
-            "",
-            "FRIDAY INPUT",
-            normalizedMultiline(generationInput.friday),
-        ].joined(separator: "\n")
     }
 
     func buildSelectedPlanDayExportText() -> String {

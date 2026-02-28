@@ -571,21 +571,8 @@ struct GeneratePlanPageView: View {
 
                 StatusBannerView(banner: coordinator.statusBanner)
 
-                HStack {
-                    Button("Template Monday") { coordinator.applyGenerationTemplate(day: "monday") }
-                    Button("Template Wednesday") { coordinator.applyGenerationTemplate(day: "wednesday") }
-                    Button("Template Friday") { coordinator.applyGenerationTemplate(day: "friday") }
-                    Button("Normalize Inputs") { coordinator.normalizeGenerationInput() }
-                    Button("Copy All Inputs") {
-                        let text = coordinator.copyGenerationInputsText()
-                        if !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            NSPasteboard.general.clearContents()
-                            NSPasteboard.general.setString(text, forType: .string)
-                        }
-                    }
-                    Button("Clear All") { coordinator.clearGenerationInput() }
-                }
-                .buttonStyle(.bordered)
+                Button("Clear") { coordinator.clearGenerationInput() }
+                    .buttonStyle(.bordered)
 
                 GroupBox("Preflight Checks") {
                     VStack(alignment: .leading, spacing: 6) {
