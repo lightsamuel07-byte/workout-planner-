@@ -292,9 +292,11 @@ final class SwapIntegrationParityTests: ExerciseNormalizerTestCase {
         XCTAssertTrue(normalizer.areSameExercise("Seated Calf Raise", "Standing Calf Raise"))
     }
 
-    func testSplitSquatMapsToGoblet() {
+    func testSplitSquatIsNotAutoSwapped() {
+        // Split squats are no longer auto-swapped — Fort days may include trainer-programmed
+        // split squats and they must be preserved. The restriction is prompt-only for supplemental days.
         let canonical = normalizer.canonicalName("Bulgarian Split Squat")
-        XCTAssertEqual(canonical, "Heel-Elevated Goblet Squat")
+        XCTAssertEqual(canonical, "Bulgarian Split Squat")
     }
 }
 

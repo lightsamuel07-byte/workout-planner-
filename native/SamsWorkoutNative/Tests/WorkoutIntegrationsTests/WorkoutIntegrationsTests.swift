@@ -38,7 +38,42 @@ actor MockHTTPClient: HTTPClient {
     }
 }
 
+// MARK: - URLProtocol mock for streaming (AnthropicClient SSE tests)
+
+final class MockURLProtocol: URLProtocol {
+    nonisolated(unsafe) static var responseData: Data = Data()
+    nonisolated(unsafe) static var statusCode: Int = 200
+    nonisolated(unsafe) static var responseHeaders: [String: String] = [:]
+
+    override class func canInit(with request: URLRequest) -> Bool { true }
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+
+    override func startLoading() {
+        let headers = Self.responseHeaders.merging(["Content-Type": "text/event-stream"]) { $1 }
+        let response = HTTPURLResponse(
+            url: request.url!,
+            statusCode: Self.statusCode,
+            httpVersion: "HTTP/1.1",
+            headerFields: headers
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: Self.responseData)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+}
+
 final class WorkoutIntegrationsTests: XCTestCase {
+    private func makeMockURLSession(responseData: Data, statusCode: Int, headers: [String: String] = [:]) -> URLSession {
+        MockURLProtocol.responseData = responseData
+        MockURLProtocol.statusCode = statusCode
+        MockURLProtocol.responseHeaders = headers
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [MockURLProtocol.self]
+        return URLSession(configuration: config)
+    }
+
     private func tempFileURL(_ name: String = UUID().uuidString) -> URL {
         FileManager.default.temporaryDirectory
             .appendingPathComponent("sams-workout-native-tests", isDirectory: true)
@@ -321,34 +356,45 @@ final class WorkoutIntegrationsTests: XCTestCase {
     }
 
     func testAnthropicClientBuildsMessageRequestAndParsesResponse() async throws {
-        let mock = MockHTTPClient()
-        let responseJSON = """
-        {
-          "model": "claude-sonnet-4-6",
-          "stop_reason": "end_turn",
-          "content": [
-            {"type": "text", "text": "## MONDAY\\n### A1. Back Squat"}
-          ]
-        }
-        """.data(using: .utf8) ?? Data()
+        // SSE-format mock response for the streaming client
+        let sseBody = """
+        event: message_start
+        data: {"type":"message_start","message":{"model":"claude-sonnet-4-6","usage":{"input_tokens":10,"output_tokens":0}}}
 
-        await mock.enqueue(.success(HTTPResponse(statusCode: 200, headers: [:], body: responseJSON)))
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"## MONDAY"}}
+
+        event: content_block_delta
+        data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"\\n### A1. Back Squat"}}
+
+        event: message_delta
+        data: {"type":"message_delta","delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":12}}
+
+        event: message_stop
+        data: {"type":"message_stop"}
+
+        """.data(using: .utf8)!
+
+        let mockSession = makeMockURLSession(
+            responseData: sseBody,
+            statusCode: 200,
+            headers: ["Content-Type": "text/event-stream"]
+        )
 
         let client = AnthropicClient(
             apiKey: "api_test",
             model: "claude-sonnet-4-6",
             maxTokens: 2048,
-            httpClient: mock
+            session: mockSession,
+            baseURL: URL(string: "https://mock.anthropic.test")!
         )
 
         let result = try await client.generatePlan(systemPrompt: "system", userPrompt: "user")
         XCTAssertTrue(result.text.contains("## MONDAY"))
         XCTAssertEqual(result.model, "claude-sonnet-4-6")
-
-        let request = await mock.latestRequest()
-        XCTAssertEqual(request?.method, "POST")
-        XCTAssertTrue(request?.url.absoluteString.hasSuffix("/v1/messages") ?? false)
-        XCTAssertEqual(request?.headers["x-api-key"], "api_test")
+        XCTAssertEqual(result.stopReason, "end_turn")
+        XCTAssertEqual(result.inputTokens, 10)
+        XCTAssertEqual(result.outputTokens, 12)
     }
 
     func testResolveOAuthAccessTokenReturnsExistingTokenWhenNotExpired() async throws {

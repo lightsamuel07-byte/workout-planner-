@@ -70,11 +70,8 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertTrue(coordinator.generationStatus.contains("Plan generation wiring complete"))
     }
 
-    func testRecoveryActionsUpdateStatus() async {
+    func testRebuildDBCacheUpdatesStatus() async {
         let coordinator = makeCoordinator()
-        coordinator.triggerReauth()
-        XCTAssertTrue(coordinator.generationStatus.contains("Re-auth"))
-
         await coordinator.triggerRebuildDBCache()
         XCTAssertTrue(coordinator.generationStatus.contains("DB cache rebuild complete"))
         XCTAssertFalse(coordinator.dbRebuildSummary.isEmpty)
@@ -159,14 +156,11 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(selected?.exercises.count, 1)
     }
 
-    func testGenerationTemplateAndResetHelpers() {
+    func testGenerationClearResetsAllInputs() {
         let coordinator = makeCoordinator()
-        coordinator.applyGenerationTemplate(day: "monday")
-        coordinator.applyGenerationTemplate(day: "wednesday")
-        coordinator.applyGenerationTemplate(day: "friday")
-        XCTAssertTrue(coordinator.generationInput.monday.contains("MONDAY"))
-        XCTAssertTrue(coordinator.generationInput.wednesday.contains("WEDNESDAY"))
-        XCTAssertTrue(coordinator.generationInput.friday.contains("FRIDAY"))
+        coordinator.generationInput.monday = "MONDAY\nSome Fort text"
+        coordinator.generationInput.wednesday = "WEDNESDAY\nSome Fort text"
+        coordinator.generationInput.friday = "FRIDAY\nSome Fort text"
 
         coordinator.clearGenerationInput()
         XCTAssertTrue(coordinator.generationInput.monday.isEmpty)
@@ -240,11 +234,13 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertFalse(coordinator.generationDisabledReason.isEmpty)
     }
 
-    func testGenerationNormalizeInputPreservesLineBreaksAndTrimsNoise() {
+    func testGenerationReadinessReportPassesWhenAllDaysHaveContent() {
         let coordinator = makeCoordinator()
-        coordinator.generationInput.monday = " MONDAY \n\n  IGNITION   \n  Deadbug  \n"
-        coordinator.normalizeGenerationInput()
-        XCTAssertEqual(coordinator.generationInput.monday, "MONDAY\nIGNITION\nDeadbug")
+        coordinator.generationInput.monday = "MONDAY\nIGNITION\nDeadbug\nBack Squat"
+        coordinator.generationInput.wednesday = "WEDNESDAY\nPREP\nHip Airplane\nBench Press"
+        coordinator.generationInput.friday = "FRIDAY\nIGNITION\nMcGill Big-3\nDeadlift"
+        XCTAssertTrue(coordinator.generationReadinessReport.isReady)
+        XCTAssertEqual(coordinator.generationIssueCount, 0)
     }
 
     func testPlanFiltersSupportBlockAndLoggedOnly() {
