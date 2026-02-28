@@ -43,7 +43,11 @@ public struct IntegrationsFacade {
     }
 
     public func makeAnthropicClient(apiKey: String, model: String, maxTokens: Int) -> AnthropicClient {
-        AnthropicClient(apiKey: apiKey, model: model, maxTokens: maxTokens)
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 300   // 5 min — plan generation can take 60-120s
+        config.timeoutIntervalForResource = 300
+        let session = URLSession(configuration: config)
+        return AnthropicClient(apiKey: apiKey, model: model, maxTokens: maxTokens, httpClient: URLSessionHTTPClient(session: session))
     }
 
     public func makeGoogleSheetsClient(spreadsheetID: String, authToken: String) -> GoogleSheetsClient {
