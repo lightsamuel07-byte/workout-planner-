@@ -990,18 +990,21 @@ private extension LiveAppGateway {
         """)
 
         CORE PRINCIPLES:
-        - Supplemental days (Tue/Thu/Sat) support Fort work with arm/shoulder/upper chest/back detail.
+        - Supplemental days (Tue/Thu/Sat) are ALL strictly upper body. Program biceps, triceps, shoulders (lateral raises, rear delts, face pulls, Y-raises), upper chest (incline press), and upper back (rows, cable work). This applies equally to Tuesday, Thursday, and Saturday — there is no lower body supplemental day.
+        - NEVER program lower body exercises on supplemental days. This ban includes: squats, deadlifts, Romanian deadlifts, hip hinges, kettlebell swings, hyperextensions, back extensions, leg press, lunges, leg curls, or any lower-body-dominant movement. Lower body work belongs exclusively to Fort days (Mon/Wed/Fri).
         - Supplemental days must be substantive: minimum 5 exercises on each of Tue, Thu, and Sat.
         - Every supplemental day (Tue, Thu, Sat) MUST include McGill Big-3 (curl-up, side bridge, bird-dog). Label it as one block entry "McGill Big-3" with coaching cues in the Notes field.
         - Preserve explicit keep/stay-here progression constraints from prior logs.
         - Never increase both reps and load in the same week for the same exercise.
+        - Notes must be clean coaching cues only. Never include internal reasoning, self-corrections, or directive references (e.g. "wait, grip is neutral per rotation directive") in the Notes field.
 
         MANDATORY HARD RULES:
         - Equipment: No belt on pulls, standing calves only. No split squats on supplemental days (Tue/Thu/Sat). Fort-trainer-programmed split squats on Mon/Wed/Fri are permitted and must not be swapped.
         - Dumbbells: even-number loads only (no odd DB loads except main barbell lifts).
         - Biceps: rotate grips (supinated -> neutral -> pronated), no repeated adjacent supplemental-day grip.
-        - Triceps: vary attachments Tue/Fri/Sat, no single-arm D-handle triceps on Saturday.
+        - Triceps: vary attachments Tue/Thu/Sat, no single-arm D-handle triceps on Saturday.
         - Carries: Tuesday only.
+        - Conditioning (THAW blocks): Reps = duration only (e.g. "8 min"). All interval protocols, pace targets, and intensity cues go in Notes exclusively. Load = 0.
         - Canonical log format in sheets: performance | RPE x | Notes: ...
 
         OUTPUT REQUIREMENTS:
