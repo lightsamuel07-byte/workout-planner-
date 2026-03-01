@@ -1010,7 +1010,7 @@ private extension LiveAppGateway {
         - Keep A:H sheet compatibility (Block, Exercise, Sets, Reps, Load, Rest, Notes, Log).
         - American spelling.
         - Notes: maximum 1-2 concise coaching cues per exercise (1 sentence each). Do not reproduce lengthy program descriptions or background context. Focus on execution — what the athlete should feel or do differently.
-        - Sparse history rule: for Fort aux exercises with fewer than 2 logged sessions in DB context, base load on 1RM percentages (30-40% of the most relevant main lift 1RM for hypertrophy rep ranges) rather than extrapolating from a single data point.
+        - Sparse history rule: for Fort aux exercises with fewer than 2 logged sessions, infer an appropriate starting load from the athlete's overall strength profile, similar exercise history, the prescribed rep range, and a target RPE of 7-8. Use intelligent inference — not a fixed percentage formula.
         """
     }
 
