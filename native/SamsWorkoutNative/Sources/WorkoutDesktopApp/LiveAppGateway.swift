@@ -981,9 +981,8 @@ private extension LiveAppGateway {
         CYCLE STATUS: \(input.isNewCycle ? "NEW CYCLE START" : "MID-CYCLE")
         \(input.isNewCycle ? """
         This is Week 1 of a new 4-week Fort cycle. The Fort exercises have changed.
-        For supplemental days (Tue/Thu/Sat): you MAY rotate in fresh exercise selections that complement the new Fort structure.
-        You are NOT required to continue the same supplemental exercises from the previous cycle.
-        Still apply progression signals from prior logs for any exercises you choose to keep.
+        SUPPLEMENTAL DAYS (Tue/Thu/Sat): This is a CLEAN SLATE. Select a completely fresh set of upper-body exercises — do NOT carry over exercises from the prior cycle. Choose new movements that complement the new Fort structure and the athlete's aesthetic goals.
+        Any PROGRESS / HOLD_LOCK / NEUTRAL directives in the context below reflect the PREVIOUS cycle. They are provided for load-reference only. They must NOT be used to lock in prior exercise choices or constrain which exercises you select. Prior-cycle progression signals do not override the clean-slate requirement.
         """ : """
         This is a mid-cycle week. Keep the same supplemental exercises as prior weeks unless a progression directive explicitly requires a swap.
         Apply PROGRESS / HOLD_LOCK / NEUTRAL signals from prior logs.
