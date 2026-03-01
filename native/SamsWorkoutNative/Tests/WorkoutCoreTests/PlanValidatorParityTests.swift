@@ -154,6 +154,57 @@ final class PlanValidatorParityTests: XCTestCase {
             "Squats and RDLs on Fort days (Mon/Wed) must not be flagged")
     }
 
+    func testDetectsSupplementalExerciseRepeatedAcrossDays() {
+        let plan = """
+        ## TUESDAY
+        ### B1. Incline DB Press (25°)
+        - 4 x 10 @ 30 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Controlled tempo.
+        ### D1. Incline DB Curl (Supinated)
+        - 3 x 12 @ 14 kg
+        - **Rest:** 60 seconds
+        - **Notes:** Supinated grip.
+        ## THURSDAY
+        ### B1. Incline DB Press (25°)
+        - 4 x 10 @ 30 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Same exercise as Tuesday.
+        ### D1. Hammer Curl (Neutral Grip)
+        - 3 x 10 @ 16 kg
+        - **Rest:** 60 seconds
+        - **Notes:** Neutral grip.
+        """
+
+        let result = validatePlan(plan)
+        XCTAssertTrue(violationCodes(result).contains("supplemental_exercise_repeated"),
+            "Incline DB Press on both Tuesday and Thursday should trigger supplemental_exercise_repeated")
+    }
+
+    func testDoesNotFlagDistinctExercisesAcrossSupplementalDays() {
+        let plan = """
+        ## TUESDAY
+        ### B1. Incline DB Press (25°)
+        - 4 x 10 @ 30 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Controlled tempo.
+        ## THURSDAY
+        ### B1. Seated Cable Row
+        - 4 x 10 @ 55 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Squeeze at top.
+        ## SATURDAY
+        ### B1. Lat Pulldown
+        - 4 x 12 @ 50 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Full stretch at top.
+        """
+
+        let result = validatePlan(plan)
+        XCTAssertFalse(violationCodes(result).contains("supplemental_exercise_repeated"),
+            "Distinct exercises across supplemental days must not be flagged")
+    }
+
     func testDetectsFortHeaderAsExerciseNoise() {
         let plan = """
         ## MONDAY

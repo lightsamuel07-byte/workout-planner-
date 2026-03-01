@@ -459,6 +459,37 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
                 day: day
             )
         }
+
+    }
+
+    // Check for exercise repetition across supplemental days within the same week.
+    // Each supplemental day must have a completely distinct exercise selection.
+    var exercisesBySupplementalDay: [String: [String]] = [:]
+    for day in supplementalDays {
+        let keys = entries
+            .filter { $0.day == day }
+            .map { normalizeText($0.exercise) }
+            .filter { !$0.isEmpty && !$0.contains("mcgill") && !($0.contains("big") && $0.contains("3")) }
+        exercisesBySupplementalDay[day] = keys
+    }
+    let dayPairs = [
+        ("TUESDAY", "THURSDAY"),
+        ("TUESDAY", "SATURDAY"),
+        ("THURSDAY", "SATURDAY"),
+    ]
+    for (dayA, dayB) in dayPairs {
+        let keysA = Set(exercisesBySupplementalDay[dayA] ?? [])
+        let keysB = Set(exercisesBySupplementalDay[dayB] ?? [])
+        let shared = keysA.intersection(keysB)
+        for key in shared.sorted() {
+            addViolation(
+                &violations,
+                code: "supplemental_exercise_repeated",
+                message: "Exercise '\(key)' appears on both \(dayA) and \(dayB) — each supplemental day must have a distinct exercise selection.",
+                day: "\(dayA)/\(dayB)",
+                exercise: key
+            )
+        }
     }
 
     let tricepsEntries = entries.filter { entry in

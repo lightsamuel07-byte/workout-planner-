@@ -993,9 +993,10 @@ private extension LiveAppGateway {
         - NEVER program lower body exercises on supplemental days. This ban includes: squats, deadlifts, Romanian deadlifts, hip hinges, kettlebell swings, hyperextensions, back extensions, leg press, lunges, leg curls, or any lower-body-dominant movement. Lower body work belongs exclusively to Fort days (Mon/Wed/Fri).
         - Supplemental days must be substantive: minimum 5 exercises on each of Tue, Thu, and Sat.
         - Every supplemental day (Tue, Thu, Sat) MUST include McGill Big-3 (curl-up, side bridge, bird-dog). Label it as one block entry "McGill Big-3" with coaching cues in the Notes field.
+        - No exercise repeated across supplemental days within the same week. Tuesday, Thursday, and Saturday must each have a completely distinct, non-overlapping exercise selection. If you use Incline DB Press on Tuesday, do not use it on Thursday or Saturday.
         - Preserve explicit keep/stay-here progression constraints from prior logs.
         - Never increase both reps and load in the same week for the same exercise.
-        - Notes must be clean coaching cues only. Never include internal reasoning, self-corrections, or directive references (e.g. "wait, grip is neutral per rotation directive") in the Notes field.
+        - Notes must be clean coaching cues only: max 2 short sentences, execution-focused. Never include load calculations (e.g. "40% of 1RM = X kg"), percentage references, internal reasoning, or directive references.
 
         MANDATORY HARD RULES:
         - Equipment: No belt on pulls, standing calves only. No split squats on supplemental days (Tue/Thu/Sat). Fort-trainer-programmed split squats on Mon/Wed/Fri are permitted and must not be swapped.
@@ -1003,7 +1004,7 @@ private extension LiveAppGateway {
         - Biceps: rotate grips (supinated -> neutral -> pronated), no repeated adjacent supplemental-day grip.
         - Triceps: vary attachments Tue/Thu/Sat, no single-arm D-handle triceps on Saturday.
         - Carries: Tuesday only.
-        - Conditioning (THAW blocks): Reps = duration only (e.g. "8 min"). All interval protocols, pace targets, and intensity cues go in Notes exclusively. Load = 0.
+        - Conditioning (THAW blocks): Sets = 1, Reps = total block duration (e.g. "12 min"), Load = 0. All interval structure, distances, pace targets, and effort cues go in Notes only. Example — correct: Reps = "12 min", Notes = "8 × 300m at tempo; 30 sec easy recovery between." Incorrect: Sets = 8, Reps = 300.
         - Canonical log format in sheets: performance | RPE x | Notes: ...
 
         OUTPUT REQUIREMENTS:
@@ -1011,6 +1012,7 @@ private extension LiveAppGateway {
         - Include six training days (Mon-Sat). Sunday is always complete rest — do not generate a Sunday block.
         - Keep A:H sheet compatibility (Block, Exercise, Sets, Reps, Load, Rest, Notes, Log).
         - American spelling.
+        - Exercise names: Title Case only. Never use ALL CAPS for exercise names. Write "Pull Up" not "PULL UP", "Incline DB Press" not "INCLINE DB PRESS", "Barbell RDL" not "BARBELL RDL". Abbreviations (DB, KB, RDL, etc.) stay abbreviated but are not full caps of the entire name.
         - Notes: maximum 1-2 concise coaching cues per exercise (1 sentence each). Do not reproduce lengthy program descriptions or background context. Focus on execution — what the athlete should feel or do differently.
         - Sparse history rule: for Fort aux exercises with fewer than 2 logged sessions, infer an appropriate starting load from the athlete's overall strength profile, similar exercise history, the prescribed rep range, and a target RPE of 7-8. Use intelligent inference — not a fixed percentage formula.
         """
