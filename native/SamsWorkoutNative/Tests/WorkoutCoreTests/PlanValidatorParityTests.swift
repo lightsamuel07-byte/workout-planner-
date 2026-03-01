@@ -117,6 +117,43 @@ final class PlanValidatorParityTests: XCTestCase {
         XCTAssertTrue(violationCodes(result).contains("supplemental_day_underfilled"))
     }
 
+    func testDetectsLowerBodyExerciseOnSupplementalDay() {
+        let plan = """
+        ## THURSDAY
+        ### D1. Barbell RDL
+        - 3 x 10 @ 80 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Hip hinge pattern.
+        ### D2. KB Swing
+        - 3 x 15 @ 24 kg
+        - **Rest:** 60 seconds
+        - **Notes:** Explosive hinge.
+        """
+
+        let result = validatePlan(plan)
+        XCTAssertTrue(violationCodes(result).contains("lower_body_on_supplemental"),
+            "RDL and KB Swing on Thursday should trigger lower_body_on_supplemental")
+    }
+
+    func testDoesNotFlagLowerBodyOnFortDay() {
+        let plan = """
+        ## MONDAY
+        ### A1. Back Squat
+        - 4 x 5 @ 110 kg
+        - **Rest:** 3 min
+        - **Notes:** Brace hard.
+        ## WEDNESDAY
+        ### A1. Romanian Deadlift
+        - 3 x 8 @ 100 kg
+        - **Rest:** 2 min
+        - **Notes:** Slow eccentric.
+        """
+
+        let result = validatePlan(plan)
+        XCTAssertFalse(violationCodes(result).contains("lower_body_on_supplemental"),
+            "Squats and RDLs on Fort days (Mon/Wed) must not be flagged")
+    }
+
     func testDetectsFortHeaderAsExerciseNoise() {
         let plan = """
         ## MONDAY

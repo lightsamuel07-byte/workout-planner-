@@ -95,6 +95,29 @@ private let dayRegex = makeRegex("^\\s*##\\s+([A-Z]+DAY)\\b", options: [.caseIns
 private let exerciseRegex = makeRegex("^\\s*###\\s+[A-Z]\\d+\\.\\s*(.+)$", options: [.caseInsensitive])
 private let prescriptionRegex = makeRegex("^\\s*-\\s*(\\d+)\\s*x\\s*([\\d:]+)\\s*@\\s*([\\d]+(?:\\.\\d+)?)\\s*kg\\b", options: [.caseInsensitive])
 private let rangeRegex = makeRegex("(\\d+)\\s*[-–]\\s*(\\d+)")
+/// Exercises that are banned on supplemental days (Tue/Thu/Sat).
+/// Checked against the normalizer's canonical key (lowercase).
+private let lowerBodySupplementalBanTerms: [String] = [
+    "squat",
+    "deadlift",
+    "hip hinge",
+    "kb swing",
+    "kettlebell swing",
+    "hyperextension",
+    "back extension",
+    "leg press",
+    "lunge",
+    "leg curl",
+    "hamstring curl",
+    "nordic",
+    "glute bridge",
+    "hip thrust",
+]
+
+private func isLowerBodyBannedExercise(_ normalizedName: String) -> Bool {
+    lowerBodySupplementalBanTerms.contains { normalizedName.contains($0) }
+}
+
 private let fortPseudoExercisePatterns: [NSRegularExpression] = [
     makeRegex("^PREPARE\\s+TO\\s+ENGAGE\\b", options: [.caseInsensitive]),
     makeRegex("^PULL[\\s\\-]*UPS?\\s+EVERY\\s+DAY\\b", options: [.caseInsensitive]),
@@ -379,6 +402,19 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
             )
         }
 
+        // Lower body exercises are banned on all supplemental days (Tue/Thu/Sat).
+        // Lower body belongs exclusively to Fort days (Mon/Wed/Fri).
+        let isSupplementalDay = ["TUESDAY", "THURSDAY", "SATURDAY"].contains(where: { day?.contains($0) == true })
+        if isSupplementalDay && isLowerBodyBannedExercise(normalizeText(exercise)) {
+            addViolation(
+                &violations,
+                code: "lower_body_on_supplemental",
+                message: "Lower body exercise '\(exercise)' is banned on supplemental days (Tue/Thu/Sat).",
+                day: day,
+                exercise: exercise
+            )
+        }
+
         if normalizeText(exercise).contains("carry") && day != "TUESDAY" {
             addViolation(
                 &violations,
@@ -429,7 +465,7 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
         guard let day = entry.day else {
             return false
         }
-        return ["TUESDAY", "FRIDAY", "SATURDAY"].contains(where: { day.contains($0) }) && normalizeText(entry.exercise).contains("tricep")
+        return ["TUESDAY", "THURSDAY", "SATURDAY"].contains(where: { day.contains($0) }) && normalizeText(entry.exercise).contains("tricep")
     }
 
     if !tricepsEntries.isEmpty {
@@ -455,7 +491,7 @@ public func validatePlan(_ planText: String, progressionDirectives: [Progression
             addViolation(
                 &violations,
                 code: "triceps_attachment_rotation",
-                message: "Triceps attachments are not varied across Tue/Fri/Sat."
+                message: "Triceps attachments are not varied across Tue/Thu/Sat."
             )
         }
     }
