@@ -1276,3 +1276,41 @@ Addendum (2026-02-22 16:45)
   - `cd native/SamsWorkoutNative && swift test` passed (`120 tests`, `3 skipped`, `0 failures`).
   - `cd native/SamsWorkoutNative && RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests` passed (`3 tests`, `0 failures`).
   - `cd native/SamsWorkoutNative && ./scripts/build_local_app.sh` passed; local signed app rebuilt.
+
+---
+
+Progress Snapshot
+Date: 2026-03-01
+
+Current Phase
+- Phase 5 (QA Hardening): native maintainability refactor of `LiveAppGateway` with behavior-preserving module split.
+
+Built (Complete)
+- Split `Sources/WorkoutDesktopApp/LiveAppGateway.swift` (2,253 lines) into focused modules with no API/behavior changes:
+  - Added `Sources/WorkoutDesktopApp/PlanRepairs.swift` (pure static repair helpers).
+  - Added `Sources/WorkoutDesktopApp/PlanTextParser.swift` (pure static markdown/sheet parser helpers).
+  - Added `Sources/WorkoutDesktopApp/PromptBuilder.swift` (pure static prompt builders).
+  - Added `Sources/WorkoutDesktopApp/LiveAppGateway+Analytics.swift` (analytics + InBody CRUD).
+  - Added `Sources/WorkoutDesktopApp/LiveAppGateway+Database.swift` (DB lifecycle/rebuild/status).
+  - Added `Sources/WorkoutDesktopApp/LiveAppGateway+Plans.swift` (plan snapshot/local IO/aliases/date candidate logic).
+  - Added `Sources/WorkoutDesktopApp/LiveAppGateway+Generation.swift` (generation orchestration + two-pass DB context + deterministic repair orchestration).
+- Trimmed `Sources/WorkoutDesktopApp/LiveAppGateway.swift` to core gateway structure/setup/date utilities/errors/test accessors.
+- Updated test accessors in `LiveAppGateway` to delegate to moved parser helpers where applicable.
+
+Validation Run
+- Baseline: `cd native/SamsWorkoutNative && swift test` passed (`156 tests`, `3 skipped`, `0 failures`).
+- After each refactor step: `swift test` passed (`156 tests`, `3 skipped`, `0 failures`).
+- Final build: `cd native/SamsWorkoutNative && bash scripts/build_local_app.sh` passed.
+- Final structure checks:
+  - `wc -l Sources/WorkoutDesktopApp/LiveAppGateway.swift` -> `376` lines.
+  - `grep -rn "func buildGenerationPrompt" Sources/WorkoutDesktopApp` -> only in `PromptBuilder.swift`.
+
+In Progress
+- None.
+
+Blocked
+- No technical blockers.
+
+Next
+1. Optional follow-up: tighten internal access control after split if stricter encapsulation is desired.
+2. Optional follow-up: add small file-level docs for each new gateway extension to codify concern boundaries.

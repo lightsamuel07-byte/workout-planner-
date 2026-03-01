@@ -1,29 +1,34 @@
-# Session Plan - Bug Scan (2026-02-21)
+# Session Plan - LiveAppGateway Structural Refactor (2026-03-01)
 
 ## Checklist
-- [x] Confirm this session plan with the user before any code changes.
-- [x] Baseline check: inspect git status and identify changed files that may affect bug risk.
-- [x] Run full automated verification suite:
-  - [x] `python3 -m unittest discover -s tests -p "test_*.py" -v`
-  - [x] `python3 -m compileall app.py pages src tests main.py`
-- [x] Run targeted high-risk validations from current progress focus:
-  - [x] Fort parser/compiler tests (`tests/test_fort_compiler.py`) via full suite coverage
-  - [x] Generation-context and validator tests (`tests/test_generation_context.py`, `tests/test_plan_validator.py`) via full suite coverage
-- [x] Perform static bug scan for obvious correctness issues:
-  - [x] fragile exception handling
-  - [x] stale session-state paths
-  - [x] schema assumptions (`A:H`, weekly sheet naming)
-- [x] Produce findings-first report with severity and file/line references.
-- [x] If no bugs found, explicitly state no findings and residual risks/testing gaps.
+- [x] Confirm this session plan with the user before any source-code changes.
+- [x] Baseline verification: `cd native/SamsWorkoutNative && swift test` (expect 156 tests, 0 failures).
+- [x] Step 1: Create `Sources/WorkoutDesktopApp/PlanRepairs.swift`; move repair functions and private regex helpers; update call sites; run `swift test`.
+- [x] Step 2: Create `Sources/WorkoutDesktopApp/PlanTextParser.swift`; move parsing functions + regex statics; update call sites; run `swift test`.
+- [x] Step 3: Create `Sources/WorkoutDesktopApp/PromptBuilder.swift`; move prompt builders; update call sites; run `swift test`.
+- [x] Step 4: Create `Sources/WorkoutDesktopApp/LiveAppGateway+Analytics.swift`; move analytics and InBody CRUD private extension methods; run `swift test`.
+- [x] Step 5: Create `Sources/WorkoutDesktopApp/LiveAppGateway+Database.swift`; move DB lifecycle methods; run `swift test`.
+- [x] Step 6: Create `Sources/WorkoutDesktopApp/LiveAppGateway+Plans.swift`; move plan snapshot/local I/O/aliases/date naming methods; run `swift test`.
+- [x] Step 7: Create `Sources/WorkoutDesktopApp/LiveAppGateway+Generation.swift`; move generation orchestration and helpers; run `swift test`.
+- [x] Step 8: Trim `Sources/WorkoutDesktopApp/LiveAppGateway.swift` to keep only required core elements; run `swift test`.
+- [x] Step 9: Update test accessor wrapper bodies in `LiveAppGateway.swift` to delegate to `PlanTextParser`, `PlanRepairs`, and `PromptBuilder` as needed; run `swift test`.
+- [x] Final verification: `bash scripts/build_local_app.sh`.
+- [x] Final verification: `wc -l Sources/WorkoutDesktopApp/LiveAppGateway.swift` (target around 400 lines).
+- [x] Final verification: `grep -rn "func buildGenerationPrompt" Sources/WorkoutDesktopApp` (must appear only in `PromptBuilder.swift`).
+- [x] Update `progress.txt` with completed work (phase reference + outcomes + validation commands).
+- [x] Capture review notes below and summarize dead code candidates for explicit user decision.
 
 ## Review (fill in at end of session)
 - Findings:
-- Confirmed 4 concrete bugs:
-  - archived weekly tabs are incorrectly included in weekly sheet selection due unanchored regex.
-  - weekly volume metric is computed per-day (not per-week), causing wrong dashboard value.
-  - main-lift progression sorts by raw date label string, producing wrong "current" load.
-  - local markdown plan parser only recognizes uppercase day headers and fails on `## Monday`.
-- Decisions:
-- No production code edits were applied in this scan-only pass.
-- Next steps:
-- Apply targeted fixes for the 4 findings and add regression tests for regex anchoring, analytics date handling, weekly aggregation, and day-header parsing.
+- Structural refactor completed per requested split with no public protocol signature changes.
+- Behavior/API regression check:
+- `swift test` remained green after each extraction step (`156 tests`, `3 skipped`, `0 failures` each run).
+- Dead code candidates:
+- None identified during this structural move.
+- Validation results:
+- Baseline and per-step verification complete (`swift test` repeated after every step).
+- `bash scripts/build_local_app.sh` succeeded.
+- `wc -l Sources/WorkoutDesktopApp/LiveAppGateway.swift` = `376`.
+- `grep -rn "func buildGenerationPrompt" Sources/WorkoutDesktopApp` reports only `PromptBuilder.swift`.
+- Risks or follow-ups:
+- Access-control scope was widened from file-private to type/module-visible for split methods/properties to support multi-file extensions; this is structural and non-behavioral but worth noting for future encapsulation tightening if desired.
