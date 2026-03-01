@@ -191,6 +191,41 @@ public struct PersistedRecentLogContextRow: Equatable, Sendable {
     }
 }
 
+/// A single exercise log row used for targeted two-pass DB context, including RPE.
+public struct PersistedTargetedLogContextRow: Equatable, Sendable {
+    public let sessionDateISO: String
+    public let dayLabel: String
+    public let exerciseName: String
+    public let normalizedName: String
+    public let sets: String
+    public let reps: String
+    public let load: String
+    public let logText: String
+    public let parsedRPE: Double?
+
+    public init(
+        sessionDateISO: String,
+        dayLabel: String,
+        exerciseName: String,
+        normalizedName: String,
+        sets: String,
+        reps: String,
+        load: String,
+        logText: String,
+        parsedRPE: Double?
+    ) {
+        self.sessionDateISO = sessionDateISO
+        self.dayLabel = dayLabel
+        self.exerciseName = exerciseName
+        self.normalizedName = normalizedName
+        self.sets = sets
+        self.reps = reps
+        self.load = load
+        self.logText = logText
+        self.parsedRPE = parsedRPE
+    }
+}
+
 public struct WorkoutSyncEntry: Equatable, Sendable {
     public let sourceRow: Int
     public let exerciseName: String
@@ -929,6 +964,65 @@ public struct WorkoutDatabase: Sendable {
     public func deleteInBodyScan(scanDate: String) throws {
         try dbQueue.write { db in
             try db.execute(sql: "DELETE FROM inbody_scans WHERE scan_date = ?", arguments: [scanDate])
+        }
+    }
+
+    /// Fetch recent logs for a specific list of normalized exercise names.
+    /// Used by the two-pass generation flow to build targeted DB context.
+    /// Each exercise gets up to `logsPerExercise` recent log rows.
+    public func fetchTargetedLogContextRows(
+        normalizedNames: [String],
+        logsPerExercise: Int = 4
+    ) throws -> [PersistedTargetedLogContextRow] {
+        guard !normalizedNames.isEmpty else {
+            return []
+        }
+
+        return try dbQueue.read { db in
+            var allRows: [PersistedTargetedLogContextRow] = []
+
+            for normalizedName in normalizedNames {
+                let rows = try Row.fetchAll(
+                    db,
+                    sql: """
+                    SELECT
+                        COALESCE(ws.session_date, '') AS session_date,
+                        ws.day_label AS day_label,
+                        e.name AS exercise_name,
+                        e.normalized_name AS normalized_name,
+                        COALESCE(el.prescribed_sets, '') AS prescribed_sets,
+                        COALESCE(el.prescribed_reps, '') AS prescribed_reps,
+                        COALESCE(el.prescribed_load, '') AS prescribed_load,
+                        COALESCE(el.log_text, '') AS log_text,
+                        el.parsed_rpe AS parsed_rpe
+                    FROM exercise_logs el
+                    JOIN exercises e ON e.id = el.exercise_id
+                    JOIN workout_sessions ws ON ws.id = el.session_id
+                    WHERE e.normalized_name = ?
+                      AND LOWER(e.name) NOT LIKE '%warm-up set%'
+                    ORDER BY COALESCE(ws.session_date, '') DESC, el.id DESC
+                    LIMIT ?
+                    """,
+                    arguments: [normalizedName, logsPerExercise]
+                )
+
+                for row in rows {
+                    let rpe: Double? = row["parsed_rpe"]
+                    allRows.append(PersistedTargetedLogContextRow(
+                        sessionDateISO: row["session_date"],
+                        dayLabel: row["day_label"],
+                        exerciseName: row["exercise_name"],
+                        normalizedName: row["normalized_name"],
+                        sets: row["prescribed_sets"],
+                        reps: row["prescribed_reps"],
+                        load: row["prescribed_load"],
+                        logText: row["log_text"],
+                        parsedRPE: rpe
+                    ))
+                }
+            }
+
+            return allRows
         }
     }
 

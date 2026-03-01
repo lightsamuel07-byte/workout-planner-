@@ -613,4 +613,126 @@ final class WorkoutDesktopAppTests: XCTestCase {
         let coordinator = makeCoordinator()
         XCTAssertEqual(coordinator.sidebarVisibility, .all)
     }
+
+    // MARK: - Sheets Write-back: parsePlanToSheetRows
+
+    func testParsePlanToSheetRowsBasicDay() {
+        // A minimal single-day markdown snippet with 2 exercises.
+        // Verifies that Block, Exercise, Sets, Reps, Load, Rest, Notes are populated
+        // correctly and that Log is always empty.
+        let markdown = """
+        ## TUESDAY
+        ### B1. Incline DB Press (30°)
+        - 4 x 10 @ 30 kg
+        - **Rest:** 90 seconds
+        - **Notes:** Control the eccentric. Elbows at 60°.
+        ### B2. Cable Lateral Raise
+        - 3 x 15 @ 8 kg
+        - **Rest:** 60 seconds
+        - **Notes:** Lead with elbow.
+        """
+
+        let rows = LiveAppGateway.testParsePlanToSheetRows(planText: markdown, dayLabel: "Tuesday")
+
+        XCTAssertEqual(rows.count, 2, "Expected one row per exercise block")
+
+        // First exercise
+        let first = rows[0]
+        XCTAssertEqual(first.count, 8, "Every row must have exactly 8 columns")
+        XCTAssertEqual(first[0], "B1", "Column A: Block")
+        XCTAssertEqual(first[1], "Incline DB Press (30°)", "Column B: Exercise")
+        XCTAssertEqual(first[2], "4", "Column C: Sets")
+        XCTAssertEqual(first[3], "10", "Column D: Reps")
+        XCTAssertEqual(first[4], "30", "Column E: Load")
+        XCTAssertEqual(first[5], "90 seconds", "Column F: Rest")
+        XCTAssertEqual(first[6], "Control the eccentric. Elbows at 60°.", "Column G: Notes")
+        XCTAssertEqual(first[7], "", "Column H: Log must be empty at generation time")
+
+        // Second exercise
+        let second = rows[1]
+        XCTAssertEqual(second[0], "B2", "Column A: Block")
+        XCTAssertEqual(second[1], "Cable Lateral Raise", "Column B: Exercise")
+        XCTAssertEqual(second[2], "3", "Column C: Sets")
+        XCTAssertEqual(second[3], "15", "Column D: Reps")
+        XCTAssertEqual(second[4], "8", "Column E: Load")
+        XCTAssertEqual(second[5], "60 seconds", "Column F: Rest")
+        XCTAssertEqual(second[6], "Lead with elbow.", "Column G: Notes")
+        XCTAssertEqual(second[7], "", "Column H: Log must be empty")
+    }
+
+    func testParsePlanToSheetRowsSkipsNonExerciseLines() {
+        // Verifies that day headers, blank lines, and rest/notes lines do NOT produce
+        // spurious rows — only exercise blocks (### Xn. Name) produce rows.
+        let markdown = """
+        ## THURSDAY
+
+        This is a non-exercise preamble line.
+
+        ### C1. DB Hammer Curl
+        - 3 x 12 @ 16 kg
+        - **Rest:** 60 seconds
+        - **Notes:** Keep elbows pinned.
+
+        Some stray text between exercises.
+
+        ### C2. Rope Triceps Pressdown
+        - 4 x 12 @ 20 kg
+        - **Rest:** 45 seconds
+        - **Notes:** Full extension at bottom.
+        """
+
+        let rows = LiveAppGateway.testParsePlanToSheetRows(planText: markdown, dayLabel: "Thursday")
+
+        // Only the 2 exercise blocks should produce rows — headers, blanks, and prose lines must
+        // be silently ignored.
+        XCTAssertEqual(rows.count, 2, "Only exercise blocks produce rows; headers and prose must be skipped")
+        XCTAssertEqual(rows[0][0], "C1")
+        XCTAssertEqual(rows[0][1], "DB Hammer Curl")
+        XCTAssertEqual(rows[1][0], "C2")
+        XCTAssertEqual(rows[1][1], "Rope Triceps Pressdown")
+
+        // Confirm no row represents the day header or stray text
+        let allExerciseNames = rows.map { $0[1] }
+        XCTAssertFalse(allExerciseNames.contains(where: { $0.contains("THURSDAY") || $0.contains("preamble") || $0.contains("stray") }),
+                       "Day headers and prose must not appear as exercise names")
+    }
+
+    // MARK: - Two-Pass Generation Tests
+
+    func testParseSelectedExercisesValidResponse() {
+        let response = """
+        Tuesday: DB Hammer Curl, Rope Pressdown, Face Pull, Incline Walk
+        Thursday: 30 Degree Incline DB Press, Cable Lateral Raise, McGill Big-3, Incline Walk
+        Saturday: EZ-Bar Curl, Overhead Triceps Extension, Rear Delt Fly, Incline Walk
+        """
+
+        let result = LiveAppGateway.testParseSelectedExercises(from: response)
+
+        XCTAssertEqual(result.keys.sorted(), ["SATURDAY", "THURSDAY", "TUESDAY"])
+        XCTAssertEqual(result["TUESDAY"]?.count, 4)
+        XCTAssertEqual(result["THURSDAY"]?.count, 4)
+        XCTAssertEqual(result["SATURDAY"]?.count, 4)
+        XCTAssertTrue(result["TUESDAY"]?.contains("DB Hammer Curl") == true)
+        XCTAssertTrue(result["THURSDAY"]?.contains("30 Degree Incline DB Press") == true)
+        XCTAssertTrue(result["SATURDAY"]?.contains("EZ-Bar Curl") == true)
+    }
+
+    func testParseSelectedExercisesInvalidResponseFallsBackGracefully() {
+        // Garbage inputs — should all return empty dict, not crash.
+        let garbageInputs = [
+            "",
+            "No days here at all.",
+            "Tuesday only, nothing else",
+            "Tuesday: A, B\nThursday: C, D",  // Missing Saturday — incomplete
+            "{ \"exercises\": [\"Back Squat\"] }",
+        ]
+
+        for input in garbageInputs {
+            let result = LiveAppGateway.testParseSelectedExercises(from: input)
+            XCTAssertTrue(
+                result.isEmpty,
+                "Expected empty dict for input '\(input.prefix(40))', got \(result)"
+            )
+        }
+    }
 }

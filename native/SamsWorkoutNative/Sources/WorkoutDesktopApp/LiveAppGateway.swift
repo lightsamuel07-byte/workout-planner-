@@ -164,8 +164,45 @@ struct LiveAppGateway: NativeAppGateway {
         let progressionRules = buildProgressionDirectives(priorSupplemental: priorSupplemental)
         let planDirectives = progressionRules.map { $0.asPlanDirective() }
         let directivesBlock = formatDirectivesForPrompt(progressionRules)
-        let dbContext = buildRecentDBContext()
         let oneRepMaxes = loadOneRepMaxesFromConfig()
+
+        // ── Two-pass: exercise selection → targeted DB context ──────────────────
+        // Pass 1: ask Claude to enumerate which exercises it will program on
+        // Tue/Thu/Sat. This is a cheap call (~200-300 output tokens). We use the
+        // result to pull targeted DB history for ONLY those exercises, avoiding
+        // the noise of fetching 40 generic recent rows that may not even be used.
+        let anthropicPass1 = integrations.makeAnthropicClient(
+            apiKey: config.anthropicAPIKey,
+            model: "claude-sonnet-4-6",
+            maxTokens: 300
+        )
+        let dbContext: String
+        do {
+            emit(.preparing, "Pass 1: selecting supplemental exercises for targeted DB context.")
+            let selectionPrompt = buildExerciseSelectionPrompt(input: input, fortContext: fortContext)
+            let pass1Result = try await anthropicPass1.generatePlan(
+                systemPrompt: nil,
+                userPrompt: selectionPrompt,
+                onEvent: nil
+            )
+            let selected = parseSelectedExercises(from: pass1Result.text)
+            if !selected.isEmpty,
+               let targeted = buildTargetedDBContext(for: selected) {
+                let exerciseCount = selected.values.reduce(0) { $0 + $1.count }
+                emit(.preparing, "Pass 1 complete: \(exerciseCount) exercises selected, targeted DB context built.")
+                dbContext = targeted
+            } else {
+                // Parsed OK but no DB history found — fall back to generic context.
+                emit(.preparing, "Pass 1: no matching DB history for selected exercises, falling back to generic context.")
+                dbContext = buildRecentDBContext()
+            }
+        } catch {
+            // Pass 1 network error or any other failure — fall back gracefully.
+            emit(.preparing, "Pass 1 failed (\(error.localizedDescription)), falling back to generic DB context.")
+            dbContext = buildRecentDBContext()
+        }
+        // ────────────────────────────────────────────────────────────────────────
+
         let prompt = buildGenerationPrompt(
             input: input,
             fortContext: fortContext,
@@ -1103,6 +1140,234 @@ private extension LiveAppGateway {
         return output
     }
 
+    // MARK: - Two-Pass Generation Helpers
+
+    /// Build a short prompt asking Claude to list only the exercise names it plans to use
+    /// on the three supplemental days (Tue/Thu/Sat). No sets, reps, or loads needed —
+    /// just names so we can pull targeted DB history before Pass 2.
+    func buildExerciseSelectionPrompt(input: PlanGenerationInput, fortContext: String) -> String {
+        let cycleBlock = input.isNewCycle
+            ? "NEW CYCLE: Select a completely fresh set of exercises — do NOT repeat prior-cycle choices."
+            : "MID-CYCLE: Keep exercises consistent with prior weeks unless progression requires a swap."
+
+        return """
+        You are selecting supplemental exercises for Tue/Thu/Sat workout days.
+
+        ATHLETE: Samuel Light | kg | Aesthetic hypertrophy focus
+        SCHEDULE: Fort Mon/Wed/Fri | Supplemental Tue/Thu/Sat
+
+        AESTHETIC PRIORITY ORDER (supplemental volume purpose):
+          1. Arms — biceps shape + triceps fullness (HIGH priority)
+          2. Delts — medial delt cap for width, rear delt for 3D look (HIGH priority)
+          3. Upper chest — clavicular pec "pop" via incline pressing/fly patterns (HIGH priority)
+          4. Back detail — upper-back density, rear-delt tie-in, posture (HIGH priority)
+
+        FORT CONTEXT (Mon/Wed/Fri exercises already programmed):
+        \(fortContext)
+
+        \(cycleBlock)
+
+        INTERFERENCE RULES:
+        - Tuesday: no heavy chest/triceps/front-delt loading; protect Wednesday bench.
+        - Thursday: no loaded carries, no heavy rows, no heavy biceps (>6 hard sets); protect Friday deadlift grip.
+        - Saturday: upper body only; no heavy lower back; protect Monday squat.
+
+        HARD RULES:
+        - No split squats on supplemental days.
+        - Standing calves only (never seated).
+        - Biceps: rotate grips across Tue/Thu/Sat — supinated -> neutral -> pronated; never same grip on consecutive days.
+        - Triceps: vary attachments across Tue/Thu/Sat (rope on Tue, straight-bar variant on Thu/Sat, no single-arm D-handle on Sat).
+        - No same exercise repeated on two supplemental days in the same week.
+        - Carries: Tuesday only, KB exclusively.
+        - Every supplemental day must include McGill Big-3 (curl-up, side bridge, bird-dog) and an incline walk.
+        - Minimum 5 exercises per supplemental day.
+
+        TASK: List the exercise names you plan to use for Tuesday, Thursday, and Saturday.
+        Include ALL exercises (McGill Big-3 warm-up, main hypertrophy work, isolation, incline walk).
+        Apply all interference and hard rules above.
+
+        Return ONLY a plain-text list in this exact format — no explanation, no sets, no reps, no markdown:
+        Tuesday: Exercise A, Exercise B, Exercise C
+        Thursday: Exercise D, Exercise E, Exercise F
+        Saturday: Exercise G, Exercise H, Exercise I
+        """
+    }
+
+    /// Parse the Pass 1 response into a dict keyed by uppercase day name.
+    /// Returns an empty dict on parse failure so the caller can fall back gracefully.
+    func parseSelectedExercises(from text: String) -> [String: [String]] {
+        var result: [String: [String]] = [:]
+        let dayKeys = ["TUESDAY", "THURSDAY", "SATURDAY"]
+
+        let lines = text.components(separatedBy: .newlines)
+        for line in lines {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            if trimmed.isEmpty {
+                continue
+            }
+
+            // Match "Tuesday: ...", "thursday: ...", etc.
+            guard let colonRange = trimmed.range(of: ":") else {
+                continue
+            }
+            let dayRaw = String(trimmed[..<colonRange.lowerBound])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+                .uppercased()
+            guard dayKeys.contains(dayRaw) else {
+                continue
+            }
+
+            let exercisePart = String(trimmed[colonRange.upperBound...])
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if exercisePart.isEmpty {
+                continue
+            }
+
+            let exercises = exercisePart
+                .components(separatedBy: ",")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+
+            if !exercises.isEmpty {
+                result[dayRaw] = exercises
+            }
+        }
+
+        // Only return a result if all three days parsed successfully.
+        let allParsed = dayKeys.allSatisfy { result[$0] != nil && !(result[$0]!.isEmpty) }
+        return allParsed ? result : [:]
+    }
+
+    /// Build targeted DB context for ONLY the exercises selected in Pass 1.
+    /// Mirrors the Python `build_targeted_db_context()` logic.
+    /// Returns nil if no targeted history is found (caller should fall back to generic context).
+    func buildTargetedDBContext(
+        for selectedExercises: [String: [String]],
+        maxChars: Int = 3200,
+        logsPerExercise: Int = 4
+    ) -> String? {
+        guard let database = try? openDatabase() else {
+            return nil
+        }
+
+        // Collect all exercise names across all three supplemental days, deduplicated.
+        let allNames = Array(Set(selectedExercises.values.flatMap { $0 }))
+        guard !allNames.isEmpty else {
+            return nil
+        }
+
+        let normalizer = getNormalizer()
+
+        // Build a deduplicated list of (displayName, normalizedKey) pairs.
+        var seen = Set<String>()
+        var targets: [(displayName: String, normalizedKey: String)] = []
+        for name in allNames {
+            let norm = normalizer.canonicalKey(name)
+            guard !norm.isEmpty, !seen.contains(norm) else {
+                continue
+            }
+            seen.insert(norm)
+            targets.append((displayName: normalizer.canonicalName(name), normalizedKey: norm))
+        }
+
+        guard !targets.isEmpty else {
+            return nil
+        }
+
+        // Fetch logs for just these exercises.
+        let normalizedKeys = targets.map { $0.normalizedKey }
+        guard let rows = try? database.fetchTargetedLogContextRows(
+            normalizedNames: normalizedKeys,
+            logsPerExercise: logsPerExercise
+        ), !rows.isEmpty else {
+            return nil
+        }
+
+        // Group rows by normalizedKey so we can emit one block per exercise.
+        var rowsByNorm: [String: [PersistedTargetedLogContextRow]] = [:]
+        for row in rows {
+            rowsByNorm[row.normalizedName, default: []].append(row)
+        }
+
+        // Build global DB summary header line.
+        let dbSummaryLine: String
+        if let summary = try? database.countSummary() {
+            let logCount = summary.exerciseLogs
+            let rpeCount = summary.logsWithRPE
+            let rpePct = logCount > 0 ? (Double(rpeCount) / Double(logCount) * 100) : 0.0
+            dbSummaryLine = "\(summary.exercises) exercises | \(summary.sessions) sessions | \(logCount) logs | RPE coverage \(String(format: "%.1f", rpePct))%"
+        } else {
+            dbSummaryLine = "DB summary unavailable."
+        }
+
+        var lines: [String] = [
+            "EXERCISE HISTORY FROM DATABASE:",
+            "- DB: \(dbSummaryLine).",
+            "- Recent prescription + performance data for selected exercises:",
+        ]
+
+        func fitsBudget(_ candidate: [String]) -> Bool {
+            return maxChars <= 0 || candidate.joined(separator: "\n").count <= maxChars
+        }
+
+        var added = 0
+        for (displayName, normalizedKey) in targets {
+            guard let exerciseRows = rowsByNorm[normalizedKey], !exerciseRows.isEmpty else {
+                continue
+            }
+
+            let compactEntries: [String] = exerciseRows.map { row in
+                let dayOrDate = row.sessionDateISO.isEmpty ? row.dayLabel : row.sessionDateISO
+                var rx = ""
+                if !row.sets.isEmpty && !row.reps.isEmpty {
+                    rx = "\(row.sets)x\(row.reps)"
+                    if !row.load.isEmpty {
+                        rx += " @\(row.load)"
+                    }
+                } else if !row.load.isEmpty {
+                    rx = "@\(row.load)"
+                }
+
+                var logPart = String(row.logText.prefix(70))
+                if let rpe = row.parsedRPE, !row.logText.lowercased().contains("rpe") {
+                    let rpeStr = rpe.truncatingRemainder(dividingBy: 1) == 0
+                        ? String(format: "%.0f", rpe)
+                        : String(format: "%.1f", rpe)
+                    logPart = logPart.isEmpty ? "RPE \(rpeStr)" : "\(logPart) | RPE \(rpeStr)"
+                }
+
+                var entry = "\(dayOrDate): \(rx)"
+                if !logPart.isEmpty {
+                    entry += " [\(logPart)]"
+                }
+                return entry
+            }
+
+            let candidateLine = "  - [DB] \(displayName) -> " + compactEntries.joined(separator: " || ")
+            let candidateLines = lines + [candidateLine]
+            if !fitsBudget(candidateLines) {
+                lines.append("- Context truncated to stay within prompt budget.")
+                break
+            }
+
+            lines.append(candidateLine)
+            added += 1
+        }
+
+        if added == 0 {
+            return nil
+        }
+
+        let tail = "- Use this for load/rep reference; prior-week sheet remains primary for immediate progression."
+        if fitsBudget(lines + [tail]) {
+            lines.append(tail)
+        }
+
+        return lines.joined(separator: "\n")
+    }
+
+    // MARK: - Generic DB Context (fallback)
+
     func buildRecentDBContext(maxRows: Int = 40, maxChars: Int = 3200) -> String {
         guard let database = try? openDatabase(),
               let rows = try? database.fetchRecentLogContextRows(limit: maxRows),
@@ -1557,6 +1822,96 @@ private extension LiveAppGateway {
         return candidates.sorted(by: { $0.1 < $1.1 }).last
     }
 
+    /// Parse the generated markdown text for a single day into the 8-column sheet schema.
+    ///
+    /// Each returned row is `[Block, Exercise, Sets, Reps, Load, Rest, Notes, Log]`.
+    /// The Log column is always empty — the user fills that in after the workout.
+    ///
+    /// - Parameters:
+    ///   - planText: The raw markdown for one day (may include the `## DAY` header or start directly
+    ///               with exercise blocks — either form is accepted).
+    ///   - dayLabel: A label used only for context when planText contains no `## DAY` header.
+    ///               When planText does contain a header the header's label is used.
+    /// - Returns: An array of 8-element string arrays, one per exercise (no header row).
+    func parsePlanToSheetRows(planText: String, dayLabel: String) -> [[String]] {
+        // Parse line by line. Skip day headers, blank lines, and non-exercise lines.
+        // Only `### Xn. Exercise Name` blocks produce rows.
+        let lines = planText.components(separatedBy: .newlines)
+        var rows: [[String]] = []
+
+        var currentBlock = ""
+        var currentExercise = ""
+        var currentSets = ""
+        var currentReps = ""
+        var currentLoad = ""
+        var currentRest = ""
+        var currentNotes = ""
+        var inExercise = false
+
+        func flushExercise() {
+            guard inExercise, !currentExercise.isEmpty else { return }
+            rows.append(GoogleSheetsClient.enforceEightColumnSchema([
+                currentBlock, currentExercise, currentSets, currentReps,
+                currentLoad, currentRest, currentNotes,
+                "",   // Log — always empty at generation time; user fills in after the workout
+            ]))
+            currentBlock = ""; currentExercise = ""; currentSets = ""; currentReps = ""
+            currentLoad = ""; currentRest = ""; currentNotes = ""
+            inExercise = false
+        }
+
+        for rawLine in lines {
+            let line = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            // Day headers (## MONDAY, ## TUESDAY, etc.) — skip
+            if line.hasPrefix("## ") {
+                continue
+            }
+
+            // Exercise header: ### A1. Exercise Name
+            if let match = firstMatch(Self.exerciseHeaderRegex, text: line),
+               let capturedBlock = match[0],
+               let capturedExercise = match[1] {
+                flushExercise()
+                currentBlock = capturedBlock
+                currentExercise = capturedExercise
+                currentSets = ""; currentReps = ""; currentLoad = ""
+                currentRest = ""; currentNotes = ""
+                inExercise = true
+                continue
+            }
+
+            guard inExercise else { continue }
+
+            // Prescription line: - N x M @ Load kg
+            if let parsed = parsePrescriptionLine(line) {
+                currentSets = parsed.sets
+                currentReps = parsed.reps
+                currentLoad = parsed.load
+                continue
+            }
+
+            // Rest line: - **Rest:** ...
+            if line.lowercased().hasPrefix("- **rest:**") {
+                currentRest = line
+                    .replacingOccurrences(of: "- **Rest:**", with: "", options: [.caseInsensitive])
+                    .trimmingCharacters(in: .whitespaces)
+                continue
+            }
+
+            // Notes line: - **Notes:** ...
+            if line.lowercased().hasPrefix("- **notes:**") {
+                currentNotes = line
+                    .replacingOccurrences(of: "- **Notes:**", with: "", options: [.caseInsensitive])
+                    .trimmingCharacters(in: .whitespaces)
+                continue
+            }
+        }
+
+        flushExercise()
+        return rows
+    }
+
     func makeSheetRows(planText: String, validationSummary: String, fidelitySummary: String) -> [[String]] {
         let days = markdownDaysToPlanDays(planText: planText, source: .localCache)
         var rows: [[String]] = []
@@ -1884,5 +2239,15 @@ extension LiveAppGateway {
     static func testMarkdownDaysToPlanDays(_ planText: String) -> [PlanDayDetail] {
         let gateway = LiveAppGateway(planWriteMode: .localOnly)
         return gateway.markdownDaysToPlanDays(planText: planText, source: .localCache)
+    }
+
+    static func testParsePlanToSheetRows(planText: String, dayLabel: String) -> [[String]] {
+        let gateway = LiveAppGateway(planWriteMode: .localOnly)
+        return gateway.parsePlanToSheetRows(planText: planText, dayLabel: dayLabel)
+    }
+
+    static func testParseSelectedExercises(from text: String) -> [String: [String]] {
+        let gateway = LiveAppGateway(planWriteMode: .localOnly)
+        return gateway.parseSelectedExercises(from: text)
     }
 }
