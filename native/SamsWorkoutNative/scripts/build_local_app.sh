@@ -63,4 +63,23 @@ PLIST
 codesign --force --deep --sign - "$BUNDLE_DIR"
 
 echo "Built and signed: $BUNDLE_DIR"
+
+# Recreate the Desktop alias so it survives rm -rf rebuilds
+DESKTOP="$HOME/Desktop"
+ALIAS_NAME="$APP_NAME.app"
+osascript <<APPLESCRIPT
+tell application "Finder"
+    set appFile to POSIX file "$BUNDLE_DIR" as alias
+    set destFolder to POSIX file "$DESKTOP" as alias
+    -- Remove stale alias if present
+    try
+        set staleAlias to file "$ALIAS_NAME" of destFolder
+        delete staleAlias
+    end try
+    make alias file to appFile at destFolder
+    set name of result to "$ALIAS_NAME"
+end tell
+APPLESCRIPT
+
+echo "Desktop alias updated: $DESKTOP/$ALIAS_NAME"
 echo "Open with: open \"$BUNDLE_DIR\""
