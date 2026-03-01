@@ -988,6 +988,19 @@ private extension LiveAppGateway {
         Apply PROGRESS / HOLD_LOCK / NEUTRAL signals from prior logs.
         """)
 
+        SUPPLEMENTAL SELECTION GOAL:
+        Supplemental days (Tue/Thu/Sat) exist for one purpose: maximum aesthetic impact on the upper body, without impairing Fort performance. This is the primary selection criterion — not variety for its own sake, not general fitness. Choose exercises that maximally develop the following, in priority order:
+          1. Arms — biceps shape + triceps fullness (HIGH priority)
+          2. Delts — medial delt cap for shoulder width, rear delt for 3D look (HIGH priority)
+          3. Upper chest — clavicular pec "pop" via incline pressing and fly patterns (HIGH priority)
+          4. Back detail — upper-back density, rear-delt tie-in, posture (HIGH priority)
+        Favour isolation and cable/DB work that directly targets these groups. Avoid exercise drift into general conditioning or functional patterns that don't serve the aesthetic priority list. Stimulus-efficient hypertrophy only — no junk volume.
+
+        INTERFERENCE PROTECTION (non-negotiable):
+        - Tuesday: protect Wednesday bench — no heavy chest/triceps/front-delt loading, no barbell pressing.
+        - Thursday: protect Friday deadlift — no loaded carries, no heavy rows, no heavy biceps (>6 hard sets), no grip-fatiguing work.
+        - Saturday: protect Monday squat and overall recovery — no heavy lower back, no spinal fatigue, no junk volume.
+
         CORE PRINCIPLES:
         - Supplemental days (Tue/Thu/Sat) are ALL strictly upper body. Program biceps, triceps, shoulders (lateral raises, rear delts, face pulls, Y-raises), upper chest (incline press), and upper back (rows, cable work). This applies equally to Tuesday, Thursday, and Saturday — there is no lower body supplemental day.
         - NEVER program lower body exercises on supplemental days. This ban includes: squats, deadlifts, Romanian deadlifts, hip hinges, kettlebell swings, hyperextensions, back extensions, leg press, lunges, leg curls, or any lower-body-dominant movement. Lower body work belongs exclusively to Fort days (Mon/Wed/Fri).
