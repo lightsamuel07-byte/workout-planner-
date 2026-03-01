@@ -609,6 +609,38 @@ final class FortCompilerParityTests: XCTestCase {
     Rx
     """
 
+    // Giant-set instructional lines like "Perform one set every 4 minutes" must never
+    // be extracted as exercise anchors — they are section-level directives, not exercises.
+    // These leaked as phantom "E1" entries in generated plans, forcing the repair system
+    // to insert fake exercises and wasting the correction pass on a non-issue.
+    func testParseFortDayFiltersGiantSetInstructionLines() {
+        let textWithGiantSetInstruction = """
+        THE PAY OFF
+        Perform one set every 4 minutes
+        3 Sets
+        1
+        2
+        3
+        60 DEGREE INCLINE BENCH PRESS
+        Reps
+        Weight
+        OFFSET DB RDL CONTRALATERAL
+        Reps
+        Weight
+        SINGLE ARM DB ROW
+        Reps
+        """
+        let parsed = parseFortDay(dayName: "Monday", workoutText: textWithGiantSetInstruction)
+        let allExercises = parsed.sections.flatMap { $0.exercises }
+        XCTAssertFalse(
+            allExercises.contains(where: { $0.lowercased().hasPrefix("perform") }),
+            "Instructional 'Perform one set every…' must not be extracted as an exercise anchor. Found: \(allExercises)"
+        )
+        XCTAssertTrue(allExercises.contains("60 DEGREE INCLINE BENCH PRESS"), "60 DEGREE INCLINE BENCH PRESS must be extracted")
+        XCTAssertTrue(allExercises.contains("OFFSET DB RDL CONTRALATERAL"), "OFFSET DB RDL CONTRALATERAL must be extracted")
+        XCTAssertTrue(allExercises.contains("SINGLE ARM DB ROW"), "SINGLE ARM DB ROW must be extracted")
+    }
+
     // When the Fort narrative intro contains "THAW:" as a standalone ALL-CAPS label
     // before the structured section tables, the compiler must not emit an empty
     // conditioning section (it would appear at the top of the preview with "?").
@@ -669,6 +701,9 @@ final class FortCompilerParityTests: XCTestCase {
         XCTAssertFalse(allExercises.contains("THE PAY OFF"), "Section header leaked as exercise")
         XCTAssertFalse(allExercises.contains("METERS"), "Table header leaked as exercise")
         XCTAssertFalse(allExercises.contains("Meters"), "Table header leaked as exercise")
+        // Giant-set instructional directive must not leak as an exercise
+        XCTAssertFalse(allExercises.contains(where: { $0.lowercased().hasPrefix("perform") }),
+            "Giant-set directive 'Perform one set every…' must not be extracted as an exercise")
 
         // Compiled sections should have correct block letters (A, B, C, E, F — not F, G)
         let compiled = parsed.compiledSections

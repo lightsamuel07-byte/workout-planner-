@@ -177,7 +177,7 @@ struct LiveAppGateway: NativeAppGateway {
         let anthropic = integrations.makeAnthropicClient(
             apiKey: config.anthropicAPIKey,
             model: "claude-sonnet-4-6",
-            maxTokens: 4096
+            maxTokens: 8192
         )
 
         emit(.requestingModel, "Requesting plan from Anthropic.")
@@ -1009,6 +1009,7 @@ private extension LiveAppGateway {
         - Include all seven days (Mon-Sun).
         - Keep A:H sheet compatibility (Block, Exercise, Sets, Reps, Load, Rest, Notes, Log).
         - American spelling.
+        - Notes: maximum 1-2 concise coaching cues per exercise (1 sentence each). Do not reproduce lengthy program descriptions or background context. Focus on execution — what the athlete should feel or do differently.
         """
     }
 

@@ -227,6 +227,10 @@ private let nonExercisePatterns: [NSRegularExpression] = [
     makeRegex("^WRITE\\s+NOTES\\b", options: [.caseInsensitive]),
     makeRegex("^HIP\\s+CIRCLE\\s+IS\\s+OPTIONAL\\b", options: [.caseInsensitive]),
     makeRegex("^\\d+\\s*SECONDS?\\s+AT\\s+\\d+(?:\\.\\d+)?\\b", options: [.caseInsensitive]),
+    // Instructional giant-set directives (e.g. "Perform one set every 4 minutes")
+    makeRegex("^PERFORM\\b", options: [.caseInsensitive]),
+    makeRegex("^MOVE\\s+THROUGH\\b", options: [.caseInsensitive]),
+    makeRegex("^COMPLETE\\s+ALL\\b", options: [.caseInsensitive]),
 ]
 
 private let metadataExact: Set<String> = [
