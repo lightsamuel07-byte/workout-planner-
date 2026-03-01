@@ -912,7 +912,11 @@ public func parseFortDay(dayName: String, workoutText: String, sectionOverrides:
         }
     }
 
+    // Drop sections with no exercises — these are phantom matches from the narrative
+    // intro paragraph (e.g. "THAW: AEROBIC POWER" as a summary label before the
+    // structured section tables). The real section will appear later with actual rows.
     let normalizedSections = normalizeDynamicSections(sections)
+        .filter { !$0.exercises.isEmpty }
     let parsedSections = normalizedSections.map {
         FortParsedSection(
             sectionID: $0.sectionID,

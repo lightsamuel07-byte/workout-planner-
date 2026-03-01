@@ -609,6 +609,37 @@ final class FortCompilerParityTests: XCTestCase {
     Rx
     """
 
+    // When the Fort narrative intro contains "THAW:" as a standalone ALL-CAPS label
+    // before the structured section tables, the compiler must not emit an empty
+    // conditioning section (it would appear at the top of the preview with "?").
+    func testParseFortDayFiltersPhantomEmptySectionsFromNarrativeLabels() {
+        let textWithNarrativeThaw = """
+        Monday 3.02.26Breakthrough Season #1
+        PREPARE TO ENGAGE: warmup description here.
+        THAW:
+        PREPARE TO ENGAGE
+        CROSSOVER SYMMETRY W/Y NEGATIVE
+        TERMINAL KNEE EXTENSION
+        THAW - AEROBIC POWER
+        ROWERG
+        """
+        let parsed = parseFortDay(dayName: "Monday", workoutText: textWithNarrativeThaw)
+        // The narrative "THAW:" line has no exercises — it must be filtered out.
+        // The real "THAW - AEROBIC POWER" section has ROWERG and must be present.
+        let emptySections = parsed.sections.filter { $0.exercises.isEmpty }
+        XCTAssertTrue(emptySections.isEmpty,
+            "Phantom empty sections must be filtered; found: \(emptySections.map(\.rawHeader))")
+        // Conditioning section must exist (from the real THAW - AEROBIC POWER line)
+        let conditioningSection = parsed.sections.first(where: { $0.sectionID == "conditioning" })
+        XCTAssertNotNil(conditioningSection, "Real conditioning section must be present")
+        XCTAssertFalse(conditioningSection?.exercises.isEmpty ?? true,
+            "Real conditioning section must have exercises")
+        // prep_mobility block letter must be A (not shifted by phantom rank-6 section)
+        let prepCompiled = parsed.compiledSections.first(where: { $0.sectionID == "prep_mobility" })
+        XCTAssertEqual(prepCompiled?.blockLetter, "A",
+            "prep_mobility must be block A; phantom THAW must not push rank to F")
+    }
+
     func testParseFortDayRealBreakthroughTextExtractsAllSections() {
         let parsed = parseFortDay(dayName: "Monday", workoutText: breakthroughRealFortText)
         let sectionIDs = Set(parsed.sections.map(\.sectionID))
