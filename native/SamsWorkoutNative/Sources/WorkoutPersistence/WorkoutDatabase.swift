@@ -950,6 +950,10 @@ public struct WorkoutDatabase: Sendable {
                 JOIN workout_sessions ws ON ws.id = el.session_id
                 JOIN exercises e ON e.id = el.exercise_id
                 WHERE TRIM(COALESCE(el.log_text, '')) <> ''
+                  -- Exclude test-phase warm-up sets (e.g. "Back Squat (Warm-up Set 1)").
+                  -- These are light percentage-based ramp sets, not working sets, and
+                  -- pollute load recommendations if treated as representative history.
+                  AND LOWER(e.name) NOT LIKE '%warm-up set%'
                 ORDER BY COALESCE(ws.session_date, '') DESC, el.id DESC
                 LIMIT ?
                 """,

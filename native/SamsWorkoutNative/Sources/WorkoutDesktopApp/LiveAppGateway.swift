@@ -1006,10 +1006,11 @@ private extension LiveAppGateway {
 
         OUTPUT REQUIREMENTS:
         - Use ## day headers and ### block.exercise headers.
-        - Include all seven days (Mon-Sun).
+        - Include six training days (Mon-Sat). Sunday is always complete rest — do not generate a Sunday block.
         - Keep A:H sheet compatibility (Block, Exercise, Sets, Reps, Load, Rest, Notes, Log).
         - American spelling.
         - Notes: maximum 1-2 concise coaching cues per exercise (1 sentence each). Do not reproduce lengthy program descriptions or background context. Focus on execution — what the athlete should feel or do differently.
+        - Sparse history rule: for Fort aux exercises with fewer than 2 logged sessions in DB context, base load on 1RM percentages (30-40% of the most relevant main lift 1RM for hypertrophy rep ranges) rather than extrapolating from a single data point.
         """
     }
 
@@ -1558,9 +1559,8 @@ private extension LiveAppGateway {
             rows.append([])
         }
 
-        rows.append(["AI Generation Summary", "", "", "", "", "", "", ""])
-        rows.append(["Validation", "", "", "", "", "", validationSummary, ""])
-        rows.append(["Fort Fidelity", "", "", "", "", "", fidelitySummary, ""])
+        // Validation metadata is intentionally NOT written to the sheet —
+        // it pollutes the sync data and creates noise rows in the exercise history.
 
         return rows.map { GoogleSheetsClient.enforceEightColumnSchema($0) }
     }
