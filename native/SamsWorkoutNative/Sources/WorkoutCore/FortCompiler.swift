@@ -638,6 +638,16 @@ private func isExerciseCandidate(_ value: String) -> Bool {
     if normalized.rangeOfCharacter(from: .letters) == nil {
         return false
     }
+    // Reject lowercase coaching cues / instructional sentences ending with a period
+    // (e.g. "Controlled eccentric tempo." or "Reps are per side.").
+    // Real exercise names are either all-caps or mixed-case proper nouns — not sentences.
+    if normalized.hasSuffix(".") {
+        let letters = normalized.filter { $0.isLetter }
+        let upperCount = letters.filter { $0.isUppercase }.count
+        if !letters.isEmpty && Double(upperCount) / Double(letters.count) < 0.60 {
+            return false
+        }
+    }
     return true
 }
 
