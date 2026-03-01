@@ -35,6 +35,23 @@ public enum HTTPClientError: Error, Equatable {
     case invalidStatus(Int, String)
 }
 
+extension HTTPClientError: LocalizedError {
+    public var errorDescription: String? {
+        switch self {
+        case .invalidResponse:
+            return "Received an invalid HTTP response."
+        case let .invalidStatus(statusCode, body):
+            let compactBody = body
+                .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if compactBody.isEmpty {
+                return "HTTP request failed with status \(statusCode)."
+            }
+            return "HTTP request failed with status \(statusCode): \(compactBody)"
+        }
+    }
+}
+
 public struct URLSessionHTTPClient: HTTPClient {
     private let session: URLSession
 

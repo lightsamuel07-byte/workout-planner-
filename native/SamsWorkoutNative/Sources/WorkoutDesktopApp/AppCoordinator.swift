@@ -2,6 +2,7 @@ import Foundation
 import Combine
 import SwiftUI
 import WorkoutCore
+import WorkoutIntegrations
 
 @MainActor
 final class AppCoordinator: ObservableObject {
@@ -734,7 +735,7 @@ if !generationStatus.isEmpty {
             // User navigated away before the fetch completed — not an error.
             return
         } catch {
-            viewPlanError = "Unable to load plan: \(error.localizedDescription)"
+            viewPlanError = "Unable to load plan: \(planLoadErrorDescription(error))"
             if planSnapshot.days.isEmpty {
                 planSnapshot = .empty
             }
@@ -1050,6 +1051,36 @@ if !generationStatus.isEmpty {
             return .success
         }
         return .info
+    }
+
+    private func planLoadErrorDescription(_ error: Error) -> String {
+        if let httpError = error as? HTTPClientError {
+            switch httpError {
+            case .invalidResponse:
+                return "Received an invalid HTTP response from an upstream service."
+            case let .invalidStatus(statusCode, body):
+                let compactBody = body
+                    .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                if compactBody.isEmpty {
+                    return "HTTP status \(statusCode)."
+                }
+                return "HTTP status \(statusCode): \(String(compactBody.prefix(320)))"
+            }
+        }
+
+        if let gatewayError = error as? LiveGatewayError,
+           let description = gatewayError.errorDescription,
+           !description.isEmpty {
+            return description
+        }
+
+        let localized = error.localizedDescription.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !localized.isEmpty, !localized.contains("HTTPClientError error 0") {
+            return localized
+        }
+
+        return String(describing: error)
     }
 
     private func estimatedVolume(for row: PlanExerciseRow) -> Double {
