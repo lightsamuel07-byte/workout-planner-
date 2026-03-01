@@ -958,6 +958,10 @@ private extension LiveAppGateway {
 
         \(progressionDirectivesBlock)
 
+        LOAD CALCULATION RULE:
+        - Training max override: if Fort coach notes define a "training max" or "working max" (e.g., "use 90% of your 1RM as training max"), apply that definition first, then calculate all set percentages from that training max — not from the raw 1RM.
+        - Load rounding: barbell lifts → nearest 0.5 kg; DB loads → nearest even 2 kg step.
+
         FORT WORKOUT CONVERSION (CRITICAL):
         - The Fort workouts below (Mon/Wed/Fri) are raw inputs and MUST be converted into markdown exercise rows.
         - Treat "FORT COMPILER DIRECTIVES" section order and listed exercise anchors as hard constraints.
@@ -1000,6 +1004,8 @@ private extension LiveAppGateway {
         - Tuesday: protect Wednesday bench — no heavy chest/triceps/front-delt loading, no barbell pressing.
         - Thursday: protect Friday deadlift — no loaded carries, no heavy rows, no heavy biceps (>6 hard sets), no grip-fatiguing work.
         - Saturday: protect Monday squat and overall recovery — no heavy lower back, no spinal fatigue, no junk volume.
+        - THAW conditioning: THAW intensity must not compromise next-day Fort performance. Even low-load conditioning (walking intervals, bike) should not push into fatigue that blunts Tuesday's or Wednesday's training. This is a fatigue management constraint, not just a format rule.
+        - Delt carry-over: If Monday Fort already included DB Lateral Raises, Tuesday must default to rear-delt / scapular hygiene work (e.g., Face Pull, Cable Y-Raise, Reverse Pec Deck, Rear Delt Fly) instead of lateral raise patterns. This protects Wednesday bench performance and avoids redundant medial-delt fatigue.
 
         CORE PRINCIPLES:
         - Supplemental days (Tue/Thu/Sat) are ALL strictly upper body. Program biceps, triceps, shoulders (lateral raises, rear delts, face pulls, Y-raises), upper chest (incline press), and upper back (rows, cable work). This applies equally to Tuesday, Thursday, and Saturday — there is no lower body supplemental day.
@@ -1015,8 +1021,8 @@ private extension LiveAppGateway {
         - Equipment: No belt on pulls, standing calves only. No split squats on supplemental days (Tue/Thu/Sat). Fort-trainer-programmed split squats on Mon/Wed/Fri are permitted and must not be swapped.
         - Dumbbells: even-number loads only (no odd DB loads except main barbell lifts).
         - Biceps: rotate grips (supinated -> neutral -> pronated), no repeated adjacent supplemental-day grip.
-        - Triceps: vary attachments Tue/Thu/Sat, no single-arm D-handle triceps on Saturday.
-        - Carries: Tuesday only.
+        - Triceps: vary attachments across Tue/Thu/Sat. Fort Friday triceps: prefer straight-bar attachment with heavier loading (strength-emphasis day). No single-arm D-handle triceps on Saturday.
+        - Carries: Tuesday only; use kettlebells exclusively — never dumbbells — to protect Friday deadlift grip.
         - Conditioning (THAW blocks): Sets = 1, Reps = total block duration (e.g. "12 min"), Load = 0. All interval structure, distances, pace targets, and effort cues go in Notes only. Example — correct: Reps = "12 min", Notes = "8 × 300m at tempo; 30 sec easy recovery between." Incorrect: Sets = 8, Reps = 300.
         - Canonical log format in sheets: performance | RPE x | Notes: ...
 
@@ -1028,6 +1034,7 @@ private extension LiveAppGateway {
         - Exercise names: Title Case only. Never use ALL CAPS for exercise names. Write "Pull Up" not "PULL UP", "Incline DB Press" not "INCLINE DB PRESS", "Barbell RDL" not "BARBELL RDL". Abbreviations (DB, KB, RDL, etc.) stay abbreviated but are not full caps of the entire name.
         - Notes: maximum 1-2 concise coaching cues per exercise (1 sentence each). Do not reproduce lengthy program descriptions or background context. Focus on execution — what the athlete should feel or do differently.
         - Sparse history rule: for Fort aux exercises with fewer than 2 logged sessions, infer an appropriate starting load from the athlete's overall strength profile, similar exercise history, the prescribed rep range, and a target RPE of 7-8. Use intelligent inference — not a fixed percentage formula.
+        - Sauna: include a sauna block at the end of each training day (Mon-Sat) where contextually appropriate. Format it as a single block entry (e.g., "G1. Sauna") with a short duration note.
         """
     }
 
