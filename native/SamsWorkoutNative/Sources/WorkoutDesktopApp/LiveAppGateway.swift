@@ -69,6 +69,7 @@ struct LiveAppGateway: NativeAppGateway {
     let nowProvider: () -> Date
     let planWriteMode: PlanWriteMode
     let cachedDatabase: ThreadSafeBox<WorkoutDatabase?>
+    let bidirectionalSyncSummary: ThreadSafeBox<String>
 
     init(
         integrations: IntegrationsFacade = IntegrationsFacade(),
@@ -85,6 +86,7 @@ struct LiveAppGateway: NativeAppGateway {
         self.nowProvider = nowProvider
         self.planWriteMode = planWriteMode
         self.cachedDatabase = ThreadSafeBox(nil)
+        self.bidirectionalSyncSummary = ThreadSafeBox("")
     }
 
     func initialRoute() -> AppRoute {
@@ -121,6 +123,10 @@ struct LiveAppGateway: NativeAppGateway {
 }
 
 extension LiveAppGateway {
+    func latestBidirectionalSyncSummary() -> String {
+        bidirectionalSyncSummary.get()
+    }
+
     func requireGenerationSetup() throws -> NativeAppConfiguration {
         let config = configStore.load()
         let key = config.anthropicAPIKey.trimmingCharacters(in: .whitespacesAndNewlines)

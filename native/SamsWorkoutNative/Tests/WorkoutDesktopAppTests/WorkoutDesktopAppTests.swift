@@ -87,6 +87,15 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertFalse(coordinator.generationProgressLog.isEmpty)
     }
 
+    func testRunBidirectionalSyncNowUpdatesStatus() async {
+        let coordinator = makeCoordinator()
+        await coordinator.runBidirectionalSyncNow()
+
+        XCTAssertFalse(coordinator.bidirectionalSyncStatus.isEmpty)
+        XCTAssertTrue(coordinator.bidirectionalSyncStatus.lowercased().contains("bidirectional"))
+        XCTAssertNotNil(coordinator.lastBidirectionalSyncAt)
+    }
+
     func testRebuildDBCacheUpdatesStatus() async {
         let coordinator = makeCoordinator()
         await coordinator.triggerRebuildDBCache()
@@ -146,6 +155,45 @@ final class WorkoutDesktopAppTests: XCTestCase {
         XCTAssertEqual(parsed.0, "Done")
         XCTAssertEqual(parsed.1, "8")
         XCTAssertEqual(parsed.2, "steady")
+    }
+
+    func testBidirectionalResolverPullsFromSheetWhenOnlySheetChanged() {
+        let decision = LiveAppGateway.testResolveBidirectionalLogDecision(
+            sheetLog: "Done | RPE 8.5",
+            dbLog: "Done | RPE 8",
+            lastSyncedSheetLog: "Done | RPE 8",
+            lastSyncedDBLog: "Done | RPE 8"
+        )
+
+        XCTAssertEqual(decision.resolvedLog, "Done | RPE 8.5")
+        XCTAssertEqual(decision.resolution, "pull_from_sheet")
+        XCTAssertFalse(decision.countsAsConflict)
+    }
+
+    func testBidirectionalResolverPushesToSheetsWhenOnlyDBChanged() {
+        let decision = LiveAppGateway.testResolveBidirectionalLogDecision(
+            sheetLog: "Done | RPE 8",
+            dbLog: "Done | RPE 8.5",
+            lastSyncedSheetLog: "Done | RPE 8",
+            lastSyncedDBLog: "Done | RPE 8"
+        )
+
+        XCTAssertEqual(decision.resolvedLog, "Done | RPE 8.5")
+        XCTAssertEqual(decision.resolution, "push_to_sheets")
+        XCTAssertFalse(decision.countsAsConflict)
+    }
+
+    func testBidirectionalResolverFlagsConflictWhenBothSidesChangedDifferently() {
+        let decision = LiveAppGateway.testResolveBidirectionalLogDecision(
+            sheetLog: "Done | RPE 9",
+            dbLog: "Done | RPE 7.5",
+            lastSyncedSheetLog: "Done | RPE 8",
+            lastSyncedDBLog: "Done | RPE 8"
+        )
+
+        XCTAssertEqual(decision.resolvedLog, "Done | RPE 9")
+        XCTAssertEqual(decision.resolution, "conflict_resolved_to_sheet")
+        XCTAssertTrue(decision.countsAsConflict)
     }
 
     func testMarkdownDayParserHandlesFlexiblePrescriptionSyntax() {

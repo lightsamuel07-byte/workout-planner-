@@ -1,0 +1,22 @@
+Date: 2026-03-03
+Runtime scope: Native Swift app only (`native/SamsWorkoutNative`)
+
+Built this session:
+- Added bidirectional log reconciliation engine between Google Sheets and local GRDB cache (force-remote refresh path).
+- Added new persistence migration `v3_log_sync_state` with row-level sync checkpointing.
+- Added DB APIs for session-log row reads and sync-state upserts/fetches.
+- Integrated reconciliation into `LiveAppGateway.loadPlanSnapshot(forceRemote: true)`.
+- Added Settings UI surface for manual sync run + last-sync status in native app.
+- Added tests for sync-state persistence, merge-rule behavior, and coordinator sync action.
+
+Verification:
+- `swift test` passed: 162 tests, 3 skipped, 0 failures.
+- `bash scripts/build_local_app.sh` passed.
+- Live smoke check passed: `RUN_LIVE_E2E=1 swift test --filter WorkoutDesktopAppLiveE2ETests/testLiveWeeklySheetNamesContainNo2099Tabs`.
+
+Implementation plan phase mapping:
+- Phase 3 (Data and Reliability): advanced with deterministic bidirectional reconciliation and durable sync state.
+- Phase 5 (QA Hardening): expanded regression coverage around sync conflict rules and persistence.
+
+In progress / next:
+- Optional next hardening: run a live end-to-end conflict scenario test that intentionally diverges one row DB-vs-Sheets and validates deterministic reconciliation counters.

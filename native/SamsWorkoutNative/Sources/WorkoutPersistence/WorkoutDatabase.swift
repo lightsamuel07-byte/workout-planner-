@@ -226,6 +226,65 @@ public struct PersistedTargetedLogContextRow: Equatable, Sendable {
     }
 }
 
+public struct PersistedSessionLogRow: Equatable, Sendable {
+    public let sourceRow: Int
+    public let exerciseName: String
+    public let block: String
+    public let prescribedSets: String
+    public let prescribedReps: String
+    public let prescribedLoad: String
+    public let prescribedRest: String
+    public let prescribedNotes: String
+    public let logText: String
+
+    public init(
+        sourceRow: Int,
+        exerciseName: String,
+        block: String,
+        prescribedSets: String,
+        prescribedReps: String,
+        prescribedLoad: String,
+        prescribedRest: String,
+        prescribedNotes: String,
+        logText: String
+    ) {
+        self.sourceRow = sourceRow
+        self.exerciseName = exerciseName
+        self.block = block
+        self.prescribedSets = prescribedSets
+        self.prescribedReps = prescribedReps
+        self.prescribedLoad = prescribedLoad
+        self.prescribedRest = prescribedRest
+        self.prescribedNotes = prescribedNotes
+        self.logText = logText
+    }
+}
+
+public struct PersistedLogSyncState: Equatable, Sendable {
+    public let sheetName: String
+    public let dayLabel: String
+    public let sourceRow: Int
+    public let lastSyncedSheetLog: String
+    public let lastSyncedDBLog: String
+    public let lastResolution: String
+
+    public init(
+        sheetName: String,
+        dayLabel: String,
+        sourceRow: Int,
+        lastSyncedSheetLog: String,
+        lastSyncedDBLog: String,
+        lastResolution: String
+    ) {
+        self.sheetName = sheetName
+        self.dayLabel = dayLabel
+        self.sourceRow = sourceRow
+        self.lastSyncedSheetLog = lastSyncedSheetLog
+        self.lastSyncedDBLog = lastSyncedDBLog
+        self.lastResolution = lastResolution
+    }
+}
+
 public struct WorkoutSyncEntry: Equatable, Sendable {
     public let sourceRow: Int
     public let exerciseName: String
@@ -415,6 +474,26 @@ public struct WorkoutDatabase: Sendable {
             }
         }
 
+        migrator.registerMigration("v3_log_sync_state") { db in
+            try db.create(table: "log_sync_state", ifNotExists: true) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("sheet_name", .text).notNull()
+                t.column("day_label", .text).notNull()
+                t.column("source_row", .integer).notNull()
+                t.column("last_synced_sheet_log", .text).notNull().defaults(to: "")
+                t.column("last_synced_db_log", .text).notNull().defaults(to: "")
+                t.column("last_resolution", .text).notNull().defaults(to: "unchanged")
+                t.column("updated_at", .text).notNull().defaults(sql: "CURRENT_TIMESTAMP")
+                t.uniqueKey(["sheet_name", "day_label", "source_row"])
+            }
+            try db.create(
+                index: "idx_log_sync_state_sheet_day",
+                on: "log_sync_state",
+                columns: ["sheet_name", "day_label"],
+                ifNotExists: true
+            )
+        }
+
         try migrator.migrate(dbQueue)
     }
 
@@ -529,6 +608,112 @@ public struct WorkoutDatabase: Sendable {
             let logs = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exercise_logs") ?? 0
             let withRPE = try Int.fetchOne(db, sql: "SELECT COUNT(*) FROM exercise_logs WHERE parsed_rpe IS NOT NULL") ?? 0
             return WorkoutDBSummary(exercises: exercises, sessions: sessions, exerciseLogs: logs, logsWithRPE: withRPE)
+        }
+    }
+
+    public func fetchSessionLogRows(sheetName: String, dayLabel: String) throws -> [PersistedSessionLogRow] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    el.source_row AS source_row,
+                    COALESCE(e.name, '') AS exercise_name,
+                    COALESCE(el.block, '') AS block,
+                    COALESCE(el.prescribed_sets, '') AS prescribed_sets,
+                    COALESCE(el.prescribed_reps, '') AS prescribed_reps,
+                    COALESCE(el.prescribed_load, '') AS prescribed_load,
+                    COALESCE(el.prescribed_rest, '') AS prescribed_rest,
+                    COALESCE(el.prescribed_notes, '') AS prescribed_notes,
+                    COALESCE(el.log_text, '') AS log_text
+                FROM exercise_logs el
+                JOIN workout_sessions ws ON ws.id = el.session_id
+                JOIN exercises e ON e.id = el.exercise_id
+                WHERE ws.sheet_name = ?
+                  AND ws.day_label = ?
+                ORDER BY el.source_row ASC
+                """,
+                arguments: [sheetName, dayLabel]
+            )
+
+            return rows.map { row in
+                PersistedSessionLogRow(
+                    sourceRow: row["source_row"],
+                    exerciseName: row["exercise_name"],
+                    block: row["block"],
+                    prescribedSets: row["prescribed_sets"],
+                    prescribedReps: row["prescribed_reps"],
+                    prescribedLoad: row["prescribed_load"],
+                    prescribedRest: row["prescribed_rest"],
+                    prescribedNotes: row["prescribed_notes"],
+                    logText: row["log_text"]
+                )
+            }
+        }
+    }
+
+    public func fetchLogSyncStateRows(sheetName: String, dayLabel: String) throws -> [PersistedLogSyncState] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    sheet_name,
+                    day_label,
+                    source_row,
+                    COALESCE(last_synced_sheet_log, '') AS last_synced_sheet_log,
+                    COALESCE(last_synced_db_log, '') AS last_synced_db_log,
+                    COALESCE(last_resolution, '') AS last_resolution
+                FROM log_sync_state
+                WHERE sheet_name = ?
+                  AND day_label = ?
+                ORDER BY source_row ASC
+                """,
+                arguments: [sheetName, dayLabel]
+            )
+
+            return rows.map { row in
+                PersistedLogSyncState(
+                    sheetName: row["sheet_name"],
+                    dayLabel: row["day_label"],
+                    sourceRow: row["source_row"],
+                    lastSyncedSheetLog: row["last_synced_sheet_log"],
+                    lastSyncedDBLog: row["last_synced_db_log"],
+                    lastResolution: row["last_resolution"]
+                )
+            }
+        }
+    }
+
+    public func upsertLogSyncState(_ state: PersistedLogSyncState) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO log_sync_state (
+                    sheet_name,
+                    day_label,
+                    source_row,
+                    last_synced_sheet_log,
+                    last_synced_db_log,
+                    last_resolution,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                ON CONFLICT(sheet_name, day_label, source_row) DO UPDATE SET
+                    last_synced_sheet_log = excluded.last_synced_sheet_log,
+                    last_synced_db_log = excluded.last_synced_db_log,
+                    last_resolution = excluded.last_resolution,
+                    updated_at = datetime('now')
+                """,
+                arguments: [
+                    state.sheetName,
+                    state.dayLabel,
+                    state.sourceRow,
+                    state.lastSyncedSheetLog,
+                    state.lastSyncedDBLog,
+                    state.lastResolution,
+                ]
+            )
         }
     }
 

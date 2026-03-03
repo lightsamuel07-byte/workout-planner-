@@ -26,6 +26,7 @@ protocol NativeAppGateway {
     func loadInBodyScans() -> [InBodyScan]
     func saveInBodyScan(_ scan: InBodyScan) throws
     func deleteInBodyScan(scanDate: String) throws
+    func latestBidirectionalSyncSummary() -> String
 }
 
 extension NativeAppGateway {
@@ -91,6 +92,7 @@ extension NativeAppGateway {
     func loadInBodyScans() -> [InBodyScan] { [] }
     func saveInBodyScan(_ scan: InBodyScan) throws { let _ = scan }
     func deleteInBodyScan(scanDate: String) throws { let _ = scanDate }
+    func latestBidirectionalSyncSummary() -> String { "" }
 }
 
 struct InMemoryAppGateway: NativeAppGateway {
@@ -220,5 +222,9 @@ struct InMemoryAppGateway: NativeAppGateway {
             MuscleGroupVolume(muscleGroup: "AUXILIARY", volume: 8500, exerciseCount: 6),
             MuscleGroupVolume(muscleGroup: "BREAKPOINT", volume: 6200, exerciseCount: 2),
         ]
+    }
+
+    func latestBidirectionalSyncSummary() -> String {
+        "Bidirectional sync summary is available only in live gateway mode."
     }
 }

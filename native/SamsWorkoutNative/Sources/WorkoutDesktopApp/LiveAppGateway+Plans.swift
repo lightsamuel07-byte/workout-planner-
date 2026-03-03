@@ -15,7 +15,17 @@ extension LiveAppGateway {
                 let sheetNames = try await sheetsClient.fetchSheetNames()
                 if let preferredSheet = preferredWeeklyPlanSheetName(sheetNames) {
                     let values = try await sheetsClient.readSheetAtoH(sheetName: preferredSheet)
-                    let days = PlanTextParser.sheetDaysToPlanDays(values: values, source: .googleSheets)
+                    let effectiveValues: [[String]]
+                    if forceRemote {
+                        effectiveValues = try await reconcileBidirectionalLogs(
+                            sheetName: preferredSheet,
+                            values: values,
+                            sheetsClient: sheetsClient
+                        )
+                    } else {
+                        effectiveValues = values
+                    }
+                    let days = PlanTextParser.sheetDaysToPlanDays(values: effectiveValues, source: .googleSheets)
                     if !days.isEmpty {
                         return PlanSnapshot(
                             title: PlanTextParser.normalizedPlanTitle(preferredSheet),

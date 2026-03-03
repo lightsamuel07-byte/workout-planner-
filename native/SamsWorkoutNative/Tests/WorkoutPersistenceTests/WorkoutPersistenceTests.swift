@@ -441,4 +441,100 @@ final class WorkoutPersistenceTests: XCTestCase {
 
         XCTAssertEqual(inferred, "2026-02-24")
     }
+
+    func testLogSyncStateUpsertAndFetch() throws {
+        let path = tempDBPath("log_sync_state")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+
+        try database.upsertLogSyncState(
+            PersistedLogSyncState(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Tuesday 2/24",
+                sourceRow: 7,
+                lastSyncedSheetLog: "Done | RPE 8",
+                lastSyncedDBLog: "Done | RPE 8",
+                lastResolution: "pull_from_sheet"
+            )
+        )
+
+        // Verify upsert updates the same unique key row.
+        try database.upsertLogSyncState(
+            PersistedLogSyncState(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Tuesday 2/24",
+                sourceRow: 7,
+                lastSyncedSheetLog: "Done | RPE 8.5",
+                lastSyncedDBLog: "Done | RPE 8.5",
+                lastResolution: "push_to_sheets"
+            )
+        )
+
+        let states = try database.fetchLogSyncStateRows(
+            sheetName: "Weekly Plan (2/23/2026)",
+            dayLabel: "Tuesday 2/24"
+        )
+        XCTAssertEqual(states.count, 1)
+        XCTAssertEqual(states.first?.sourceRow, 7)
+        XCTAssertEqual(states.first?.lastSyncedSheetLog, "Done | RPE 8.5")
+        XCTAssertEqual(states.first?.lastSyncedDBLog, "Done | RPE 8.5")
+        XCTAssertEqual(states.first?.lastResolution, "push_to_sheets")
+    }
+
+    func testFetchSessionLogRowsReturnsRowsForSpecificSession() throws {
+        let path = tempDBPath("session_log_rows")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+        let syncService = WorkoutSyncService(database: database)
+
+        _ = try syncService.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Monday 2/23",
+                fallbackDayName: "Monday",
+                fallbackDateISO: "2026-02-23",
+                entries: [
+                    WorkoutSyncEntry(
+                        sourceRow: 3,
+                        exerciseName: "Back Squat",
+                        block: "A1",
+                        prescribedSets: "5",
+                        prescribedReps: "3",
+                        prescribedLoad: "100",
+                        prescribedRest: "180",
+                        prescribedNotes: "Depth",
+                        logText: "Done | RPE 8",
+                        explicitRPE: "",
+                        parsedNotes: ""
+                    ),
+                    WorkoutSyncEntry(
+                        sourceRow: 4,
+                        exerciseName: "Bench Press",
+                        block: "B1",
+                        prescribedSets: "4",
+                        prescribedReps: "6",
+                        prescribedLoad: "80",
+                        prescribedRest: "120",
+                        prescribedNotes: "Pause",
+                        logText: "",
+                        explicitRPE: "",
+                        parsedNotes: ""
+                    ),
+                ],
+                includeEmptyLogs: true
+            )
+        )
+
+        let rows = try database.fetchSessionLogRows(
+            sheetName: "Weekly Plan (2/23/2026)",
+            dayLabel: "Monday 2/23"
+        )
+
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertEqual(rows[0].sourceRow, 3)
+        XCTAssertEqual(rows[0].exerciseName, "Back Squat")
+        XCTAssertEqual(rows[0].logText, "Done | RPE 8")
+        XCTAssertEqual(rows[1].sourceRow, 4)
+        XCTAssertEqual(rows[1].exerciseName, "Bench Press")
+    }
 }

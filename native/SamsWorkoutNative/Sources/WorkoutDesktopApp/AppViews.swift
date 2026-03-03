@@ -2016,6 +2016,42 @@ struct SettingsPageView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                         }
+
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        Text("Bidirectional Sync")
+                            .font(.headline)
+
+                        Text("Reconciles log differences between Google Sheets and the local DB cache with deterministic conflict resolution.")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+
+                        HStack(spacing: 12) {
+                            Button {
+                                Task { await coordinator.runBidirectionalSyncNow() }
+                            } label: {
+                                if coordinator.isBidirectionalSyncing {
+                                    Label("Syncing…", systemImage: "arrow.triangle.2.circlepath")
+                                } else {
+                                    Label("Run Sync Now", systemImage: "arrow.triangle.2.circlepath")
+                                }
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(coordinator.isBidirectionalSyncing)
+
+                            if let syncedAt = coordinator.lastBidirectionalSyncAt {
+                                Text("Last synced: \(coordinator.formatTimestamp(syncedAt))")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+
+                        if !coordinator.bidirectionalSyncStatus.isEmpty {
+                            Text(coordinator.bidirectionalSyncStatus)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                 }

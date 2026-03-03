@@ -100,3 +100,8 @@ Last updated: 2026-02-28
 - New rule: SSE parser must flush pending `data:` on both blank-line boundaries and when a new `event:` line begins.
 - Correction received: stream callback propagation can fail strict Swift concurrency checks.
 - New rule: callbacks crossing actor boundaries must be `@Sendable`, and UI updates from stream callbacks must hop explicitly to `MainActor`.
+
+## Session Corrections (2026-03-03)
+
+- Correction received: user is now exclusively on the native Swift app track.
+- New rule: scope planning, implementation, and verification to `native/SamsWorkoutNative` by default unless the user explicitly requests Streamlit/Python work.

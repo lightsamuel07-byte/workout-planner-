@@ -30,6 +30,9 @@ final class AppCoordinator: ObservableObject {
     @Published var exerciseCatalog: [String] = []
     @Published var isRebuildingDBCache = false
     @Published var dbRebuildSummary = ""
+    @Published var isBidirectionalSyncing = false
+    @Published var bidirectionalSyncStatus = ""
+    @Published var lastBidirectionalSyncAt: Date?
 
     @Published var planSearchQuery = ""
     @Published var showPlanNotes = true
@@ -740,6 +743,27 @@ if !generationStatus.isEmpty {
                 planSnapshot = .empty
             }
         }
+    }
+
+    func runBidirectionalSyncNow() async {
+        if isBidirectionalSyncing {
+            return
+        }
+
+        isBidirectionalSyncing = true
+        bidirectionalSyncStatus = "Running bidirectional log sync with Google Sheets..."
+        defer { isBidirectionalSyncing = false }
+
+        await refreshPlanSnapshot(forceRemote: true)
+        if !viewPlanError.isEmpty {
+            bidirectionalSyncStatus = viewPlanError
+            return
+        }
+
+        let summary = gateway.latestBidirectionalSyncSummary()
+        bidirectionalSyncStatus = summary.isEmpty ? "Bidirectional log sync complete." : summary
+        lastBidirectionalSyncAt = Date()
+        refreshAnalytics()
     }
 
     func refreshAnalytics() {
