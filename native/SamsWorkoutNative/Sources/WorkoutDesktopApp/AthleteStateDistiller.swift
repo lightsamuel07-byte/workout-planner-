@@ -359,7 +359,8 @@ enum AthleteStateDistiller {
     static func formatForPrompt(
         states: [ExerciseAthleteState],
         dbSummaryLine: String,
-        rawContextChars: Int = 0
+        rawContextChars: Int = 0,
+        progressionInsights: [ProgressionInsight] = []
     ) -> (prompt: String, telemetry: DistillationTelemetry) {
         var lines: [String] = [
             "DISTILLED ATHLETE STATE (pre-computed from DB — use directly for load/rep decisions):",
@@ -380,6 +381,11 @@ enum AthleteStateDistiller {
             lines.append("    trends: load \(state.loadTrend) | RPE \(state.rpeTrend)")
             lines.append("    signal: \(state.progressionSignal) — \(state.progressionReason)")
             lines.append("    -> \(state.recommendation)")
+        }
+
+        if !progressionInsights.isEmpty {
+            lines.append("")
+            lines.append(contentsOf: formatProgressionInsightsForPrompt(progressionInsights))
         }
 
         // Add instruction footer.
@@ -427,6 +433,19 @@ enum AthleteStateDistiller {
             return String(withoutRPE.prefix(57)) + "..."
         }
         return withoutRPE.isEmpty ? "logged (no text)" : withoutRPE
+    }
+
+    private static func formatProgressionInsightsForPrompt(_ insights: [ProgressionInsight]) -> [String] {
+        var lines = ["PROGRESSION INSIGHTS (DB-derived, use directly for supplemental progression decisions):"]
+        for insight in insights {
+            let sessionLabel = insight.sessionCount == 1 ? "1 session" : "\(insight.sessionCount) sessions"
+            let latestRPE = insight.latestRPE.map { formatRPE($0) } ?? "n/a"
+            lines.append("  \(insight.exerciseName) [\(insight.dayHint)] (\(sessionLabel)):")
+            lines.append("    signal: \(insight.progressionSignal) — \(insight.progressionReason)")
+            lines.append("    last_rx: \(insight.lastPrescription) | load: \(insight.loadTrend) | RPE: \(latestRPE)")
+            lines.append("    recommendation: \(insight.recommendation)")
+        }
+        return lines
     }
 
     static func formatRPE(_ value: Double) -> String {

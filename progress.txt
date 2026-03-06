@@ -21,13 +21,14 @@ Built this session:
   - recent DB rows are distilled into `ProgressionInsight` records
   - rules are documented and deterministic (`PROGRESS`, `LOCK`, `NEUTRAL`)
   - insights now surface in the Progress screen and analytics refresh path
+  - the staged generation prompt now receives a dedicated DB-derived progression insights block alongside the distilled athlete state
 - Preserved and completed the staged generation domain work already present in:
   - `AthleteStateDistiller.swift`
   - `AthleteStateDistillerTests.swift`
 - Previously delivered native canonical docs, sync hardening, and build-checkout doctor tooling remain in place from earlier in the day.
 
 Verification:
-- `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306k` passed: 195 tests, 3 skipped, 0 failures.
+- `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306m` passed: 196 tests, 3 skipped, 0 failures.
 - `bash native/SamsWorkoutNative/scripts/build_local_app.sh` passed and rebuilt `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`.
 - Focused regression runs also passed for:
   - generation telemetry and Stage 1 validation
@@ -37,7 +38,7 @@ Verification:
 
 Implementation plan phase mapping:
 - Phase 0 (Canonical Native Documentation): extended with timestamped sync review + progression addenda.
-- Phase 2 (Domain and Generation Parity): advanced with bounded staged-generation validation, correction retry, and pipeline telemetry UI.
+- Phase 2 (Domain and Generation Parity): advanced with bounded staged-generation validation, correction retry, pipeline telemetry UI, and explicit progression-insight prompt injection.
 - Phase 4 (Persistence and Sync): advanced with manual conflict repair actions layered on top of the existing audit trail and checkpoints.
 - Phase 5 (Native UI Coverage): expanded Settings and Progress surfaces for sync repair and progression visibility.
 - Phase 6 (QA Hardening): expanded regression coverage around staged generation, manual conflict repair, progression insights, and persistence isolation.

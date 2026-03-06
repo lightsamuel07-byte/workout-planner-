@@ -245,6 +245,32 @@ final class AthleteStateDistillerTests: XCTestCase {
         XCTAssertGreaterThan(telemetry.distilledPromptChars, 0)
     }
 
+    func testFormatForPromptIncludesProgressionInsightsBlockWhenProvided() {
+        let rows = [
+            makeRow(dateISO: "2026-02-17", load: "24", parsedRPE: 7.0),
+            makeRow(dateISO: "2026-02-10", load: "22", parsedRPE: 7.5),
+        ]
+        let selected: [String: [String]] = ["TUESDAY": ["DB Hammer Curl"]]
+
+        let states = AthleteStateDistiller.distill(
+            targetedRows: rows,
+            progressionDirectives: [],
+            selectedExercises: selected
+        )
+        let insights = AthleteStateDistiller.buildProgressionInsights(targetedRows: rows, limit: 4)
+
+        let (prompt, _) = AthleteStateDistiller.formatForPrompt(
+            states: states,
+            dbSummaryLine: "125 exercises | 72 sessions",
+            rawContextChars: 2000,
+            progressionInsights: insights
+        )
+
+        XCTAssertTrue(prompt.contains("PROGRESSION INSIGHTS"))
+        XCTAssertTrue(prompt.contains("DB Hammer Curl"))
+        XCTAssertTrue(prompt.contains("recommendation: increase load"))
+    }
+
     // MARK: - Helper Formatting Tests
 
     func testFormatRPEInteger() {
