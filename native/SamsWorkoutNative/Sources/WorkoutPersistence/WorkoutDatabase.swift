@@ -285,6 +285,58 @@ public struct PersistedLogSyncState: Equatable, Sendable {
     }
 }
 
+public struct PersistedSyncAuditEvent: Equatable, Sendable, Identifiable {
+    public let id: Int64
+    public let syncRunID: String
+    public let sheetName: String
+    public let dayLabel: String
+    public let sourceRow: Int
+    public let exerciseName: String
+    public let sheetLog: String
+    public let dbLog: String
+    public let resolvedLog: String
+    public let resolution: String
+    public let conflictPolicy: String
+    public let didPushToSheets: Bool
+    public let didPullToDB: Bool
+    public let countsAsConflict: Bool
+    public let createdAt: String
+
+    public init(
+        id: Int64 = 0,
+        syncRunID: String,
+        sheetName: String,
+        dayLabel: String,
+        sourceRow: Int,
+        exerciseName: String,
+        sheetLog: String,
+        dbLog: String,
+        resolvedLog: String,
+        resolution: String,
+        conflictPolicy: String,
+        didPushToSheets: Bool,
+        didPullToDB: Bool,
+        countsAsConflict: Bool,
+        createdAt: String = ""
+    ) {
+        self.id = id
+        self.syncRunID = syncRunID
+        self.sheetName = sheetName
+        self.dayLabel = dayLabel
+        self.sourceRow = sourceRow
+        self.exerciseName = exerciseName
+        self.sheetLog = sheetLog
+        self.dbLog = dbLog
+        self.resolvedLog = resolvedLog
+        self.resolution = resolution
+        self.conflictPolicy = conflictPolicy
+        self.didPushToSheets = didPushToSheets
+        self.didPullToDB = didPullToDB
+        self.countsAsConflict = countsAsConflict
+        self.createdAt = createdAt
+    }
+}
+
 public struct WorkoutSyncEntry: Equatable, Sendable {
     public let sourceRow: Int
     public let exerciseName: String
@@ -489,6 +541,38 @@ public struct WorkoutDatabase: Sendable {
             try db.create(
                 index: "idx_log_sync_state_sheet_day",
                 on: "log_sync_state",
+                columns: ["sheet_name", "day_label"],
+                ifNotExists: true
+            )
+        }
+
+        migrator.registerMigration("v4_sync_audit_events") { db in
+            try db.create(table: "sync_audit_events", ifNotExists: true) { t in
+                t.autoIncrementedPrimaryKey("id")
+                t.column("sync_run_id", .text).notNull()
+                t.column("sheet_name", .text).notNull()
+                t.column("day_label", .text).notNull()
+                t.column("source_row", .integer).notNull()
+                t.column("exercise_name", .text).notNull().defaults(to: "")
+                t.column("sheet_log", .text).notNull().defaults(to: "")
+                t.column("db_log", .text).notNull().defaults(to: "")
+                t.column("resolved_log", .text).notNull().defaults(to: "")
+                t.column("resolution", .text).notNull().defaults(to: "unchanged")
+                t.column("conflict_policy", .text).notNull().defaults(to: "prefer_sheets")
+                t.column("did_push_to_sheets", .integer).notNull().defaults(to: 0)
+                t.column("did_pull_to_db", .integer).notNull().defaults(to: 0)
+                t.column("counts_as_conflict", .integer).notNull().defaults(to: 0)
+                t.column("created_at", .text).notNull().defaults(sql: "CURRENT_TIMESTAMP")
+            }
+            try db.create(
+                index: "idx_sync_audit_events_created_at",
+                on: "sync_audit_events",
+                columns: ["created_at"],
+                ifNotExists: true
+            )
+            try db.create(
+                index: "idx_sync_audit_events_sheet_day",
+                on: "sync_audit_events",
                 columns: ["sheet_name", "day_label"],
                 ifNotExists: true
             )
@@ -714,6 +798,97 @@ public struct WorkoutDatabase: Sendable {
                     state.lastResolution,
                 ]
             )
+        }
+    }
+
+    public func insertSyncAuditEvent(_ event: PersistedSyncAuditEvent) throws {
+        try dbQueue.write { db in
+            try db.execute(
+                sql: """
+                INSERT INTO sync_audit_events (
+                    sync_run_id,
+                    sheet_name,
+                    day_label,
+                    source_row,
+                    exercise_name,
+                    sheet_log,
+                    db_log,
+                    resolved_log,
+                    resolution,
+                    conflict_policy,
+                    did_push_to_sheets,
+                    did_pull_to_db,
+                    counts_as_conflict,
+                    created_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+                """,
+                arguments: [
+                    event.syncRunID,
+                    event.sheetName,
+                    event.dayLabel,
+                    event.sourceRow,
+                    event.exerciseName,
+                    event.sheetLog,
+                    event.dbLog,
+                    event.resolvedLog,
+                    event.resolution,
+                    event.conflictPolicy,
+                    event.didPushToSheets ? 1 : 0,
+                    event.didPullToDB ? 1 : 0,
+                    event.countsAsConflict ? 1 : 0,
+                ]
+            )
+        }
+    }
+
+    public func fetchRecentSyncAuditEvents(limit: Int = 20) throws -> [PersistedSyncAuditEvent] {
+        try dbQueue.read { db in
+            let rows = try Row.fetchAll(
+                db,
+                sql: """
+                SELECT
+                    id,
+                    sync_run_id,
+                    sheet_name,
+                    day_label,
+                    source_row,
+                    exercise_name,
+                    sheet_log,
+                    db_log,
+                    resolved_log,
+                    resolution,
+                    conflict_policy,
+                    did_push_to_sheets,
+                    did_pull_to_db,
+                    counts_as_conflict,
+                    created_at
+                FROM sync_audit_events
+                ORDER BY id DESC
+                LIMIT ?
+                """,
+                arguments: [limit]
+            )
+
+            return rows.map { row in
+                PersistedSyncAuditEvent(
+                    id: row["id"],
+                    syncRunID: row["sync_run_id"],
+                    sheetName: row["sheet_name"],
+                    dayLabel: row["day_label"],
+                    sourceRow: row["source_row"],
+                    exerciseName: row["exercise_name"],
+                    sheetLog: row["sheet_log"],
+                    dbLog: row["db_log"],
+                    resolvedLog: row["resolved_log"],
+                    resolution: row["resolution"],
+                    conflictPolicy: row["conflict_policy"],
+                    didPushToSheets: (row["did_push_to_sheets"] as Int) != 0,
+                    didPullToDB: (row["did_pull_to_db"] as Int) != 0,
+                    countsAsConflict: (row["counts_as_conflict"] as Int) != 0,
+                    createdAt: row["created_at"]
+                )
+            }
         }
     }
 

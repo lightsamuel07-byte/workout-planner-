@@ -3,6 +3,7 @@ import Combine
 import SwiftUI
 import WorkoutCore
 import WorkoutIntegrations
+import WorkoutPersistence
 
 @MainActor
 final class AppCoordinator: ObservableObject {
@@ -33,6 +34,8 @@ final class AppCoordinator: ObservableObject {
     @Published var isBidirectionalSyncing = false
     @Published var bidirectionalSyncStatus = ""
     @Published var lastBidirectionalSyncAt: Date?
+    @Published var bidirectionalSyncConflictPolicy: BidirectionalSyncConflictPolicy = .preferSheets
+    @Published var recentSyncAuditEvents: [PersistedSyncAuditEvent] = []
 
     @Published var planSearchQuery = ""
     @Published var showPlanNotes = true
@@ -777,6 +780,7 @@ if !generationStatus.isEmpty {
         refreshInBodyScans()
         lastAnalyticsRefreshAt = Date()
         refreshExerciseCatalog()
+        refreshSyncAuditEvents()
     }
 
     func refreshInBodyScans() {
@@ -805,6 +809,18 @@ if !generationStatus.isEmpty {
 
     func refreshExerciseCatalog() {
         exerciseCatalog = gateway.loadExerciseCatalog(limit: 240)
+    }
+
+    func refreshSyncAuditEvents(limit: Int = 12) {
+        recentSyncAuditEvents = gateway.loadRecentSyncAuditEvents(limit: limit)
+    }
+
+    func setBidirectionalSyncConflictPolicy(_ policy: BidirectionalSyncConflictPolicy) {
+        guard bidirectionalSyncConflictPolicy != policy else {
+            return
+        }
+        bidirectionalSyncConflictPolicy = policy
+        persistConfig()
     }
 
     func applyHistorySuggestion(_ exerciseName: String) {
@@ -1197,6 +1213,7 @@ if !generationStatus.isEmpty {
             spreadsheetID: config.spreadsheetID,
             googleAuthHint: config.googleAuthHint
         )
+        bidirectionalSyncConflictPolicy = config.bidirectionalSyncConflictPolicy
         isSetupComplete = true
         loadOneRepMaxFields()
         loadSavedFortSectionOverrides()
@@ -1213,7 +1230,8 @@ if !generationStatus.isEmpty {
             anthropicAPIKey: setupState.anthropicAPIKey,
             spreadsheetID: setupState.spreadsheetID,
             googleAuthHint: setupState.googleAuthHint,
-            oneRepMaxes: existingConfig.oneRepMaxes
+            oneRepMaxes: existingConfig.oneRepMaxes,
+            bidirectionalSyncConflictPolicy: bidirectionalSyncConflictPolicy
         )
         do {
             try configStore.save(config)

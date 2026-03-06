@@ -2027,6 +2027,28 @@ struct SettingsPageView: View {
                             .font(.callout)
                             .foregroundStyle(.secondary)
 
+                        VStack(alignment: .leading, spacing: 6) {
+                            Text("Conflict Policy")
+                                .font(.caption.bold())
+
+                            Picker(
+                                "Conflict Policy",
+                                selection: Binding(
+                                    get: { coordinator.bidirectionalSyncConflictPolicy },
+                                    set: { coordinator.setBidirectionalSyncConflictPolicy($0) }
+                                )
+                            ) {
+                                ForEach(BidirectionalSyncConflictPolicy.allCases) { policy in
+                                    Text(policy.title).tag(policy)
+                                }
+                            }
+                            .pickerStyle(.menu)
+
+                            Text(coordinator.bidirectionalSyncConflictPolicy.summary)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+
                         HStack(spacing: 12) {
                             Button {
                                 Task { await coordinator.runBidirectionalSyncNow() }
@@ -2051,6 +2073,42 @@ struct SettingsPageView: View {
                             Text(coordinator.bidirectionalSyncStatus)
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
+                        }
+
+                        Divider()
+                            .padding(.vertical, 2)
+
+                        Text("Recent Sync Audit")
+                            .font(.headline)
+
+                        if coordinator.recentSyncAuditEvents.isEmpty {
+                            Text("No sync audit events recorded yet.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                ForEach(coordinator.recentSyncAuditEvents.prefix(8)) { event in
+                                    VStack(alignment: .leading, spacing: 4) {
+                                        Text("\(event.exerciseName) · row \(event.sourceRow) · \(event.resolution)")
+                                            .font(.caption.bold())
+                                        Text("\(event.dayLabel) · policy \(event.conflictPolicy) · \(event.createdAt)")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        if event.countsAsConflict {
+                                            Text("Sheet: \(event.sheetLog)")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Text("DB: \(event.dbLog)")
+                                                .font(.caption2)
+                                                .foregroundStyle(.secondary)
+                                            Text("Resolved: \(event.resolvedLog)")
+                                                .font(.caption2)
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .padding(.vertical, 2)
+                                }
+                            }
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)

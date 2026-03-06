@@ -14,6 +14,10 @@ final class WorkoutDesktopAppTests: XCTestCase {
         func save(_ config: NativeAppConfiguration) throws {
             self.config = config
         }
+
+        var storedConfig: NativeAppConfiguration {
+            config
+        }
     }
 
     private func makeCoordinator() -> AppCoordinator {
@@ -193,6 +197,20 @@ final class WorkoutDesktopAppTests: XCTestCase {
 
         XCTAssertEqual(decision.resolvedLog, "Done | RPE 9")
         XCTAssertEqual(decision.resolution, "conflict_resolved_to_sheet")
+        XCTAssertTrue(decision.countsAsConflict)
+    }
+
+    func testBidirectionalResolverHonorsDatabasePreferredConflictPolicy() {
+        let decision = LiveAppGateway.testResolveBidirectionalLogDecision(
+            sheetLog: "Done | RPE 9",
+            dbLog: "Done | RPE 7.5",
+            lastSyncedSheetLog: "Done | RPE 8",
+            lastSyncedDBLog: "Done | RPE 8",
+            conflictPolicy: .preferDatabase
+        )
+
+        XCTAssertEqual(decision.resolvedLog, "Done | RPE 7.5")
+        XCTAssertEqual(decision.resolution, "conflict_resolved_to_db")
         XCTAssertTrue(decision.countsAsConflict)
     }
 
@@ -534,7 +552,8 @@ final class WorkoutDesktopAppTests: XCTestCase {
             anthropicAPIKey: "key",
             spreadsheetID: "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU",
             googleAuthHint: "",
-            oneRepMaxes: ["Back Squat": entry]
+            oneRepMaxes: ["Back Squat": entry],
+            bidirectionalSyncConflictPolicy: .preferDatabase
         )
 
         let encoder = JSONEncoder()
@@ -543,6 +562,32 @@ final class WorkoutDesktopAppTests: XCTestCase {
         let decoded = try! decoder.decode(NativeAppConfiguration.self, from: data)
         XCTAssertEqual(decoded.oneRepMaxes["Back Squat"]?.valueKG, 140.0)
         XCTAssertEqual(decoded.anthropicAPIKey, "key")
+        XCTAssertEqual(decoded.bidirectionalSyncConflictPolicy, .preferDatabase)
+    }
+
+    func testConfigDecodeDefaultsBidirectionalConflictPolicyWhenMissing() {
+        let legacyJSON = """
+        {
+          "anthropicAPIKey": "key",
+          "spreadsheetID": "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU",
+          "googleAuthHint": "/tmp/token.json",
+          "oneRepMaxes": {}
+        }
+        """
+
+        let data = Data(legacyJSON.utf8)
+        let decoded = try! JSONDecoder().decode(NativeAppConfiguration.self, from: data)
+        XCTAssertEqual(decoded.bidirectionalSyncConflictPolicy, .preferSheets)
+    }
+
+    func testCoordinatorPersistsBidirectionalSyncConflictPolicy() {
+        let store = TestConfigStore()
+        let coordinator = AppCoordinator(gateway: InMemoryAppGateway(), configStore: store)
+
+        coordinator.setBidirectionalSyncConflictPolicy(.preferDatabase)
+
+        XCTAssertEqual(coordinator.bidirectionalSyncConflictPolicy, .preferDatabase)
+        XCTAssertEqual(store.storedConfig.bidirectionalSyncConflictPolicy, .preferDatabase)
     }
 
     func testOneRepMaxMainLiftsConstant() {

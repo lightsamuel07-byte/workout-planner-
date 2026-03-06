@@ -152,6 +152,120 @@ enum PromptBuilder {
         """
     }
 
+    /// Staged pipeline generation prompt. Uses distilled athlete state instead of raw DB context.
+    /// The distilled state provides pre-computed signals (RPE trends, load trends, progression
+    /// recommendations) so the model can make load/rep decisions directly without parsing raw logs.
+    static func buildStagedGenerationPrompt(
+        input: PlanGenerationInput,
+        fortContext: String,
+        distilledAthleteState: String,
+        oneRepMaxes: [String: Double] = [:]
+    ) -> String {
+        let oneRMSection: String
+        if oneRepMaxes.isEmpty {
+            oneRMSection = "ATHLETE 1RM PROFILE:\nNo 1RM data provided. Use RPE feedback from athlete state to infer appropriate intensity."
+        } else {
+            let lines = oneRepMaxes.sorted(by: { $0.key < $1.key }).map { exercise, value in
+                String(format: "- %@: %.1f kg", exercise, value)
+            }
+            oneRMSection = "ATHLETE 1RM PROFILE (use these for percentage-based load calculations):\n" + lines.joined(separator: "\n")
+        }
+
+        return """
+        You are an expert strength and conditioning coach creating a personalized weekly workout plan.
+
+        CRITICAL: NO RANGES - use single values only (e.g., "15 reps" not "12-15", "24 kg" not "22-26 kg")
+
+        \(oneRMSection)
+
+        \(fortContext)
+
+        \(distilledAthleteState)
+
+        LOAD DECISION RULES:
+        - For each supplemental exercise, the athlete state above includes a pre-computed recommendation. Follow it directly.
+        - LOCK signal: use EXACTLY the locked reps and load. Do not deviate.
+        - PROGRESS signal: apply the suggested progression (load OR reps, never both in the same week).
+        - NEUTRAL signal: maintain the last prescription unless the recommendation says otherwise.
+        - New exercises (no prior data): infer starting load from the athlete's 1RM profile, similar exercise history, prescribed rep range, and target RPE 7-8.
+        - Training max override: if Fort coach notes define a "training max" or "working max", apply that first.
+        - Load rounding: barbell lifts -> nearest 0.5 kg; DB loads -> nearest even 2 kg step.
+
+        FORT WORKOUT CONVERSION (CRITICAL):
+        - The Fort workouts below (Mon/Wed/Fri) are raw inputs and MUST be converted into markdown exercise rows.
+        - Treat "FORT COMPILER DIRECTIVES" section order and listed exercise anchors as hard constraints.
+        - Keep day section order aligned with detected Fort sections and include each anchor exercise at least once.
+        - Convert each exercise to:
+          ### A1. [Exercise Name]
+          - [Sets] x [Reps] @ [Load] kg
+          - **Rest:** [period]
+          - **Notes:** [coaching cues]
+        - Never output section labels/instruction lines as exercises.
+
+        Monday input:
+        \(input.monday)
+
+        Wednesday input:
+        \(input.wednesday)
+
+        Friday input:
+        \(input.friday)
+
+        CYCLE STATUS: \(input.isNewCycle ? "NEW CYCLE START" : "MID-CYCLE")
+        \(input.isNewCycle ? """
+        This is Week 1 of a new 4-week Fort cycle. The Fort exercises have changed.
+        SUPPLEMENTAL DAYS (Tue/Thu/Sat): This is a CLEAN SLATE. Select a completely fresh set of upper-body exercises — do NOT carry over exercises from the prior cycle. Choose new movements that complement the new Fort structure and the athlete's aesthetic goals.
+        Any signals in the athlete state above reflect the PREVIOUS cycle. They are provided for load-reference only. They must NOT be used to lock in prior exercise choices.
+        """ : """
+        This is a mid-cycle week. Keep the same supplemental exercises as prior weeks unless a progression directive explicitly requires a swap.
+        Apply LOCK / PROGRESS / NEUTRAL signals from the athlete state above.
+        """)
+
+        SUPPLEMENTAL SELECTION GOAL:
+        Supplemental days (Tue/Thu/Sat) exist for one purpose: maximum aesthetic impact on the upper body, without impairing Fort performance. This is the primary selection criterion — not variety for its own sake, not general fitness. Choose exercises that maximally develop the following, in priority order:
+          1. Arms — biceps shape + triceps fullness (HIGH priority)
+          2. Delts — medial delt cap for shoulder width, rear delt for 3D look (HIGH priority)
+          3. Upper chest — clavicular pec "pop" via incline pressing and fly patterns (HIGH priority)
+          4. Back detail — upper-back density, rear-delt tie-in, posture (HIGH priority)
+        Favour isolation and cable/DB work that directly targets these groups. Stimulus-efficient hypertrophy only — no junk volume.
+
+        INTERFERENCE PROTECTION (non-negotiable):
+        - Tuesday: protect Wednesday bench — no heavy chest/triceps/front-delt loading, no barbell pressing.
+        - Thursday: protect Friday deadlift — no loaded carries, no heavy rows, no heavy biceps (>6 hard sets), no grip-fatiguing work.
+        - Saturday: protect Monday squat and overall recovery — no heavy lower back, no spinal fatigue, no junk volume.
+        - THAW conditioning: THAW intensity must not compromise next-day Fort performance.
+        - Delt carry-over: If Monday Fort already included DB Lateral Raises, Tuesday must default to rear-delt / scapular hygiene work instead of lateral raise patterns.
+
+        CORE PRINCIPLES:
+        - Supplemental days (Tue/Thu/Sat) are ALL strictly upper body. Program biceps, triceps, shoulders, upper chest, and upper back.
+        - NEVER program lower body exercises on supplemental days. This ban includes: squats, deadlifts, Romanian deadlifts, hip hinges, kettlebell swings, hyperextensions, back extensions, leg press, lunges, leg curls, or any lower-body-dominant movement.
+        - Supplemental days must be substantive: minimum 5 exercises on each of Tue, Thu, and Sat.
+        - Every supplemental day (Tue, Thu, Sat) MUST include McGill Big-3 (curl-up, side bridge, bird-dog). Label it as one block entry "McGill Big-3" with coaching cues in the Notes field.
+        - No exercise repeated across supplemental days within the same week.
+        - Never increase both reps and load in the same week for the same exercise.
+        - Notes must be clean coaching cues only: max 2 short sentences, execution-focused. Never include load calculations, percentage references, or directive references.
+
+        MANDATORY HARD RULES:
+        - Equipment: No belt on pulls, standing calves only. No split squats on supplemental days.
+        - Dumbbells: even-number loads only (no odd DB loads except main barbell lifts).
+        - Biceps: rotate grips (supinated -> neutral -> pronated), no repeated adjacent supplemental-day grip.
+        - Triceps: vary attachments across Tue/Thu/Sat. Fort Friday triceps: prefer straight-bar attachment with heavier loading. No single-arm D-handle triceps on Saturday.
+        - Carries: Tuesday only; use kettlebells exclusively — never dumbbells.
+        - Conditioning (THAW blocks): Sets = 1, Reps = total block duration (e.g. "12 min"), Load = 0. All interval structure goes in Notes only.
+        - Canonical log format in sheets: performance | RPE x | Notes: ...
+
+        OUTPUT REQUIREMENTS:
+        - Use ## day headers and ### block.exercise headers.
+        - Include six training days (Mon-Sat). Sunday is always complete rest — do not generate a Sunday block.
+        - Keep A:H sheet compatibility (Block, Exercise, Sets, Reps, Load, Rest, Notes, Log).
+        - American spelling.
+        - Exercise names: Title Case only. Never use ALL CAPS.
+        - Notes: maximum 1-2 concise coaching cues per exercise.
+        - Sparse history rule: for exercises with "no prior data" in athlete state, infer starting load from 1RM profile + target RPE 7-8.
+        - Sauna: include a sauna block at the end of each training day (Mon-Sat) where contextually appropriate.
+        """
+    }
+
     static func buildExerciseSelectionPrompt(
         input: PlanGenerationInput,
         fortContext: String

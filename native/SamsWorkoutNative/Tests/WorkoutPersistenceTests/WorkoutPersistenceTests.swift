@@ -481,6 +481,58 @@ final class WorkoutPersistenceTests: XCTestCase {
         XCTAssertEqual(states.first?.lastResolution, "push_to_sheets")
     }
 
+    func testSyncAuditEventInsertAndFetchMostRecentFirst() throws {
+        let path = tempDBPath("sync_audit_events")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+
+        try database.insertSyncAuditEvent(
+            PersistedSyncAuditEvent(
+                syncRunID: "run-1",
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Tuesday 2/24",
+                sourceRow: 7,
+                exerciseName: "DB Hammer Curl",
+                sheetLog: "Done | RPE 8",
+                dbLog: "Done | RPE 7.5",
+                resolvedLog: "Done | RPE 8",
+                resolution: "conflict_resolved_to_sheet",
+                conflictPolicy: "prefer_sheets",
+                didPushToSheets: false,
+                didPullToDB: true,
+                countsAsConflict: true
+            )
+        )
+
+        try database.insertSyncAuditEvent(
+            PersistedSyncAuditEvent(
+                syncRunID: "run-2",
+                sheetName: "Weekly Plan (3/2/2026)",
+                dayLabel: "Thursday 3/5",
+                sourceRow: 9,
+                exerciseName: "Cable Lateral Raise",
+                sheetLog: "Done | RPE 8.5",
+                dbLog: "Done | RPE 9",
+                resolvedLog: "Done | RPE 9",
+                resolution: "conflict_resolved_to_db",
+                conflictPolicy: "prefer_database",
+                didPushToSheets: true,
+                didPullToDB: false,
+                countsAsConflict: true
+            )
+        )
+
+        let events = try database.fetchRecentSyncAuditEvents(limit: 10)
+        XCTAssertEqual(events.count, 2)
+        XCTAssertEqual(events.first?.syncRunID, "run-2")
+        XCTAssertEqual(events.first?.exerciseName, "Cable Lateral Raise")
+        XCTAssertEqual(events.first?.resolution, "conflict_resolved_to_db")
+        XCTAssertEqual(events.first?.conflictPolicy, "prefer_database")
+        XCTAssertTrue(events.first?.didPushToSheets == true)
+        XCTAssertTrue(events.first?.countsAsConflict == true)
+        XCTAssertFalse(events.first?.createdAt.isEmpty ?? true)
+    }
+
     func testFetchSessionLogRowsReturnsRowsForSpecificSession() throws {
         let path = tempDBPath("session_log_rows")
         let database = try WorkoutDatabase(path: path)

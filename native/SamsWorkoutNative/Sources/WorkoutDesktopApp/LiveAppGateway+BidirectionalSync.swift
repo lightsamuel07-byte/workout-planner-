@@ -24,8 +24,8 @@ private struct BidirectionalSyncCounters {
     var conflicts = 0
     var unchanged = 0
 
-    func summary(sheetName: String) -> String {
-        "Bidirectional sync (\(sheetName)): \(exerciseRowsProcessed) rows across \(daySessionsProcessed) day sessions | pulled \(pulledToDB) | pushed \(pushedToSheets) | conflicts \(conflicts) | unchanged \(unchanged)."
+    func summary(sheetName: String, conflictPolicy: BidirectionalSyncConflictPolicy) -> String {
+        "Bidirectional sync (\(sheetName)): \(exerciseRowsProcessed) rows across \(daySessionsProcessed) day sessions | pulled \(pulledToDB) | pushed \(pushedToSheets) | conflicts \(conflicts) | unchanged \(unchanged) | policy \(conflictPolicy.rawValue)."
     }
 }
 
@@ -45,6 +45,8 @@ extension LiveAppGateway {
 
         let database = try openDatabase()
         let syncService = try makeSyncService()
+        let conflictPolicy = configStore.load().bidirectionalSyncConflictPolicy
+        let syncRunID = UUID().uuidString
         var counters = BidirectionalSyncCounters()
 
         for workout in workouts {
@@ -58,6 +60,7 @@ extension LiveAppGateway {
             var daySheetUpdates: [ValueRangeUpdate] = []
             var dayEntries: [WorkoutSyncEntry] = []
             var daySyncStates: [PersistedLogSyncState] = []
+            var dayAuditEvents: [PersistedSyncAuditEvent] = []
 
             for exercise in workout.exercises {
                 counters.exerciseRowsProcessed += 1
@@ -68,7 +71,8 @@ extension LiveAppGateway {
                 let decision = resolveBidirectionalLogDecision(
                     sheetLog: sheetLog,
                     dbLog: dbLog,
-                    syncState: syncState
+                    syncState: syncState,
+                    conflictPolicy: conflictPolicy
                 )
 
                 if decision.countsAsConflict {
@@ -124,6 +128,26 @@ extension LiveAppGateway {
                         lastResolution: decision.resolution.rawValue
                     )
                 )
+
+                let didPushToSheets = decision.resolution == .pushToSheets || decision.resolution == .conflictResolvedToDB
+                let didPullToDB = decision.resolution == .pullFromSheet || decision.resolution == .conflictResolvedToSheet
+                dayAuditEvents.append(
+                    PersistedSyncAuditEvent(
+                        syncRunID: syncRunID,
+                        sheetName: sheetName,
+                        dayLabel: workout.dayLabel,
+                        sourceRow: exercise.sourceRow,
+                        exerciseName: exercise.exercise,
+                        sheetLog: sheetLog,
+                        dbLog: dbLog,
+                        resolvedLog: decision.resolvedLog,
+                        resolution: decision.resolution.rawValue,
+                        conflictPolicy: conflictPolicy.rawValue,
+                        didPushToSheets: didPushToSheets,
+                        didPullToDB: didPullToDB,
+                        countsAsConflict: decision.countsAsConflict
+                    )
+                )
             }
 
             if !daySheetUpdates.isEmpty {
@@ -146,16 +170,21 @@ extension LiveAppGateway {
             for syncState in daySyncStates {
                 try database.upsertLogSyncState(syncState)
             }
+
+            for auditEvent in dayAuditEvents {
+                try database.insertSyncAuditEvent(auditEvent)
+            }
         }
 
-        bidirectionalSyncSummary.set(counters.summary(sheetName: sheetName))
+        bidirectionalSyncSummary.set(counters.summary(sheetName: sheetName, conflictPolicy: conflictPolicy))
         return mutableValues
     }
 
     private func resolveBidirectionalLogDecision(
         sheetLog: String,
         dbLog: String,
-        syncState: PersistedLogSyncState?
+        syncState: PersistedLogSyncState?,
+        conflictPolicy: BidirectionalSyncConflictPolicy
     ) -> BidirectionalDecision {
         guard let syncState else {
             if sheetLog == dbLog {
@@ -167,7 +196,9 @@ extension LiveAppGateway {
             if sheetLog.isEmpty {
                 return BidirectionalDecision(resolvedLog: dbLog, resolution: .pushToSheets, countsAsConflict: false)
             }
-            return BidirectionalDecision(resolvedLog: sheetLog, resolution: .conflictResolvedToSheet, countsAsConflict: true)
+            let resolved = Self.preferredConflictLog(sheetLog: sheetLog, dbLog: dbLog, conflictPolicy: conflictPolicy)
+            let resolution: BidirectionalLogResolution = resolved == sheetLog ? .conflictResolvedToSheet : .conflictResolvedToDB
+            return BidirectionalDecision(resolvedLog: resolved, resolution: resolution, countsAsConflict: true)
         }
 
         let lastSheetLog = normalizeLogForSync(syncState.lastSyncedSheetLog)
@@ -179,7 +210,7 @@ extension LiveAppGateway {
             if sheetLog == dbLog {
                 return BidirectionalDecision(resolvedLog: sheetLog, resolution: .unchanged, countsAsConflict: false)
             }
-            let resolved = Self.preferredConflictLog(sheetLog: sheetLog, dbLog: dbLog)
+            let resolved = Self.preferredConflictLog(sheetLog: sheetLog, dbLog: dbLog, conflictPolicy: conflictPolicy)
             let resolution: BidirectionalLogResolution = resolved == sheetLog ? .conflictResolvedToSheet : .conflictResolvedToDB
             return BidirectionalDecision(resolvedLog: resolved, resolution: resolution, countsAsConflict: true)
         }
@@ -196,20 +227,28 @@ extension LiveAppGateway {
             return BidirectionalDecision(resolvedLog: sheetLog, resolution: .unchanged, countsAsConflict: false)
         }
 
-        let resolved = Self.preferredConflictLog(sheetLog: sheetLog, dbLog: dbLog)
+        let resolved = Self.preferredConflictLog(sheetLog: sheetLog, dbLog: dbLog, conflictPolicy: conflictPolicy)
         let resolution: BidirectionalLogResolution = resolved == sheetLog ? .conflictResolvedToSheet : .conflictResolvedToDB
         return BidirectionalDecision(resolvedLog: resolved, resolution: resolution, countsAsConflict: true)
     }
 
-    private static func preferredConflictLog(sheetLog: String, dbLog: String) -> String {
+    private static func preferredConflictLog(
+        sheetLog: String,
+        dbLog: String,
+        conflictPolicy: BidirectionalSyncConflictPolicy
+    ) -> String {
         if sheetLog.isEmpty && !dbLog.isEmpty {
             return dbLog
         }
         if dbLog.isEmpty && !sheetLog.isEmpty {
             return sheetLog
         }
-        // Tie-breaker remains deterministic: Google Sheets wins when both non-empty and different.
-        return sheetLog
+        switch conflictPolicy {
+        case .preferSheets:
+            return sheetLog
+        case .preferDatabase:
+            return dbLog
+        }
     }
 
     private func normalizeLogForSync(_ raw: String) -> String {
@@ -239,7 +278,8 @@ extension LiveAppGateway {
         sheetLog: String,
         dbLog: String,
         lastSyncedSheetLog: String?,
-        lastSyncedDBLog: String?
+        lastSyncedDBLog: String?,
+        conflictPolicy: BidirectionalSyncConflictPolicy = .preferSheets
     ) -> (resolvedLog: String, resolution: String, countsAsConflict: Bool) {
         let gateway = LiveAppGateway(planWriteMode: .localOnly)
         let state: PersistedLogSyncState?
@@ -259,7 +299,8 @@ extension LiveAppGateway {
         let decision = gateway.resolveBidirectionalLogDecision(
             sheetLog: gateway.normalizeLogForSync(sheetLog),
             dbLog: gateway.normalizeLogForSync(dbLog),
-            syncState: state
+            syncState: state,
+            conflictPolicy: conflictPolicy
         )
 
         return (decision.resolvedLog, decision.resolution.rawValue, decision.countsAsConflict)

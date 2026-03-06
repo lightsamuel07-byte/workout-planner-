@@ -31,9 +31,36 @@ struct StatusBanner: Equatable {
     static let empty = StatusBanner(text: "", severity: .info)
 }
 
+enum BidirectionalSyncConflictPolicy: String, CaseIterable, Codable, Equatable, Identifiable {
+    case preferSheets = "prefer_sheets"
+    case preferDatabase = "prefer_database"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .preferSheets:
+            return "Prefer Google Sheets"
+        case .preferDatabase:
+            return "Prefer Local DB"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .preferSheets:
+            return "If both sides changed differently and both are non-empty, Google Sheets wins."
+        case .preferDatabase:
+            return "If both sides changed differently and both are non-empty, the local DB wins."
+        }
+    }
+}
+
 enum GenerationProgressStage: String, Equatable {
     case preparing = "Preparing"
     case normalizingFort = "Normalizing Fort Input"
+    case selectingExercises = "Selecting Exercises"
+    case distillingContext = "Distilling Athlete State"
     case requestingModel = "Requesting Model"
     case streamingResponse = "Streaming Response"
     case validating = "Validating Plan"
@@ -41,6 +68,14 @@ enum GenerationProgressStage: String, Equatable {
     case writingOutputs = "Writing Outputs"
     case syncingDatabase = "Syncing Database"
     case completed = "Completed"
+}
+
+/// Controls which generation pipeline to use.
+enum GenerationPipelineMode: String, Equatable {
+    /// Original two-pass pipeline with raw DB context.
+    case legacy
+    /// Staged pipeline with distilled athlete state context.
+    case staged
 }
 
 struct GenerationProgressUpdate: Equatable {
@@ -68,6 +103,36 @@ struct GenerationProgressUpdate: Equatable {
         self.outputTokens = outputTokens
         self.previewTail = previewTail
         self.correctionAttempt = correctionAttempt
+    }
+}
+
+/// Per-stage token telemetry for generation pipeline analysis.
+struct PipelineTelemetry: Equatable {
+    struct StageMetrics: Equatable {
+        let stageName: String
+        let inputTokens: Int
+        let outputTokens: Int
+        let durationMs: Int
+        let promptChars: Int
+    }
+
+    var stages: [StageMetrics] = []
+    var distillation: DistillationTelemetry?
+    var pipelineMode: GenerationPipelineMode = .legacy
+
+    var totalInputTokens: Int { stages.reduce(0) { $0 + $1.inputTokens } }
+    var totalOutputTokens: Int { stages.reduce(0) { $0 + $1.outputTokens } }
+    var totalTokens: Int { totalInputTokens + totalOutputTokens }
+
+    var summary: String {
+        var lines = ["Pipeline: \(pipelineMode.rawValue) | Stages: \(stages.count) | Total tokens: \(totalTokens) (in: \(totalInputTokens), out: \(totalOutputTokens))"]
+        for stage in stages {
+            lines.append("  \(stage.stageName): \(stage.inputTokens) in / \(stage.outputTokens) out (\(stage.durationMs)ms)")
+        }
+        if let d = distillation {
+            lines.append("  Distillation: \(d.exercisesDistilled) exercises, \(d.rawRowsConsumed) rows -> \(d.distilledPromptChars) chars (compression: \(String(format: "%.1f", d.compressionRatio * 100))%)")
+        }
+        return lines.joined(separator: "\n")
     }
 }
 

@@ -68,8 +68,10 @@ struct LiveAppGateway: NativeAppGateway {
     let fileManager: FileManager
     let nowProvider: () -> Date
     let planWriteMode: PlanWriteMode
+    let generationMode: GenerationPipelineMode
     let cachedDatabase: ThreadSafeBox<WorkoutDatabase?>
     let bidirectionalSyncSummary: ThreadSafeBox<String>
+    let latestPipelineTelemetry: ThreadSafeBox<PipelineTelemetry?>
 
     init(
         integrations: IntegrationsFacade = IntegrationsFacade(),
@@ -77,7 +79,8 @@ struct LiveAppGateway: NativeAppGateway {
         bootstrap: PersistenceBootstrap = PersistenceBootstrap(),
         fileManager: FileManager = .default,
         nowProvider: @escaping () -> Date = Date.init,
-        planWriteMode: PlanWriteMode = .normal
+        planWriteMode: PlanWriteMode = .normal,
+        generationMode: GenerationPipelineMode = .staged
     ) {
         self.integrations = integrations
         self.configStore = configStore
@@ -85,8 +88,10 @@ struct LiveAppGateway: NativeAppGateway {
         self.fileManager = fileManager
         self.nowProvider = nowProvider
         self.planWriteMode = planWriteMode
+        self.generationMode = generationMode
         self.cachedDatabase = ThreadSafeBox(nil)
         self.bidirectionalSyncSummary = ThreadSafeBox("")
+        self.latestPipelineTelemetry = ThreadSafeBox(nil)
     }
 
     func initialRoute() -> AppRoute {
@@ -125,6 +130,13 @@ struct LiveAppGateway: NativeAppGateway {
 extension LiveAppGateway {
     func latestBidirectionalSyncSummary() -> String {
         bidirectionalSyncSummary.get()
+    }
+
+    func loadRecentSyncAuditEvents(limit: Int) -> [PersistedSyncAuditEvent] {
+        guard let database = try? openDatabase() else {
+            return []
+        }
+        return (try? database.fetchRecentSyncAuditEvents(limit: limit)) ?? []
     }
 
     func requireGenerationSetup() throws -> NativeAppConfiguration {

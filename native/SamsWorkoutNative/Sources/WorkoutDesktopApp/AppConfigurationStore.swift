@@ -12,16 +12,50 @@ struct NativeAppConfiguration: Codable, Equatable {
     var spreadsheetID: String
     var googleAuthHint: String
     var oneRepMaxes: [String: OneRepMaxEntry]
+    var bidirectionalSyncConflictPolicy: BidirectionalSyncConflictPolicy
 
     static let empty = NativeAppConfiguration(
         anthropicAPIKey: "",
         spreadsheetID: "",
         googleAuthHint: "OAuth token path",
-        oneRepMaxes: [:]
+        oneRepMaxes: [:],
+        bidirectionalSyncConflictPolicy: .preferSheets
     )
 
     /// Canonical lift names for the three main barbell lifts.
     static let mainLifts = ["Back Squat", "Bench Press", "Deadlift"]
+
+    init(
+        anthropicAPIKey: String,
+        spreadsheetID: String,
+        googleAuthHint: String,
+        oneRepMaxes: [String: OneRepMaxEntry],
+        bidirectionalSyncConflictPolicy: BidirectionalSyncConflictPolicy = .preferSheets
+    ) {
+        self.anthropicAPIKey = anthropicAPIKey
+        self.spreadsheetID = spreadsheetID
+        self.googleAuthHint = googleAuthHint
+        self.oneRepMaxes = oneRepMaxes
+        self.bidirectionalSyncConflictPolicy = bidirectionalSyncConflictPolicy
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case anthropicAPIKey
+        case spreadsheetID
+        case googleAuthHint
+        case oneRepMaxes
+        case bidirectionalSyncConflictPolicy
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        anthropicAPIKey = try container.decodeIfPresent(String.self, forKey: .anthropicAPIKey) ?? ""
+        spreadsheetID = try container.decodeIfPresent(String.self, forKey: .spreadsheetID) ?? ""
+        googleAuthHint = try container.decodeIfPresent(String.self, forKey: .googleAuthHint) ?? "OAuth token path"
+        oneRepMaxes = try container.decodeIfPresent([String: OneRepMaxEntry].self, forKey: .oneRepMaxes) ?? [:]
+        bidirectionalSyncConflictPolicy =
+            try container.decodeIfPresent(BidirectionalSyncConflictPolicy.self, forKey: .bidirectionalSyncConflictPolicy) ?? .preferSheets
+    }
 }
 
 protocol AppConfigurationStore {

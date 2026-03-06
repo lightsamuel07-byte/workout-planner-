@@ -16,6 +16,7 @@ __pycache__/
 *$py.class
 *.so
 .Python
+.venv312/
 venv/
 env/
 ENV/
