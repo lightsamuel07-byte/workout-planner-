@@ -164,6 +164,24 @@ final class AthleteStateDistillerTests: XCTestCase {
         XCTAssertTrue(state.recommendation.contains("new exercise"), "Expected new exercise recommendation, got: \(state.recommendation)")
     }
 
+    func testDistillWithoutDirectiveUsesHistoryProgressionSignal() {
+        let rows = [
+            makeRow(dateISO: "2026-02-17", load: "24", parsedRPE: 7.0),
+            makeRow(dateISO: "2026-02-10", load: "22", parsedRPE: 7.5),
+        ]
+        let selected: [String: [String]] = ["TUESDAY": ["DB Hammer Curl"]]
+
+        let states = AthleteStateDistiller.distill(
+            targetedRows: rows,
+            progressionDirectives: [],
+            selectedExercises: selected
+        )
+
+        XCTAssertEqual(states.count, 1)
+        XCTAssertEqual(states[0].progressionSignal, "PROGRESS")
+        XCTAssertTrue(states[0].recommendation.contains("increase load"))
+    }
+
     func testDistillMultipleDays() {
         let rows = [
             makeRow(dateISO: "2026-02-17", exerciseName: "DB Hammer Curl", normalizedName: "db_hammer_curl", load: "24", parsedRPE: 7.0),
@@ -245,7 +263,7 @@ final class AthleteStateDistillerTests: XCTestCase {
         XCTAssertGreaterThan(telemetry.distilledPromptChars, 0)
     }
 
-    func testFormatForPromptIncludesProgressionInsightsBlockWhenProvided() {
+    func testFormatForPromptKeepsUnifiedProgressionRecommendationsInDistilledStateOnly() {
         let rows = [
             makeRow(dateISO: "2026-02-17", load: "24", parsedRPE: 7.0),
             makeRow(dateISO: "2026-02-10", load: "22", parsedRPE: 7.5),
@@ -257,18 +275,16 @@ final class AthleteStateDistillerTests: XCTestCase {
             progressionDirectives: [],
             selectedExercises: selected
         )
-        let insights = AthleteStateDistiller.buildProgressionInsights(targetedRows: rows, limit: 4)
-
         let (prompt, _) = AthleteStateDistiller.formatForPrompt(
             states: states,
             dbSummaryLine: "125 exercises | 72 sessions",
-            rawContextChars: 2000,
-            progressionInsights: insights
+            rawContextChars: 2000
         )
 
-        XCTAssertTrue(prompt.contains("PROGRESSION INSIGHTS"))
+        XCTAssertFalse(prompt.contains("PROGRESSION INSIGHTS"))
         XCTAssertTrue(prompt.contains("DB Hammer Curl"))
-        XCTAssertTrue(prompt.contains("recommendation: increase load"))
+        XCTAssertTrue(prompt.contains("signal: PROGRESS"))
+        XCTAssertTrue(prompt.contains("increase load"))
     }
 
     // MARK: - Helper Formatting Tests
@@ -392,6 +408,26 @@ final class AthleteStateDistillerTests: XCTestCase {
         XCTAssertEqual(insights.count, 1)
         XCTAssertEqual(insights.first?.progressionSignal, "LOCK")
         XCTAssertTrue(insights.first?.progressionReason.contains("near limit") == true)
+    }
+
+    func testProgressionInsightsMatchDistilledStateRecommendationsWithoutDirective() {
+        let rows = [
+            makeRow(dateISO: "2026-03-05", dayLabel: "Thursday 3/5", load: "24", parsedRPE: 7.0),
+            makeRow(dateISO: "2026-02-27", dayLabel: "Thursday 2/27", load: "22", parsedRPE: 7.5),
+        ]
+        let selected: [String: [String]] = ["THURSDAY": ["DB Hammer Curl"]]
+
+        let state = AthleteStateDistiller.distill(
+            targetedRows: rows,
+            progressionDirectives: [],
+            selectedExercises: selected
+        )[0]
+        let insight = AthleteStateDistiller.buildProgressionInsights(targetedRows: rows, limit: 4)[0]
+
+        XCTAssertEqual(insight.exerciseName, state.exerciseName)
+        XCTAssertEqual(insight.progressionSignal, state.progressionSignal)
+        XCTAssertEqual(insight.progressionReason, state.progressionReason)
+        XCTAssertEqual(insight.recommendation, state.recommendation)
     }
 
     // MARK: - Generation Mode Tests

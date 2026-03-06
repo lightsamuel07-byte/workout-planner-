@@ -29,6 +29,12 @@ struct DistillationTelemetry: Equatable, Sendable {
     let compressionRatio: Double       // distilled / raw (lower = more compressed)
 }
 
+private struct ProgressionEvaluation {
+    let signal: String
+    let reason: String
+    let recommendation: String
+}
+
 enum AthleteStateDistiller {
 
     // MARK: - Main Entry Point
@@ -147,18 +153,6 @@ enum AthleteStateDistiller {
                 rows: rows,
                 directive: nil
             )
-            let (signal, reason) = progressionSignalFromRecentHistory(
-                latestRPE: state.latestRPE,
-                sessionCount: state.sessionCount
-            )
-            let recommendation = generateRecommendation(
-                signal: signal,
-                latestRPE: state.latestRPE,
-                loads: rows.compactMap { parseLoad($0.load) },
-                lastRx: state.lastPrescription,
-                directive: nil,
-                sessionCount: state.sessionCount
-            )
 
             return ProgressionInsight(
                 id: "\(normalizedName)|\(dayHint)",
@@ -169,9 +163,9 @@ enum AthleteStateDistiller {
                 latestRPE: state.latestRPE,
                 rpeTrend: state.rpeTrend,
                 loadTrend: state.loadTrend,
-                progressionSignal: signal,
-                progressionReason: reason,
-                recommendation: recommendation
+                progressionSignal: state.progressionSignal,
+                progressionReason: state.progressionReason,
+                recommendation: state.recommendation
             )
         }
     }
@@ -207,17 +201,12 @@ enum AthleteStateDistiller {
         let loads = rows.compactMap { parseLoad($0.load) }
         let loadTrend = computeLoadTrend(loads)
 
-        // Progression signal from directives.
-        let (signal, reason) = progressionFromDirective(directive)
-
-        // Generate recommendation.
-        let recommendation = generateRecommendation(
-            signal: signal,
+        let progression = evaluateProgression(
             latestRPE: latestRPE,
+            sessionCount: sessionCount,
             loads: loads,
             lastRx: lastRx,
             directive: directive,
-            sessionCount: sessionCount
         )
 
         return ExerciseAthleteState(
@@ -230,9 +219,9 @@ enum AthleteStateDistiller {
             latestRPE: latestRPE,
             rpeTrend: rpeTrend,
             loadTrend: loadTrend,
-            progressionSignal: signal,
-            progressionReason: reason,
-            recommendation: recommendation
+            progressionSignal: progression.signal,
+            progressionReason: progression.reason,
+            recommendation: progression.recommendation
         )
     }
 
@@ -313,6 +302,42 @@ enum AthleteStateDistiller {
 
     // MARK: - Recommendation Engine
 
+    private static func evaluateProgression(
+        latestRPE: Double?,
+        sessionCount: Int,
+        loads: [Double],
+        lastRx: String,
+        directive: ProgressionRuleDirective?
+    ) -> ProgressionEvaluation {
+        let historySignal = progressionSignalFromRecentHistory(
+            latestRPE: latestRPE,
+            sessionCount: sessionCount
+        )
+        let directiveSignal = progressionFromDirective(directive)
+        let chosenSignal: (signal: String, reason: String)
+
+        if let directive, directive.holdLock || directive.signal == "progress" {
+            chosenSignal = directiveSignal
+        } else {
+            chosenSignal = historySignal
+        }
+
+        let recommendation = generateRecommendation(
+            signal: chosenSignal.signal,
+            latestRPE: latestRPE,
+            loads: loads,
+            lastRx: lastRx,
+            directive: directive,
+            sessionCount: sessionCount
+        )
+
+        return ProgressionEvaluation(
+            signal: chosenSignal.signal,
+            reason: chosenSignal.reason,
+            recommendation: recommendation
+        )
+    }
+
     private static func generateRecommendation(
         signal: String,
         latestRPE: Double?,
@@ -359,8 +384,7 @@ enum AthleteStateDistiller {
     static func formatForPrompt(
         states: [ExerciseAthleteState],
         dbSummaryLine: String,
-        rawContextChars: Int = 0,
-        progressionInsights: [ProgressionInsight] = []
+        rawContextChars: Int = 0
     ) -> (prompt: String, telemetry: DistillationTelemetry) {
         var lines: [String] = [
             "DISTILLED ATHLETE STATE (pre-computed from DB — use directly for load/rep decisions):",
@@ -381,11 +405,6 @@ enum AthleteStateDistiller {
             lines.append("    trends: load \(state.loadTrend) | RPE \(state.rpeTrend)")
             lines.append("    signal: \(state.progressionSignal) — \(state.progressionReason)")
             lines.append("    -> \(state.recommendation)")
-        }
-
-        if !progressionInsights.isEmpty {
-            lines.append("")
-            lines.append(contentsOf: formatProgressionInsightsForPrompt(progressionInsights))
         }
 
         // Add instruction footer.
@@ -433,19 +452,6 @@ enum AthleteStateDistiller {
             return String(withoutRPE.prefix(57)) + "..."
         }
         return withoutRPE.isEmpty ? "logged (no text)" : withoutRPE
-    }
-
-    private static func formatProgressionInsightsForPrompt(_ insights: [ProgressionInsight]) -> [String] {
-        var lines = ["PROGRESSION INSIGHTS (DB-derived, use directly for supplemental progression decisions):"]
-        for insight in insights {
-            let sessionLabel = insight.sessionCount == 1 ? "1 session" : "\(insight.sessionCount) sessions"
-            let latestRPE = insight.latestRPE.map { formatRPE($0) } ?? "n/a"
-            lines.append("  \(insight.exerciseName) [\(insight.dayHint)] (\(sessionLabel)):")
-            lines.append("    signal: \(insight.progressionSignal) — \(insight.progressionReason)")
-            lines.append("    last_rx: \(insight.lastPrescription) | load: \(insight.loadTrend) | RPE: \(latestRPE)")
-            lines.append("    recommendation: \(insight.recommendation)")
-        }
-        return lines
     }
 
     static func formatRPE(_ value: Double) -> String {

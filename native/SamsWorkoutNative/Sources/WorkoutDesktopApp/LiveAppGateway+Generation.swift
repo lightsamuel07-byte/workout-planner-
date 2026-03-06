@@ -168,16 +168,11 @@ extension LiveAppGateway {
                     progressionDirectives: progressionRules,
                     selectedExercises: selectedExercises
                 )
-                let progressionInsights = AthleteStateDistiller.buildProgressionInsights(
-                    targetedRows: rows,
-                    limit: max(states.count, 1)
-                )
 
                 let formatted = AthleteStateDistiller.formatForPrompt(
                     states: states,
                     dbSummaryLine: dbSummaryLine,
-                    rawContextChars: rawContext.count,
-                    progressionInsights: progressionInsights
+                    rawContextChars: rawContext.count
                 )
                 distilledPrompt = formatted.prompt
                 telemetry.distillation = formatted.telemetry

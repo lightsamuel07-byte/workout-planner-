@@ -2,6 +2,7 @@ import Foundation
 import XCTest
 @testable import WorkoutDesktopApp
 import WorkoutIntegrations
+import WorkoutPersistence
 
 @MainActor
 final class WorkoutDesktopAppLiveE2ETests: XCTestCase {
@@ -56,6 +57,43 @@ final class WorkoutDesktopAppLiveE2ETests: XCTestCase {
             THAW
             Rower
             """
+        )
+    }
+
+    private func normalizeLog(_ raw: String) -> String {
+        raw
+            .replacingOccurrences(of: "\\s+", with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func preferredLiveSheetName(
+        gateway: LiveAppGateway,
+        sheetsClient: GoogleSheetsClient
+    ) async throws -> String {
+        let names = try await sheetsClient.fetchSheetNames()
+        if let preferred = LiveAppGateway.testPreferredWeeklyPlanSheetName(names, referenceDate: Date()) {
+            return preferred
+        }
+        if let mostRecent = GoogleSheetsClient.mostRecentWeeklyPlanSheet(names) {
+            return mostRecent
+        }
+        throw XCTSkip("No weekly plan sheets available for live conflict E2E.")
+    }
+
+    private func makeSyncEntry(exercise: SheetDayExercise, log: String) -> WorkoutSyncEntry {
+        let parsed = PlanTextParser.parseExistingLog(log)
+        return WorkoutSyncEntry(
+            sourceRow: exercise.sourceRow,
+            exerciseName: exercise.exercise,
+            block: exercise.block,
+            prescribedSets: exercise.sets,
+            prescribedReps: exercise.reps,
+            prescribedLoad: exercise.load,
+            prescribedRest: exercise.rest,
+            prescribedNotes: exercise.notes,
+            logText: log,
+            explicitRPE: parsed.rpe,
+            parsedNotes: parsed.notes
         )
     }
 
@@ -117,5 +155,170 @@ final class WorkoutDesktopAppLiveE2ETests: XCTestCase {
             name.lowercased().contains("weekly plan") && name.contains("2099")
         }
         XCTAssertFalse(has2099WeeklyPlan, "Found weekly plan tab(s) containing year 2099: \(names)")
+    }
+
+    func testLiveBidirectionalConflictSyncWritesAuditForDivergedRow() async throws {
+        guard ProcessInfo.processInfo.environment["RUN_LIVE_E2E"] == "1" else {
+            throw XCTSkip("Set RUN_LIVE_E2E=1 to run live integration flow.")
+        }
+
+        let configStore = FileAppConfigurationStore()
+        let originalConfig = configStore.load()
+        var testConfig = originalConfig
+        testConfig.bidirectionalSyncConflictPolicy = .preferDatabase
+        try configStore.save(testConfig)
+        defer { try? configStore.save(originalConfig) }
+
+        let gateway = LiveAppGateway()
+        let config = try gateway.requireSheetsSetup()
+        let sheetsClient = try await gateway.makeSheetsClient(config: config)
+        let sheetName = try await preferredLiveSheetName(gateway: gateway, sheetsClient: sheetsClient)
+
+        _ = try await gateway.rebuildDatabaseCache()
+
+        let values = try await sheetsClient.readSheetAtoH(sheetName: sheetName)
+        let workouts = GoogleSheetsClient.parseDayWorkouts(values: values)
+        guard let targetWorkout = workouts.first(where: { !$0.exercises.isEmpty }),
+              let targetExercise = targetWorkout.exercises.first(where: {
+                  !$0.exercise.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+              }) else {
+            throw XCTSkip("No parseable exercise rows available for live conflict E2E.")
+        }
+
+        let originalLog = normalizeLog(targetExercise.log)
+        let uniqueMarker = UUID().uuidString.prefix(8)
+        let sheetConflictLog = "sheet conflict \(uniqueMarker) | RPE 7 | Notes: live-e2e"
+        let dbConflictLog = "db conflict \(uniqueMarker) | RPE 9 | Notes: live-e2e"
+
+        let database = try gateway.openDatabase()
+        let syncService = try gateway.makeSyncService()
+        let existingAuditMaxID = try database.fetchRecentSyncAuditEvents(limit: 500).map(\.id).max() ?? 0
+
+        try database.upsertLogSyncState(
+            PersistedLogSyncState(
+                sheetName: sheetName,
+                dayLabel: targetWorkout.dayLabel,
+                sourceRow: targetExercise.sourceRow,
+                lastSyncedSheetLog: originalLog,
+                lastSyncedDBLog: originalLog,
+                lastResolution: "unchanged"
+            )
+        )
+
+        let restoreEntry = makeSyncEntry(exercise: targetExercise, log: originalLog)
+        let conflictEntry = makeSyncEntry(exercise: targetExercise, log: dbConflictLog)
+
+        var needsRestore = false
+        do {
+            try await sheetsClient.batchUpdateLogs([
+                ValueRangeUpdate(
+                    range: "'\(sheetName)'!H\(targetExercise.sourceRow)",
+                    values: [[sheetConflictLog]]
+                )
+            ])
+            needsRestore = true
+
+            _ = try syncService.sync(
+                input: WorkoutSyncSessionInput(
+                    sheetName: sheetName,
+                    dayLabel: targetWorkout.dayLabel,
+                    fallbackDayName: targetWorkout.dayName,
+                    fallbackDateISO: gateway.isoDate(gateway.nowProvider()),
+                    entries: [conflictEntry],
+                    includeEmptyLogs: true
+                )
+            )
+
+            _ = try await gateway.loadPlanSnapshot(forceRemote: true)
+
+            let refreshedValues = try await sheetsClient.readSheetAtoH(sheetName: sheetName)
+            let refreshedSheetLog = normalizeLog(
+                refreshedValues[targetExercise.sourceRow - 1][7]
+            )
+            XCTAssertEqual(refreshedSheetLog, dbConflictLog)
+
+            let refreshedDBRow = try database
+                .fetchSessionLogRows(sheetName: sheetName, dayLabel: targetWorkout.dayLabel)
+                .first { $0.sourceRow == targetExercise.sourceRow }
+            XCTAssertEqual(normalizeLog(refreshedDBRow?.logText ?? ""), dbConflictLog)
+
+            let summary = gateway.latestBidirectionalSyncSummary()
+            XCTAssertTrue(summary.contains("conflicts 1"), "Unexpected live sync summary: \(summary)")
+            XCTAssertTrue(summary.contains("policy prefer_database"), "Unexpected live sync summary: \(summary)")
+
+            let recentAudit = try database.fetchRecentSyncAuditEvents(limit: 500)
+            let matchingAudit = recentAudit.first {
+                $0.id > existingAuditMaxID &&
+                $0.sheetName == sheetName &&
+                $0.dayLabel == targetWorkout.dayLabel &&
+                $0.sourceRow == targetExercise.sourceRow &&
+                normalizeLog($0.resolvedLog) == dbConflictLog
+            }
+
+            XCTAssertNotNil(matchingAudit)
+            XCTAssertEqual(matchingAudit?.resolution, "conflict_resolved_to_db")
+            XCTAssertEqual(matchingAudit?.countsAsConflict, true)
+            XCTAssertEqual(matchingAudit?.didPushToSheets, true)
+            XCTAssertEqual(matchingAudit?.didPullToDB, false)
+        } catch {
+            if needsRestore {
+                try? await sheetsClient.batchUpdateLogs([
+                    ValueRangeUpdate(
+                        range: "'\(sheetName)'!H\(targetExercise.sourceRow)",
+                        values: [[originalLog]]
+                    )
+                ])
+                _ = try? syncService.sync(
+                    input: WorkoutSyncSessionInput(
+                        sheetName: sheetName,
+                        dayLabel: targetWorkout.dayLabel,
+                        fallbackDayName: targetWorkout.dayName,
+                        fallbackDateISO: gateway.isoDate(gateway.nowProvider()),
+                        entries: [restoreEntry],
+                        includeEmptyLogs: true
+                    )
+                )
+                try? database.upsertLogSyncState(
+                    PersistedLogSyncState(
+                        sheetName: sheetName,
+                        dayLabel: targetWorkout.dayLabel,
+                        sourceRow: targetExercise.sourceRow,
+                        lastSyncedSheetLog: originalLog,
+                        lastSyncedDBLog: originalLog,
+                        lastResolution: "test_restore"
+                    )
+                )
+            }
+            throw error
+        }
+
+        if needsRestore {
+            try await sheetsClient.batchUpdateLogs([
+                ValueRangeUpdate(
+                    range: "'\(sheetName)'!H\(targetExercise.sourceRow)",
+                    values: [[originalLog]]
+                )
+            ])
+            _ = try syncService.sync(
+                input: WorkoutSyncSessionInput(
+                    sheetName: sheetName,
+                    dayLabel: targetWorkout.dayLabel,
+                    fallbackDayName: targetWorkout.dayName,
+                    fallbackDateISO: gateway.isoDate(gateway.nowProvider()),
+                    entries: [restoreEntry],
+                    includeEmptyLogs: true
+                )
+            )
+            try database.upsertLogSyncState(
+                PersistedLogSyncState(
+                    sheetName: sheetName,
+                    dayLabel: targetWorkout.dayLabel,
+                    sourceRow: targetExercise.sourceRow,
+                    lastSyncedSheetLog: originalLog,
+                    lastSyncedDBLog: originalLog,
+                    lastResolution: "test_restore"
+                )
+            )
+        }
     }
 }

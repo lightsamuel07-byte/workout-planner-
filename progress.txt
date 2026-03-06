@@ -21,29 +21,35 @@ Built this session:
   - recent DB rows are distilled into `ProgressionInsight` records
   - rules are documented and deterministic (`PROGRESS`, `LOCK`, `NEUTRAL`)
   - insights now surface in the Progress screen and analytics refresh path
-  - the staged generation prompt now receives a dedicated DB-derived progression insights block alongside the distilled athlete state
+  - generation and analytics now reuse the same deterministic progression evaluation path instead of maintaining separate recommendation flows
+- Added a live sync-conflict E2E:
+  - intentionally diverges one real sheet row vs local DB row
+  - verifies conflict audit resolution and sync counters
+  - restores the original sheet cell, DB row, config conflict policy, and row-level sync checkpoint before exit
 - Preserved and completed the staged generation domain work already present in:
   - `AthleteStateDistiller.swift`
   - `AthleteStateDistillerTests.swift`
 - Previously delivered native canonical docs, sync hardening, and build-checkout doctor tooling remain in place from earlier in the day.
 
 Verification:
-- `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306m` passed: 196 tests, 3 skipped, 0 failures.
+- `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306r` passed: 199 tests, 4 skipped, 0 failures.
 - `bash native/SamsWorkoutNative/scripts/build_local_app.sh` passed and rebuilt `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`.
 - Focused regression runs also passed for:
   - generation telemetry and Stage 1 validation
   - manual sync conflict repair decisions and coordinator state
-  - progression insight distillation
+  - progression insight distillation and unified recommendation semantics
   - recent progression context DB fetch ordering
+- Live verification also passed:
+  - `RUN_LIVE_E2E=1 swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306q --filter WorkoutDesktopAppLiveE2ETests/testLiveBidirectionalConflictSyncWritesAuditForDivergedRow`
+  - result: pass, row restored after test
 
 Implementation plan phase mapping:
 - Phase 0 (Canonical Native Documentation): extended with timestamped sync review + progression addenda.
-- Phase 2 (Domain and Generation Parity): advanced with bounded staged-generation validation, correction retry, pipeline telemetry UI, and explicit progression-insight prompt injection.
+- Phase 2 (Domain and Generation Parity): advanced with bounded staged-generation validation, correction retry, pipeline telemetry UI, and a unified progression recommendation source of truth shared by generation and analytics.
 - Phase 4 (Persistence and Sync): advanced with manual conflict repair actions layered on top of the existing audit trail and checkpoints.
 - Phase 5 (Native UI Coverage): expanded Settings and Progress surfaces for sync repair and progression visibility.
-- Phase 6 (QA Hardening): expanded regression coverage around staged generation, manual conflict repair, progression insights, and persistence isolation.
+- Phase 6 (QA Hardening): expanded regression coverage around staged generation, manual conflict repair, progression insights, persistence isolation, and a real live sync-conflict E2E restore path.
 
 In progress / next:
-- Optional next hardening: add a live conflict-scenario E2E that intentionally diverges one row DB-vs-Sheets and verifies audit rows plus conflict counters.
-- Optional next hardening: feed `ProgressionInsight` outputs directly into generation prompts instead of surfacing them only in analytics/UI.
+- Optional next hardening: add a second live sync E2E that exercises manual conflict repair after an automatic resolution, so both sync paths are covered against the real sheet.
 - Optional next hardening: expose per-stage retry/error detail in generation telemetry if the pipeline needs production debugging.
