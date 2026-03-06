@@ -5,10 +5,18 @@ import GRDB
 
 final class WorkoutPersistenceTests: XCTestCase {
     private func tempDBPath(_ name: String = UUID().uuidString) -> String {
-        FileManager.default.temporaryDirectory
+        let path = FileManager.default.temporaryDirectory
             .appendingPathComponent("sams-workout-tests")
             .appendingPathComponent("\(name).db")
             .path
+
+        let fileManager = FileManager.default
+        let pathsToClear = [path, "\(path)-wal", "\(path)-shm"]
+        for candidate in pathsToClear where fileManager.fileExists(atPath: candidate) {
+            try? fileManager.removeItem(atPath: candidate)
+        }
+
+        return path
     }
 
     func testBootstrapCanBeInitialized() throws {
@@ -588,5 +596,68 @@ final class WorkoutPersistenceTests: XCTestCase {
         XCTAssertEqual(rows[0].logText, "Done | RPE 8")
         XCTAssertEqual(rows[1].sourceRow, 4)
         XCTAssertEqual(rows[1].exerciseName, "Bench Press")
+    }
+
+    func testFetchRecentProgressionContextRowsReturnsMostRecentExercisesFirst() throws {
+        let path = tempDBPath("progression_context")
+        let database = try WorkoutDatabase(path: path)
+        try database.migrate()
+        let syncService = WorkoutSyncService(database: database)
+
+        _ = try syncService.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: "Weekly Plan (2/23/2026)",
+                dayLabel: "Tuesday 2/24",
+                fallbackDayName: "Tuesday",
+                fallbackDateISO: "2026-02-24",
+                entries: [
+                    WorkoutSyncEntry(
+                        sourceRow: 3,
+                        exerciseName: "DB Hammer Curl",
+                        block: "B1",
+                        prescribedSets: "3",
+                        prescribedReps: "12",
+                        prescribedLoad: "22",
+                        prescribedRest: "60 seconds",
+                        prescribedNotes: "",
+                        logText: "Done | RPE 7.5",
+                        explicitRPE: "7.5",
+                        parsedNotes: ""
+                    ),
+                ],
+                includeEmptyLogs: true
+            )
+        )
+
+        _ = try syncService.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: "Weekly Plan (3/2/2026)",
+                dayLabel: "Thursday 3/5",
+                fallbackDayName: "Thursday",
+                fallbackDateISO: "2026-03-05",
+                entries: [
+                    WorkoutSyncEntry(
+                        sourceRow: 4,
+                        exerciseName: "Reverse Pec Deck",
+                        block: "C1",
+                        prescribedSets: "4",
+                        prescribedReps: "18",
+                        prescribedLoad: "42.5",
+                        prescribedRest: "60 seconds",
+                        prescribedNotes: "",
+                        logText: "Done | RPE 8.5",
+                        explicitRPE: "8.5",
+                        parsedNotes: ""
+                    ),
+                ],
+                includeEmptyLogs: true
+            )
+        )
+
+        let rows = try database.fetchRecentProgressionContextRows(limitExercises: 1, logsPerExercise: 4)
+
+        XCTAssertEqual(rows.count, 1)
+        XCTAssertEqual(rows.first?.exerciseName, "Reverse Pec Deck")
+        XCTAssertEqual(rows.first?.sessionDateISO, "2026-03-05")
     }
 }

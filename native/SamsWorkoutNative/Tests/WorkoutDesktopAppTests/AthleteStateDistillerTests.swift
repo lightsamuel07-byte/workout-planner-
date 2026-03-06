@@ -301,6 +301,73 @@ final class AthleteStateDistillerTests: XCTestCase {
         XCTAssertEqual(telemetry.totalOutputTokens, 5100)
     }
 
+    func testBuildProgressionInsightsEmitsProgressSignalForLowRecentRPE() {
+        let rows = [
+            PersistedTargetedLogContextRow(
+                sessionDateISO: "2026-03-05",
+                dayLabel: "Thursday 3/5",
+                exerciseName: "DB Hammer Curl",
+                normalizedName: "db_hammer_curl",
+                sets: "3",
+                reps: "12",
+                load: "24",
+                logText: "Done | RPE 7",
+                parsedRPE: 7.0
+            ),
+            PersistedTargetedLogContextRow(
+                sessionDateISO: "2026-02-27",
+                dayLabel: "Thursday 2/27",
+                exerciseName: "DB Hammer Curl",
+                normalizedName: "db_hammer_curl",
+                sets: "3",
+                reps: "12",
+                load: "22",
+                logText: "Done | RPE 7.5",
+                parsedRPE: 7.5
+            ),
+        ]
+
+        let insights = AthleteStateDistiller.buildProgressionInsights(targetedRows: rows, limit: 4)
+
+        XCTAssertEqual(insights.count, 1)
+        XCTAssertEqual(insights.first?.progressionSignal, "PROGRESS")
+        XCTAssertEqual(insights.first?.dayHint, "Thursday")
+        XCTAssertTrue(insights.first?.recommendation.contains("increase load") == true)
+    }
+
+    func testBuildProgressionInsightsEmitsLockSignalForHighRecentRPE() {
+        let rows = [
+            PersistedTargetedLogContextRow(
+                sessionDateISO: "2026-03-04",
+                dayLabel: "Wednesday 3/4",
+                exerciseName: "Reverse Pec Deck",
+                normalizedName: "reverse_pec_deck",
+                sets: "4",
+                reps: "18",
+                load: "42.5",
+                logText: "Done | RPE 8.5",
+                parsedRPE: 8.5
+            ),
+            PersistedTargetedLogContextRow(
+                sessionDateISO: "2026-02-25",
+                dayLabel: "Wednesday 2/25",
+                exerciseName: "Reverse Pec Deck",
+                normalizedName: "reverse_pec_deck",
+                sets: "4",
+                reps: "18",
+                load: "42.5",
+                logText: "Done | RPE 8",
+                parsedRPE: 8.0
+            ),
+        ]
+
+        let insights = AthleteStateDistiller.buildProgressionInsights(targetedRows: rows, limit: 4)
+
+        XCTAssertEqual(insights.count, 1)
+        XCTAssertEqual(insights.first?.progressionSignal, "LOCK")
+        XCTAssertTrue(insights.first?.progressionReason.contains("near limit") == true)
+    }
+
     // MARK: - Generation Mode Tests
 
     func testGenerationPipelineModeDefault() {

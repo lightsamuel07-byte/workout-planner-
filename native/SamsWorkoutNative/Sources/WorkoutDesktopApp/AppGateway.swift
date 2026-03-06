@@ -17,6 +17,7 @@ protocol NativeAppGateway {
     func rebuildDatabaseCache() async throws -> DBRebuildReport
     func loadPlanSnapshot(forceRemote: Bool) async throws -> PlanSnapshot
     func loadProgressSummary() -> ProgressSummary
+    func loadProgressionInsights(limit: Int) -> [ProgressionInsight]
     func loadWeeklyReviewSummaries() -> [WeeklyReviewSummary]
     func loadTopExercises(limit: Int) -> [TopExerciseSummary]
     func loadRecentSessions(limit: Int) -> [RecentSessionSummary]
@@ -28,6 +29,8 @@ protocol NativeAppGateway {
     func deleteInBodyScan(scanDate: String) throws
     func latestBidirectionalSyncSummary() -> String
     func loadRecentSyncAuditEvents(limit: Int) -> [PersistedSyncAuditEvent]
+    func latestGenerationPipelineTelemetry() -> PipelineTelemetry?
+    func repairSyncConflict(event: PersistedSyncAuditEvent, choice: SyncConflictRepairChoice) async throws -> String
 }
 
 extension NativeAppGateway {
@@ -59,6 +62,11 @@ extension NativeAppGateway {
 
     func loadProgressSummary() -> ProgressSummary {
         .empty
+    }
+
+    func loadProgressionInsights(limit: Int = 8) -> [ProgressionInsight] {
+        let _ = limit
+        return []
     }
 
     func loadWeeklyReviewSummaries() -> [WeeklyReviewSummary] {
@@ -97,6 +105,16 @@ extension NativeAppGateway {
     func loadRecentSyncAuditEvents(limit: Int = 12) -> [PersistedSyncAuditEvent] {
         let _ = limit
         return []
+    }
+
+    func latestGenerationPipelineTelemetry() -> PipelineTelemetry? {
+        nil
+    }
+
+    func repairSyncConflict(event: PersistedSyncAuditEvent, choice: SyncConflictRepairChoice) async throws -> String {
+        let _ = event
+        let _ = choice
+        return "Manual sync repair is unavailable in the current gateway."
     }
 }
 
@@ -229,6 +247,38 @@ struct InMemoryAppGateway: NativeAppGateway {
         ]
     }
 
+    func loadProgressionInsights(limit: Int = 8) -> [ProgressionInsight] {
+        let _ = limit
+        return [
+            ProgressionInsight(
+                id: "db-hammer-curl",
+                exerciseName: "DB Hammer Curl",
+                dayHint: "Thursday",
+                sessionCount: 4,
+                lastPrescription: "3x12 @ 24 kg",
+                latestRPE: 7.0,
+                rpeTrend: "stable ~7",
+                loadTrend: "rising 22->24 kg",
+                progressionSignal: "PROGRESS",
+                progressionReason: "latest RPE 7.0 with repeated exposure",
+                recommendation: "increase load to 26 kg"
+            ),
+            ProgressionInsight(
+                id: "reverse-pec-deck",
+                exerciseName: "Reverse Pec Deck",
+                dayHint: "Tuesday",
+                sessionCount: 3,
+                lastPrescription: "4x18 @ 42.5 kg",
+                latestRPE: 8.5,
+                rpeTrend: "rising 7.5->8.5",
+                loadTrend: "stable 42.5 kg",
+                progressionSignal: "LOCK",
+                progressionReason: "latest RPE 8.5 suggests near limit",
+                recommendation: "maintain current prescription"
+            ),
+        ]
+    }
+
     func latestBidirectionalSyncSummary() -> String {
         "Bidirectional sync summary is available only in live gateway mode."
     }
@@ -236,5 +286,10 @@ struct InMemoryAppGateway: NativeAppGateway {
     func loadRecentSyncAuditEvents(limit: Int = 12) -> [PersistedSyncAuditEvent] {
         let _ = limit
         return []
+    }
+
+    func repairSyncConflict(event: PersistedSyncAuditEvent, choice: SyncConflictRepairChoice) async throws -> String {
+        let selectedSide = choice == .applySheetsValue ? "Google Sheets" : "Local DB"
+        return "Applied \(selectedSide) value for \(event.exerciseName) row \(event.sourceRow)."
     }
 }

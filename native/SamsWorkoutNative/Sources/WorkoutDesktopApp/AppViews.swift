@@ -757,6 +757,50 @@ struct GeneratePlanPageView: View {
                     }
                 }
 
+                if let telemetry = coordinator.latestGenerationTelemetry {
+                    GroupBox("Pipeline Telemetry") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            HStack(spacing: 14) {
+                                Label(telemetry.pipelineMode.rawValue.capitalized, systemImage: "point.3.connected.trianglepath.dotted")
+                                    .font(.caption)
+                                Label("\(telemetry.totalTokens) total", systemImage: "sum")
+                                    .font(.caption)
+                                Label("\(telemetry.totalInputTokens) in", systemImage: "arrow.down.circle")
+                                    .font(.caption)
+                                Label("\(telemetry.totalOutputTokens) out", systemImage: "arrow.up.circle")
+                                    .font(.caption)
+                            }
+                            .foregroundStyle(.secondary)
+
+                            if let distillation = telemetry.distillation {
+                                let compressionText = String(format: "%.1f", distillation.compressionRatio * 100)
+                                Text(
+                                    "Distillation compressed \(distillation.rawRowsConsumed) rows into \(distillation.distilledPromptChars) chars (\(compressionText)% of raw context)."
+                                )
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            }
+
+                            VStack(alignment: .leading, spacing: 6) {
+                                ForEach(Array(telemetry.stages.enumerated()), id: \.offset) { _, stage in
+                                    HStack {
+                                        Text(stage.stageName.replacingOccurrences(of: "_", with: " ").capitalized)
+                                            .font(.caption.weight(.semibold))
+                                        Spacer()
+                                        Text("\(stage.durationMs)ms")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                        Text("\(stage.inputTokens) in / \(stage.outputTokens) out")
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+
                 if !coordinator.generationDisabledReason.isEmpty {
                     Text(coordinator.generationDisabledReason)
                         .font(.caption)
@@ -1178,6 +1222,47 @@ struct ProgressPageView: View {
                     MetricCardView(title: "Avg RPE", value: coordinator.averageRPEText)
                 }
 
+                VStack(alignment: .leading, spacing: 14) {
+                    SectionLabel("Progression Insights")
+                    if coordinator.progressionInsights.isEmpty {
+                        Text("No progression insights yet. Rebuild the DB cache or log more sessions to populate this section.")
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    } else {
+                        VStack(alignment: .leading, spacing: 10) {
+                            ForEach(coordinator.progressionInsights) { insight in
+                                VStack(alignment: .leading, spacing: 4) {
+                                    HStack {
+                                        Text(insight.exerciseName)
+                                            .font(.callout.weight(.semibold))
+                                        Text(insight.progressionSignal)
+                                            .font(.caption.weight(.semibold))
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(progressionInsightColor(insight.progressionSignal).opacity(0.12))
+                                            .clipShape(Capsule())
+                                        Spacer()
+                                        Text(insight.dayHint)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                    Text("\(insight.lastPrescription) | \(insight.loadTrend) | \(insight.rpeTrend)")
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(insight.progressionReason)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                    Text(insight.recommendation)
+                                        .font(.caption.weight(.semibold))
+                                }
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .padding(.vertical, 4)
+                                Divider()
+                            }
+                        }
+                    }
+                }
+
                 // MARK: - Volume Trend Chart
                 VStack(alignment: .leading, spacing: 14) {
                     SectionLabel("Weekly Volume Trend")
@@ -1330,6 +1415,17 @@ struct ProgressPageView: View {
         if rpe >= 7.5 { return .orange }
         if rpe >= 6.0 { return .yellow }
         return .green
+    }
+
+    private func progressionInsightColor(_ signal: String) -> Color {
+        switch signal.uppercased() {
+        case "PROGRESS":
+            return .green
+        case "LOCK":
+            return .orange
+        default:
+            return .blue
+        }
     }
 
     private func formatScanDate(_ iso: String) -> String {
@@ -2103,6 +2199,36 @@ struct SettingsPageView: View {
                                                 .foregroundStyle(.secondary)
                                             Text("Resolved: \(event.resolvedLog)")
                                                 .font(.caption2)
+                                            HStack(spacing: 8) {
+                                                Button("Apply Google Sheets Value") {
+                                                    Task {
+                                                        await coordinator.runSyncConflictRepair(
+                                                            event: event,
+                                                            choice: .applySheetsValue
+                                                        )
+                                                    }
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .controlSize(.small)
+                                                .disabled(coordinator.repairingSyncAuditEventID == event.id)
+
+                                                Button("Apply Local DB Value") {
+                                                    Task {
+                                                        await coordinator.runSyncConflictRepair(
+                                                            event: event,
+                                                            choice: .applyDatabaseValue
+                                                        )
+                                                    }
+                                                }
+                                                .buttonStyle(.bordered)
+                                                .controlSize(.small)
+                                                .disabled(coordinator.repairingSyncAuditEventID == event.id)
+
+                                                if coordinator.repairingSyncAuditEventID == event.id {
+                                                    ProgressView()
+                                                        .controlSize(.small)
+                                                }
+                                            }
                                         }
                                     }
                                     .frame(maxWidth: .infinity, alignment: .leading)

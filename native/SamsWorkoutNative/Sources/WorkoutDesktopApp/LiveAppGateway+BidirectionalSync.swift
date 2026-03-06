@@ -8,6 +8,8 @@ private enum BidirectionalLogResolution: String {
     case pushToSheets = "push_to_sheets"
     case conflictResolvedToSheet = "conflict_resolved_to_sheet"
     case conflictResolvedToDB = "conflict_resolved_to_db"
+    case manualRepairToSheet = "manual_repair_to_sheet"
+    case manualRepairToDB = "manual_repair_to_db"
 }
 
 private struct BidirectionalDecision {
@@ -27,6 +29,14 @@ private struct BidirectionalSyncCounters {
     func summary(sheetName: String, conflictPolicy: BidirectionalSyncConflictPolicy) -> String {
         "Bidirectional sync (\(sheetName)): \(exerciseRowsProcessed) rows across \(daySessionsProcessed) day sessions | pulled \(pulledToDB) | pushed \(pushedToSheets) | conflicts \(conflicts) | unchanged \(unchanged) | policy \(conflictPolicy.rawValue)."
     }
+}
+
+private struct ManualConflictRepairDecision {
+    let resolvedLog: String
+    let resolution: BidirectionalLogResolution
+    let didPushToSheets: Bool
+    let didPullToDB: Bool
+    let shouldWriteAudit: Bool
 }
 
 extension LiveAppGateway {
@@ -80,7 +90,7 @@ extension LiveAppGateway {
                 }
 
                 switch decision.resolution {
-                case .unchanged:
+                case .unchanged, .manualRepairToSheet, .manualRepairToDB:
                     counters.unchanged += 1
                 case .pullFromSheet, .conflictResolvedToSheet:
                     counters.pulledToDB += 1
@@ -180,6 +190,98 @@ extension LiveAppGateway {
         return mutableValues
     }
 
+    func repairSyncConflict(
+        event: PersistedSyncAuditEvent,
+        choice: SyncConflictRepairChoice
+    ) async throws -> String {
+        let config = try requireSheetsSetup()
+        let sheetsClient = try await makeSheetsClient(config: config)
+        let database = try openDatabase()
+        let syncService = try makeSyncService()
+
+        let values = try await sheetsClient.readSheetAtoH(sheetName: event.sheetName)
+        let normalizedValues = values.map { GoogleSheetsClient.enforceEightColumnSchema($0) }
+        let rowIndex = event.sourceRow - 1
+        let currentSheetRow = (rowIndex >= 0 && rowIndex < normalizedValues.count) ? normalizedValues[rowIndex] : nil
+        let currentSheetLog = normalizeLogForSync(currentSheetRow?[7] ?? event.sheetLog)
+        let dbRow = try database
+            .fetchSessionLogRows(sheetName: event.sheetName, dayLabel: event.dayLabel)
+            .first { $0.sourceRow == event.sourceRow }
+        let currentDBLog = normalizeLogForSync(dbRow?.logText ?? event.dbLog)
+
+        let decision = manualConflictRepairDecision(
+            currentSheetLog: currentSheetLog,
+            currentDBLog: currentDBLog,
+            choice: choice
+        )
+
+        if !decision.shouldWriteAudit {
+            let summary = "Manual sync repair skipped for \(event.exerciseName) row \(event.sourceRow): both stores already match the chosen value."
+            bidirectionalSyncSummary.set(summary)
+            return summary
+        }
+
+        if decision.didPushToSheets {
+            try await sheetsClient.batchUpdateLogs([
+                ValueRangeUpdate(
+                    range: "'\(event.sheetName)'!H\(event.sourceRow)",
+                    values: [[decision.resolvedLog]]
+                )
+            ])
+        }
+
+        let entry = try makeManualRepairSyncEntry(
+            event: event,
+            sheetRow: currentSheetRow,
+            dbRow: dbRow,
+            resolvedLog: decision.resolvedLog
+        )
+        _ = try syncService.sync(
+            input: WorkoutSyncSessionInput(
+                sheetName: event.sheetName,
+                dayLabel: event.dayLabel,
+                fallbackDayName: GoogleSheetsClient.dayNameFromLabel(event.dayLabel) ?? event.dayLabel,
+                fallbackDateISO: isoDate(nowProvider()),
+                entries: [entry],
+                includeEmptyLogs: true
+            )
+        )
+
+        try database.upsertLogSyncState(
+            PersistedLogSyncState(
+                sheetName: event.sheetName,
+                dayLabel: event.dayLabel,
+                sourceRow: event.sourceRow,
+                lastSyncedSheetLog: decision.resolvedLog,
+                lastSyncedDBLog: decision.resolvedLog,
+                lastResolution: decision.resolution.rawValue
+            )
+        )
+
+        try database.insertSyncAuditEvent(
+            PersistedSyncAuditEvent(
+                syncRunID: UUID().uuidString,
+                sheetName: event.sheetName,
+                dayLabel: event.dayLabel,
+                sourceRow: event.sourceRow,
+                exerciseName: event.exerciseName,
+                sheetLog: currentSheetLog,
+                dbLog: currentDBLog,
+                resolvedLog: decision.resolvedLog,
+                resolution: decision.resolution.rawValue,
+                conflictPolicy: configStore.load().bidirectionalSyncConflictPolicy.rawValue,
+                didPushToSheets: decision.didPushToSheets,
+                didPullToDB: decision.didPullToDB,
+                countsAsConflict: true
+            )
+        )
+
+        let selectedSide = choice == .applySheetsValue ? "Google Sheets" : "Local DB"
+        let summary = "Applied \(selectedSide) value for \(event.exerciseName) row \(event.sourceRow) and refreshed sync checkpoints."
+        bidirectionalSyncSummary.set(summary)
+        return summary
+    }
+
     private func resolveBidirectionalLogDecision(
         sheetLog: String,
         dbLog: String,
@@ -257,6 +359,67 @@ extension LiveAppGateway {
             .trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    private func manualConflictRepairDecision(
+        currentSheetLog: String,
+        currentDBLog: String,
+        choice: SyncConflictRepairChoice
+    ) -> ManualConflictRepairDecision {
+        let resolvedLog = choice == .applySheetsValue ? currentSheetLog : currentDBLog
+        let didPushToSheets = currentSheetLog != resolvedLog
+        let didPullToDB = currentDBLog != resolvedLog
+        let resolution: BidirectionalLogResolution = choice == .applySheetsValue ? .manualRepairToSheet : .manualRepairToDB
+
+        return ManualConflictRepairDecision(
+            resolvedLog: resolvedLog,
+            resolution: resolution,
+            didPushToSheets: didPushToSheets,
+            didPullToDB: didPullToDB,
+            shouldWriteAudit: didPushToSheets || didPullToDB
+        )
+    }
+
+    private func makeManualRepairSyncEntry(
+        event: PersistedSyncAuditEvent,
+        sheetRow: [String]?,
+        dbRow: PersistedSessionLogRow?,
+        resolvedLog: String
+    ) throws -> WorkoutSyncEntry {
+        let parsed = PlanTextParser.parseExistingLog(resolvedLog)
+        if let dbRow {
+            return WorkoutSyncEntry(
+                sourceRow: event.sourceRow,
+                exerciseName: dbRow.exerciseName,
+                block: dbRow.block,
+                prescribedSets: dbRow.prescribedSets,
+                prescribedReps: dbRow.prescribedReps,
+                prescribedLoad: dbRow.prescribedLoad,
+                prescribedRest: dbRow.prescribedRest,
+                prescribedNotes: dbRow.prescribedNotes,
+                logText: resolvedLog,
+                explicitRPE: parsed.rpe,
+                parsedNotes: parsed.notes
+            )
+        }
+
+        if let sheetRow {
+            return WorkoutSyncEntry(
+                sourceRow: event.sourceRow,
+                exerciseName: sheetRow[1],
+                block: sheetRow[0],
+                prescribedSets: sheetRow[2],
+                prescribedReps: sheetRow[3],
+                prescribedLoad: sheetRow[4],
+                prescribedRest: sheetRow[5],
+                prescribedNotes: sheetRow[6],
+                logText: resolvedLog,
+                explicitRPE: parsed.rpe,
+                parsedNotes: parsed.notes
+            )
+        }
+
+        throw LiveGatewayError.manualSyncRepairTargetNotFound
+    }
+
     private func applyResolvedLogToValues(
         _ values: inout [[String]],
         sourceRow: Int,
@@ -304,5 +467,25 @@ extension LiveAppGateway {
         )
 
         return (decision.resolvedLog, decision.resolution.rawValue, decision.countsAsConflict)
+    }
+
+    static func testManualConflictRepairDecision(
+        currentSheetLog: String,
+        currentDBLog: String,
+        choice: SyncConflictRepairChoice
+    ) -> (resolvedLog: String, resolution: String, didPushToSheets: Bool, didPullToDB: Bool, shouldWriteAudit: Bool) {
+        let gateway = LiveAppGateway(planWriteMode: .localOnly)
+        let decision = gateway.manualConflictRepairDecision(
+            currentSheetLog: gateway.normalizeLogForSync(currentSheetLog),
+            currentDBLog: gateway.normalizeLogForSync(currentDBLog),
+            choice: choice
+        )
+        return (
+            decision.resolvedLog,
+            decision.resolution.rawValue,
+            decision.didPushToSheets,
+            decision.didPullToDB,
+            decision.shouldWriteAudit
+        )
     }
 }

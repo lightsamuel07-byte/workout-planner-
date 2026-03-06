@@ -91,9 +91,9 @@ extension LiveAppGateway {
             maxTokens: 300
         )
         var selectedExercises: [String: [String]] = [:]
+        let selectionPrompt = PromptBuilder.buildExerciseSelectionPrompt(input: input, fortContext: fortContext)
         var pass1Tokens = (input: 0, output: 0)
         do {
-            let selectionPrompt = PromptBuilder.buildExerciseSelectionPrompt(input: input, fortContext: fortContext)
             let pass1Result = try await anthropicPass1.generatePlan(
                 systemPrompt: nil,
                 userPrompt: selectionPrompt,
@@ -101,9 +101,44 @@ extension LiveAppGateway {
             )
             pass1Tokens = (input: pass1Result.inputTokens, output: pass1Result.outputTokens)
             selectedExercises = parseSelectedExercises(from: pass1Result.text)
+            let selectionIssues = validateSelectedExercises(selectedExercises)
 
-            let exerciseCount = selectedExercises.values.reduce(0) { $0 + $1.count }
-            emit(.selectingExercises, "Stage 1 complete: \(exerciseCount) exercises selected.")
+            if selectionIssues.isEmpty {
+                let exerciseCount = selectedExercises.values.reduce(0) { $0 + $1.count }
+                emit(.selectingExercises, "Stage 1 complete: \(exerciseCount) exercises selected.")
+            } else {
+                emit(.selectingExercises, "Stage 1 output needs correction (\(selectionIssues.count) issue(s)).")
+                let correctionPrompt = PromptBuilder.buildExerciseSelectionCorrectionPrompt(
+                    input: input,
+                    fortContext: fortContext,
+                    rawSelection: pass1Result.text,
+                    issues: selectionIssues
+                )
+                let correctionStart = CFAbsoluteTimeGetCurrent()
+                let corrected = try await anthropicPass1.generatePlan(
+                    systemPrompt: nil,
+                    userPrompt: correctionPrompt,
+                    onEvent: nil
+                )
+                telemetry.stages.append(PipelineTelemetry.StageMetrics(
+                    stageName: "exercise_selection_correction",
+                    inputTokens: corrected.inputTokens,
+                    outputTokens: corrected.outputTokens,
+                    durationMs: Int((CFAbsoluteTimeGetCurrent() - correctionStart) * 1000),
+                    promptChars: correctionPrompt.count
+                ))
+
+                let correctedExercises = parseSelectedExercises(from: corrected.text)
+                let correctedIssues = validateSelectedExercises(correctedExercises)
+                if correctedIssues.isEmpty {
+                    selectedExercises = correctedExercises
+                    let exerciseCount = correctedExercises.values.reduce(0) { $0 + $1.count }
+                    emit(.selectingExercises, "Stage 1 corrected successfully: \(exerciseCount) exercises selected.")
+                } else {
+                    selectedExercises = [:]
+                    emit(.selectingExercises, "Stage 1 correction still invalid; using generic context.")
+                }
+            }
         } catch {
             emit(.selectingExercises, "Stage 1 failed (\(error.localizedDescription)), will use generic context.")
         }
@@ -114,7 +149,7 @@ extension LiveAppGateway {
             inputTokens: pass1Tokens.input,
             outputTokens: pass1Tokens.output,
             durationMs: selectionDurationMs,
-            promptChars: 0
+            promptChars: selectionPrompt.count
         ))
 
         // ── Stage 2: Context Distillation (local computation) ────────────────
@@ -746,10 +781,11 @@ extension LiveAppGateway {
     func parseSelectedExercises(from text: String) -> [String: [String]] {
         var result: [String: [String]] = [:]
         let dayKeys = ["TUESDAY", "THURSDAY", "SATURDAY"]
+        let normalizer = getNormalizer()
 
         let lines = text.components(separatedBy: .newlines)
         for line in lines {
-            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            let trimmed = sanitizeSelectedExerciseLine(line)
             if trimmed.isEmpty {
                 continue
             }
@@ -773,17 +809,96 @@ extension LiveAppGateway {
 
             let exercises = exercisePart
                 .components(separatedBy: ",")
-                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .map { sanitizeSelectedExerciseItem($0) }
                 .filter { !$0.isEmpty }
 
             if !exercises.isEmpty {
-                result[dayRaw] = exercises
+                result[dayRaw, default: []].append(contentsOf: exercises)
             }
+        }
+
+        for key in result.keys {
+            var seen: Set<String> = []
+            var unique: [String] = []
+            for exercise in result[key] ?? [] {
+                let normalized = normalizer.canonicalKey(exercise)
+                guard seen.insert(normalized).inserted else {
+                    continue
+                }
+                unique.append(exercise)
+            }
+            result[key] = unique
         }
 
         // Only return a result if all three days parsed successfully.
         let allParsed = dayKeys.allSatisfy { result[$0] != nil && !(result[$0]!.isEmpty) }
         return allParsed ? result : [:]
+    }
+
+    func sanitizeSelectedExerciseLine(_ text: String) -> String {
+        let withoutBullets = text.replacingOccurrences(
+            of: #"^\s*[-*•\d\.\)]*\s*"#,
+            with: "",
+            options: .regularExpression
+        )
+        return withoutBullets
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func sanitizeSelectedExerciseItem(_ text: String) -> String {
+        text
+            .replacingOccurrences(of: #"\s+"#, with: " ", options: .regularExpression)
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    func validateSelectedExercises(_ selectedExercises: [String: [String]]) -> [String] {
+        let requiredDays = [
+            ("TUESDAY", "Tuesday"),
+            ("THURSDAY", "Thursday"),
+            ("SATURDAY", "Saturday"),
+        ]
+        let normalizer = getNormalizer()
+        var issues: [String] = []
+        var seenAcrossDays: [String: (day: String, exercise: String)] = [:]
+
+        func appendIssue(_ issue: String) {
+            if !issues.contains(issue) {
+                issues.append(issue)
+            }
+        }
+
+        for (dayKey, dayLabel) in requiredDays {
+            guard let exercises = selectedExercises[dayKey], !exercises.isEmpty else {
+                appendIssue("Missing \(dayLabel) exercise list.")
+                continue
+            }
+
+            if exercises.count < 5 {
+                appendIssue("\(dayLabel) has \(exercises.count) exercises; minimum 5 required.")
+            }
+
+            var seenWithinDay: Set<String> = []
+            for exercise in exercises {
+                let normalized = normalizer.canonicalKey(exercise)
+                guard !normalized.isEmpty else {
+                    continue
+                }
+
+                if !seenWithinDay.insert(normalized).inserted {
+                    appendIssue("\(dayLabel) repeats \(exercise).")
+                    continue
+                }
+
+                if let previous = seenAcrossDays[normalized], previous.day != dayLabel {
+                    appendIssue("\(previous.exercise) appears on both \(previous.day) and \(dayLabel).")
+                } else {
+                    seenAcrossDays[normalized] = (dayLabel, exercise)
+                }
+            }
+        }
+
+        return issues
     }
 
     /// Build targeted DB context for ONLY the exercises selected in Pass 1.

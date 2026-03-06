@@ -48,6 +48,17 @@ extension LiveAppGateway {
         )
     }
 
+    func loadProgressionInsights(limit: Int = 8) -> [ProgressionInsight] {
+        guard let database = try? openDatabase(),
+              let rows = try? database.fetchRecentProgressionContextRows(limitExercises: limit, logsPerExercise: 4),
+              !rows.isEmpty
+        else {
+            return []
+        }
+
+        return AthleteStateDistiller.buildProgressionInsights(targetedRows: rows, limit: limit)
+    }
+
     func loadWeeklyReviewSummaries() -> [WeeklyReviewSummary] {
         guard let database = try? openDatabase(),
               let summaries = try? database.fetchWeeklySummaries(limit: 12)

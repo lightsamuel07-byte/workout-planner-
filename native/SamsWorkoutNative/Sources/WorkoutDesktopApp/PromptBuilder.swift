@@ -316,4 +316,45 @@ enum PromptBuilder {
         Saturday: Exercise G, Exercise H, Exercise I
         """
     }
+
+    static func buildExerciseSelectionCorrectionPrompt(
+        input: PlanGenerationInput,
+        fortContext: String,
+        rawSelection: String,
+        issues: [String]
+    ) -> String {
+        let cycleBlock = input.isNewCycle
+            ? "NEW CYCLE: choose a fresh set of exercises instead of reusing the prior cycle."
+            : "MID-CYCLE: keep exercises consistent with prior weeks unless progression requires a swap."
+        let renderedIssues = issues.map { "- \($0)" }.joined(separator: "\n")
+
+        return """
+        You are correcting a Stage 1 supplemental exercise selection list for Tuesday, Thursday, and Saturday.
+
+        FORT CONTEXT:
+        \(fortContext)
+
+        \(cycleBlock)
+
+        CURRENT SELECTION:
+        \(rawSelection)
+
+        ISSUES TO FIX:
+        \(renderedIssues)
+
+        HARD RULES:
+        - Return all three days: Tuesday, Thursday, Saturday.
+        - Minimum 5 exercises per supplemental day.
+        - No repeated exercise across supplemental days in the same week.
+        - Tuesday protects Wednesday bench.
+        - Thursday protects Friday deadlift grip and biceps.
+        - Saturday protects Monday squat and overall recovery.
+        - Include McGill Big-3 and incline walk in each supplemental day list.
+
+        Return ONLY a plain-text list in this exact format — no explanation, no markdown:
+        Tuesday: Exercise A, Exercise B, Exercise C
+        Thursday: Exercise D, Exercise E, Exercise F
+        Saturday: Exercise G, Exercise H, Exercise I
+        """
+    }
 }

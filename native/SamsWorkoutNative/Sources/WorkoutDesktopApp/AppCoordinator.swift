@@ -21,6 +21,7 @@ final class AppCoordinator: ObservableObject {
     @Published var generationOutputTokenCount: Int?
     @Published var generationPreviewTail = ""
     @Published var generationProgressLog: [String] = []
+    @Published var latestGenerationTelemetry: PipelineTelemetry?
     @Published var planSnapshot = PlanSnapshot.empty
     @Published var selectedPlanDay = ""
     @Published var viewPlanError = ""
@@ -54,6 +55,7 @@ final class AppCoordinator: ObservableObject {
     @Published var weeklyVolumePoints: [WeeklyVolumePoint] = []
     @Published var weeklyRPEPoints: [WeeklyRPEPoint] = []
     @Published var muscleGroupVolumes: [MuscleGroupVolume] = []
+    @Published var progressionInsights: [ProgressionInsight] = []
 
     @Published var oneRepMaxFields: [OneRepMaxFieldState] = []
     @Published var oneRepMaxStatus = ""
@@ -61,6 +63,7 @@ final class AppCoordinator: ObservableObject {
     @Published var inBodyScans: [InBodyScan] = []
     @Published var showAddScanSheet = false
     @Published var inBodyScanStatus = ""
+    @Published var repairingSyncAuditEventID: Int64?
 
     // Fort Normalization Preview
     @Published var showFortPreview = false
@@ -674,6 +677,7 @@ if !generationStatus.isEmpty {
         generationOutputTokenCount = nil
         generationPreviewTail = ""
         generationProgressLog = []
+        latestGenerationTelemetry = nil
 
         generationInput = PlanGenerationInput(
             monday: normalizedMultiline(generationInput.monday),
@@ -690,6 +694,7 @@ if !generationStatus.isEmpty {
                     }
                 }
             )
+            latestGenerationTelemetry = gateway.latestGenerationPipelineTelemetry()
             generationStage = .completed
             await refreshPlanSnapshot()
             refreshAnalytics()
@@ -769,8 +774,28 @@ if !generationStatus.isEmpty {
         refreshAnalytics()
     }
 
+    func runSyncConflictRepair(event: PersistedSyncAuditEvent, choice: SyncConflictRepairChoice) async {
+        if repairingSyncAuditEventID != nil {
+            return
+        }
+
+        repairingSyncAuditEventID = event.id
+        bidirectionalSyncStatus = "Applying \(choice.title.lowercased()) for \(event.exerciseName) row \(event.sourceRow)..."
+        defer { repairingSyncAuditEventID = nil }
+
+        do {
+            bidirectionalSyncStatus = try await gateway.repairSyncConflict(event: event, choice: choice)
+            lastBidirectionalSyncAt = Date()
+            refreshSyncAuditEvents()
+            refreshAnalytics()
+        } catch {
+            bidirectionalSyncStatus = "Manual sync repair failed: \(error.localizedDescription)"
+        }
+    }
+
     func refreshAnalytics() {
         progressSummary = gateway.loadProgressSummary()
+        progressionInsights = gateway.loadProgressionInsights(limit: 8)
         weeklyReviewSummaries = gateway.loadWeeklyReviewSummaries()
         topExercises = gateway.loadTopExercises(limit: 5)
         recentSessions = gateway.loadRecentSessions(limit: 8)

@@ -33,6 +33,7 @@ enum LiveGatewayError: LocalizedError {
     case noPlanData
     case noWorkoutForToday
     case dbSyncFailedAfterSheetsWrite(underlyingError: String)
+    case manualSyncRepairTargetNotFound
 
     var errorDescription: String? {
         switch self {
@@ -52,6 +53,8 @@ enum LiveGatewayError: LocalizedError {
             return "No workout found for today in the latest weekly sheet."
         case .dbSyncFailedAfterSheetsWrite(let underlyingError):
             return "Sheets updated but local DB sync failed: \(underlyingError). Try Rebuild DB Cache to re-sync."
+        case .manualSyncRepairTargetNotFound:
+            return "Unable to locate the target row for manual sync repair."
         }
     }
 }
@@ -128,6 +131,10 @@ struct LiveAppGateway: NativeAppGateway {
 }
 
 extension LiveAppGateway {
+    func latestGenerationPipelineTelemetry() -> PipelineTelemetry? {
+        latestPipelineTelemetry.get()
+    }
+
     func latestBidirectionalSyncSummary() -> String {
         bidirectionalSyncSummary.get()
     }
@@ -390,5 +397,10 @@ extension LiveAppGateway {
     static func testParseSelectedExercises(from text: String) -> [String: [String]] {
         let gateway = LiveAppGateway(planWriteMode: .localOnly)
         return gateway.parseSelectedExercises(from: text)
+    }
+
+    static func testValidateSelectedExercises(_ selectedExercises: [String: [String]]) -> [String] {
+        let gateway = LiveAppGateway(planWriteMode: .localOnly)
+        return gateway.validateSelectedExercises(selectedExercises)
     }
 }

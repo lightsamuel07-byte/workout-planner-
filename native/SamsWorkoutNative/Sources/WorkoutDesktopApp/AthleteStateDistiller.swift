@@ -120,6 +120,62 @@ enum AthleteStateDistiller {
         return states
     }
 
+    static func buildProgressionInsights(
+        targetedRows: [PersistedTargetedLogContextRow],
+        limit: Int = 8
+    ) -> [ProgressionInsight] {
+        var rowsByNorm: [String: [PersistedTargetedLogContextRow]] = [:]
+        for row in targetedRows {
+            rowsByNorm[row.normalizedName, default: []].append(row)
+        }
+
+        let groupedRows = rowsByNorm.values
+            .map { rows in rows.sorted { $0.sessionDateISO > $1.sessionDateISO } }
+            .sorted { lhs, rhs in
+                (lhs.first?.sessionDateISO ?? "") > (rhs.first?.sessionDateISO ?? "")
+            }
+
+        return groupedRows.prefix(limit).map { rows in
+            let latest = rows.first
+            let exerciseName = latest?.exerciseName ?? "Unknown Exercise"
+            let normalizedName = latest?.normalizedName ?? getNormalizer().canonicalKey(exerciseName)
+            let dayHint = latest?.dayLabel.components(separatedBy: " ").first ?? "Recent"
+            let state = distillSingleExercise(
+                exerciseName: exerciseName,
+                normalizedName: normalizedName,
+                dayHint: dayHint,
+                rows: rows,
+                directive: nil
+            )
+            let (signal, reason) = progressionSignalFromRecentHistory(
+                latestRPE: state.latestRPE,
+                sessionCount: state.sessionCount
+            )
+            let recommendation = generateRecommendation(
+                signal: signal,
+                latestRPE: state.latestRPE,
+                loads: rows.compactMap { parseLoad($0.load) },
+                lastRx: state.lastPrescription,
+                directive: nil,
+                sessionCount: state.sessionCount
+            )
+
+            return ProgressionInsight(
+                id: "\(normalizedName)|\(dayHint)",
+                exerciseName: state.exerciseName,
+                dayHint: state.dayHint,
+                sessionCount: state.sessionCount,
+                lastPrescription: state.lastPrescription,
+                latestRPE: state.latestRPE,
+                rpeTrend: state.rpeTrend,
+                loadTrend: state.loadTrend,
+                progressionSignal: signal,
+                progressionReason: reason,
+                recommendation: recommendation
+            )
+        }
+    }
+
     // MARK: - Single Exercise Distillation
 
     private static func distillSingleExercise(
@@ -237,6 +293,22 @@ enum AthleteStateDistiller {
         } else {
             return ("NEUTRAL", directive.reason)
         }
+    }
+
+    private static func progressionSignalFromRecentHistory(
+        latestRPE: Double?,
+        sessionCount: Int
+    ) -> (signal: String, reason: String) {
+        guard let latestRPE else {
+            return ("NEUTRAL", "no recent RPE data")
+        }
+        if latestRPE >= 8.5 {
+            return ("LOCK", "latest RPE \(formatRPE(latestRPE)) suggests near limit")
+        }
+        if latestRPE <= 7.0, sessionCount >= 2 {
+            return ("PROGRESS", "latest RPE \(formatRPE(latestRPE)) with repeated exposure")
+        }
+        return ("NEUTRAL", "latest RPE \(formatRPE(latestRPE)) suggests maintain")
     }
 
     // MARK: - Recommendation Engine

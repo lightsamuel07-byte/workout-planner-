@@ -1386,6 +1386,34 @@ public struct WorkoutDatabase: Sendable {
         }
     }
 
+    public func fetchRecentProgressionContextRows(
+        limitExercises: Int = 8,
+        logsPerExercise: Int = 4
+    ) throws -> [PersistedTargetedLogContextRow] {
+        let normalizedNames = try dbQueue.read { db in
+            try String.fetchAll(
+                db,
+                sql: """
+                SELECT e.normalized_name
+                FROM exercise_logs el
+                JOIN exercises e ON e.id = el.exercise_id
+                JOIN workout_sessions ws ON ws.id = el.session_id
+                WHERE TRIM(COALESCE(el.log_text, '')) <> ''
+                  AND LOWER(e.name) NOT LIKE '%warm-up set%'
+                GROUP BY e.normalized_name
+                ORDER BY MAX(COALESCE(ws.session_date, '')) DESC
+                LIMIT ?
+                """,
+                arguments: [limitExercises]
+            )
+        }
+
+        return try fetchTargetedLogContextRows(
+            normalizedNames: normalizedNames,
+            logsPerExercise: logsPerExercise
+        )
+    }
+
     public func fetchRecentLogContextRows(limit: Int = 40) throws -> [PersistedRecentLogContextRow] {
         try dbQueue.read { db in
             let rows = try Row.fetchAll(

@@ -2,44 +2,47 @@ Date: 2026-03-06
 Runtime scope: Native Swift app only (`native/SamsWorkoutNative`)
 
 Built this session:
-- Added timestamped native canonical docs for the active Swift app:
-  - `PRD_2026-03-06_1545_native-swift.md`
-  - `APP_FLOW_2026-03-06_1545_native-swift.md`
-  - `TECH_STACK_2026-03-06_1545_native-swift.md`
-  - `DESIGN_SYSTEM_2026-03-06_1545_native-swift.md`
-  - `FRONTEND_GUIDELINES_2026-03-06_1545_native-swift.md`
-  - `BACKEND_STRUCTURE_2026-03-06_1545_native-swift.md`
-  - `IMPLEMENTATION_PLAN_2026-03-06_1545_native-swift.md`
-- Added bidirectional sync conflict policy configuration:
-  - config persistence default/migration-safe decode
-  - Settings picker
-  - resolver support for Sheets-preferred vs DB-preferred conflict handling
-- Added new persistence migration `v4_sync_audit_events` plus fetch/insert APIs.
-- Added recent sync audit visibility in Settings.
-- Folded intentional staged-generation work into the repo change set:
+- Fixed native persistence test isolation in `WorkoutPersistenceTests` by clearing reused `.db`, `-wal`, and `-shm` files before each temp-path reuse.
+- Added timestamped native doc addenda for sync review + progression work:
+  - `PRD_2026-03-06_1235_native-sync-review-progression.md`
+  - `APP_FLOW_2026-03-06_1235_native-sync-review-progression.md`
+  - `BACKEND_STRUCTURE_2026-03-06_1235_native-sync-review-progression.md`
+  - `IMPLEMENTATION_PLAN_2026-03-06_1235_native-sync-review-progression.md`
+- Hardened staged generation into a bounded multi-call pipeline:
+  - Stage 1 exercise selection now performs local structural validation
+  - one correction retry is issued only when Stage 1 output is invalid
+  - fallback remains bounded and low-context if correction still fails
+  - latest pipeline telemetry is surfaced through the gateway, coordinator, and Generate Plan UI
+- Added manual sync conflict review + repair in Settings:
+  - audit rows now expose `Apply Google Sheets Value` and `Apply Local DB Value`
+  - repairs are idempotent and write both the chosen store and a new audit event
+  - repair state is visible while the action is running
+- Added explicit progression insights from recent workout history:
+  - recent DB rows are distilled into `ProgressionInsight` records
+  - rules are documented and deterministic (`PROGRESS`, `LOCK`, `NEUTRAL`)
+  - insights now surface in the Progress screen and analytics refresh path
+- Preserved and completed the staged generation domain work already present in:
   - `AthleteStateDistiller.swift`
   - `AthleteStateDistillerTests.swift`
-- Added repo hygiene fix for local `.venv312/`.
-- Fixed the default native build-script hang:
-  - root cause was SwiftPM triggering `git status` inside `GRDB.swift`, which descended into the `SQLiteCustom/src` submodule and hung on status refresh
-  - `native/SamsWorkoutNative/scripts/build_local_app.sh` now preconfigures the GRDB checkout to ignore that submodule for status scans before `swift build`
-- Added `native/SamsWorkoutNative/scripts/doctor_build_checkout.sh`:
-  - safely removes stale generated checkout lock/index artifacts in `.build/checkouts/GRDB.swift`
-  - refuses cleanup while related build/status processes are active unless `--force` is supplied
-  - verifies both `GRDB.swift` and `SQLiteCustom/src` status after cleanup
+- Previously delivered native canonical docs, sync hardening, and build-checkout doctor tooling remain in place from earlier in the day.
 
 Verification:
-- `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306 -v` passed: 187 tests, 3 skipped, 0 failures.
-- Equivalent release build completed and regenerated `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`.
-- `bash scripts/build_local_app.sh` passed end-to-end after the GRDB submodule-status fix.
-- `bash scripts/doctor_build_checkout.sh` passed and confirmed clean GRDB + `SQLiteCustom/src` generated checkout state.
+- `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306k` passed: 195 tests, 3 skipped, 0 failures.
+- `bash native/SamsWorkoutNative/scripts/build_local_app.sh` passed and rebuilt `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`.
+- Focused regression runs also passed for:
+  - generation telemetry and Stage 1 validation
+  - manual sync conflict repair decisions and coordinator state
+  - progression insight distillation
+  - recent progression context DB fetch ordering
 
 Implementation plan phase mapping:
-- Phase 0 (Canonical Native Documentation): completed realignment for the active native app track.
-- Phase 2 (Domain and Generation Parity): advanced with staged athlete-state distillation work captured in source + tests.
-- Phase 4 (Persistence and Sync): advanced with configurable conflict policy and durable sync audit trail.
-- Phase 6 (QA Hardening): expanded regression coverage around config migration, sync policy, sync audit, and distillation.
+- Phase 0 (Canonical Native Documentation): extended with timestamped sync review + progression addenda.
+- Phase 2 (Domain and Generation Parity): advanced with bounded staged-generation validation, correction retry, and pipeline telemetry UI.
+- Phase 4 (Persistence and Sync): advanced with manual conflict repair actions layered on top of the existing audit trail and checkpoints.
+- Phase 5 (Native UI Coverage): expanded Settings and Progress surfaces for sync repair and progression visibility.
+- Phase 6 (QA Hardening): expanded regression coverage around staged generation, manual conflict repair, progression insights, and persistence isolation.
 
 In progress / next:
 - Optional next hardening: add a live conflict-scenario E2E that intentionally diverges one row DB-vs-Sheets and verifies audit rows plus conflict counters.
-- Optional cleanup: investigate why the GRDB `SQLiteCustom/src` submodule checkout appears stat-dirty across the whole tree, even though content diffs are empty.
+- Optional next hardening: feed `ProgressionInsight` outputs directly into generation prompts instead of surfacing them only in analytics/UI.
+- Optional next hardening: expose per-stage retry/error detail in generation telemetry if the pipeline needs production debugging.

@@ -56,6 +56,22 @@ enum BidirectionalSyncConflictPolicy: String, CaseIterable, Codable, Equatable, 
     }
 }
 
+enum SyncConflictRepairChoice: String, CaseIterable, Equatable, Identifiable {
+    case applySheetsValue = "apply_sheets_value"
+    case applyDatabaseValue = "apply_database_value"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .applySheetsValue:
+            return "Apply Google Sheets Value"
+        case .applyDatabaseValue:
+            return "Apply Local DB Value"
+        }
+    }
+}
+
 enum GenerationProgressStage: String, Equatable {
     case preparing = "Preparing"
     case normalizingFort = "Normalizing Fort Input"
@@ -300,6 +316,46 @@ struct ProgressSummary: Equatable {
         recentLoggedText: "Recent logs: 0",
         sourceText: "Source: Local DB cache"
     )
+}
+
+struct ProgressionInsight: Equatable, Identifiable {
+    let id: String
+    let exerciseName: String
+    let dayHint: String
+    let sessionCount: Int
+    let lastPrescription: String
+    let latestRPE: Double?
+    let rpeTrend: String
+    let loadTrend: String
+    let progressionSignal: String
+    let progressionReason: String
+    let recommendation: String
+
+    init(
+        id: String,
+        exerciseName: String,
+        dayHint: String,
+        sessionCount: Int,
+        lastPrescription: String,
+        latestRPE: Double?,
+        rpeTrend: String,
+        loadTrend: String,
+        progressionSignal: String,
+        progressionReason: String,
+        recommendation: String
+    ) {
+        self.id = id
+        self.exerciseName = exerciseName
+        self.dayHint = dayHint
+        self.sessionCount = sessionCount
+        self.lastPrescription = lastPrescription
+        self.latestRPE = latestRPE
+        self.rpeTrend = rpeTrend
+        self.loadTrend = loadTrend
+        self.progressionSignal = progressionSignal
+        self.progressionReason = progressionReason
+        self.recommendation = recommendation
+    }
 }
 
 struct WeeklyVolumePoint: Equatable, Identifiable {

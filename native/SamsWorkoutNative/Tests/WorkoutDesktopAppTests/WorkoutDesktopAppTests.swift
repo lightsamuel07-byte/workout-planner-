@@ -1,6 +1,7 @@
 import XCTest
 @testable import WorkoutDesktopApp
 import WorkoutIntegrations
+import WorkoutPersistence
 
 @MainActor
 final class WorkoutDesktopAppTests: XCTestCase {
@@ -17,6 +18,74 @@ final class WorkoutDesktopAppTests: XCTestCase {
 
         var storedConfig: NativeAppConfiguration {
             config
+        }
+    }
+
+    private struct TelemetryGateway: NativeAppGateway {
+        let telemetry: PipelineTelemetry
+
+        func initialRoute() -> AppRoute { .dashboard }
+        func loadDashboardDays() -> [DayPlanSummary] { [] }
+        func generatePlan(
+            input: PlanGenerationInput,
+            onProgress: ((GenerationProgressUpdate) -> Void)?
+        ) async throws -> String {
+            let _ = input
+            onProgress?(
+                GenerationProgressUpdate(
+                    stage: .selectingExercises,
+                    message: "Stage 1 complete.",
+                    inputTokens: 120,
+                    outputTokens: 45
+                )
+            )
+            onProgress?(
+                GenerationProgressUpdate(
+                    stage: .completed,
+                    message: "Generation complete.",
+                    inputTokens: telemetry.totalInputTokens,
+                    outputTokens: telemetry.totalOutputTokens
+                )
+            )
+            return "Generated test plan."
+        }
+        func loadExerciseHistory(exerciseName: String) -> [ExerciseHistoryPoint] {
+            let _ = exerciseName
+            return []
+        }
+        func dbStatusText() -> String { "ok" }
+        func latestBidirectionalSyncSummary() -> String { "" }
+        func loadRecentSyncAuditEvents(limit: Int) -> [PersistedSyncAuditEvent] {
+            let _ = limit
+            return []
+        }
+        func latestGenerationPipelineTelemetry() -> PipelineTelemetry? { telemetry }
+    }
+
+    private struct RepairGateway: NativeAppGateway {
+        func initialRoute() -> AppRoute { .dashboard }
+        func loadDashboardDays() -> [DayPlanSummary] { [] }
+        func generatePlan(
+            input: PlanGenerationInput,
+            onProgress: ((GenerationProgressUpdate) -> Void)?
+        ) async throws -> String {
+            let _ = input
+            let _ = onProgress
+            return "Generated test plan."
+        }
+        func loadExerciseHistory(exerciseName: String) -> [ExerciseHistoryPoint] {
+            let _ = exerciseName
+            return []
+        }
+        func dbStatusText() -> String { "ok" }
+        func latestBidirectionalSyncSummary() -> String { "" }
+        func loadRecentSyncAuditEvents(limit: Int) -> [PersistedSyncAuditEvent] {
+            let _ = limit
+            return []
+        }
+        func repairSyncConflict(event: PersistedSyncAuditEvent, choice: SyncConflictRepairChoice) async throws -> String {
+            let selectedSide = choice == .applySheetsValue ? "Google Sheets" : "Local DB"
+            return "Applied \(selectedSide) value for \(event.exerciseName) row \(event.sourceRow)."
         }
     }
 
@@ -89,6 +158,112 @@ final class WorkoutDesktopAppTests: XCTestCase {
         }
         XCTAssertEqual(coordinator.generationStage, .completed)
         XCTAssertFalse(coordinator.generationProgressLog.isEmpty)
+    }
+
+    func testGenerationCapturesLatestPipelineTelemetry() async {
+        var telemetry = PipelineTelemetry()
+        telemetry.pipelineMode = .staged
+        telemetry.stages = [
+            PipelineTelemetry.StageMetrics(
+                stageName: "exercise_selection",
+                inputTokens: 120,
+                outputTokens: 45,
+                durationMs: 800,
+                promptChars: 900
+            ),
+            PipelineTelemetry.StageMetrics(
+                stageName: "plan_synthesis",
+                inputTokens: 1800,
+                outputTokens: 3200,
+                durationMs: 12000,
+                promptChars: 4200
+            ),
+        ]
+
+        let coordinator = AppCoordinator(
+            gateway: TelemetryGateway(telemetry: telemetry),
+            configStore: TestConfigStore()
+        )
+        coordinator.generationInput.monday = "MONDAY\nIGNITION\nDeadbug"
+        coordinator.generationInput.wednesday = "WEDNESDAY\nPREP\nHip Airplane"
+        coordinator.generationInput.friday = "FRIDAY\nIGNITION\nMcGill Big-3"
+        coordinator.setupState.anthropicAPIKey = "key"
+        coordinator.setupState.spreadsheetID = "1S9Bh_f69Hgy4iqgtqT9F-t1CR6eiN9e6xJecyHyDBYU"
+        coordinator.setupState.googleAuthHint = "/tmp/token.json"
+
+        await coordinator.runGeneration()
+
+        XCTAssertEqual(coordinator.latestGenerationTelemetry?.pipelineMode, .staged)
+        XCTAssertEqual(coordinator.latestGenerationTelemetry?.totalTokens, 5165)
+        XCTAssertTrue(coordinator.latestGenerationTelemetry?.summary.contains("exercise_selection") == true)
+    }
+
+    func testSelectedExerciseValidationFlagsMissingDaysLowCountsAndCrossDayDuplicates() {
+        let issues = LiveAppGateway.testValidateSelectedExercises([
+            "TUESDAY": ["DB Hammer Curl", "Incline Walk", "McGill Big-3"],
+            "THURSDAY": ["DB Hammer Curl", "Cable Curl", "Incline Walk", "McGill Big-3"],
+        ])
+
+        XCTAssertTrue(issues.contains("Missing Saturday exercise list."))
+        XCTAssertTrue(issues.contains("Tuesday has 3 exercises; minimum 5 required."))
+        XCTAssertTrue(issues.contains("Thursday has 4 exercises; minimum 5 required."))
+        XCTAssertTrue(issues.contains("DB Hammer Curl appears on both Tuesday and Thursday."))
+    }
+
+    func testManualConflictRepairDecisionPushesDatabaseValueToSheets() {
+        let decision = LiveAppGateway.testManualConflictRepairDecision(
+            currentSheetLog: "Done | RPE 8",
+            currentDBLog: "Done | RPE 9",
+            choice: .applyDatabaseValue
+        )
+
+        XCTAssertEqual(decision.resolvedLog, "Done | RPE 9")
+        XCTAssertEqual(decision.resolution, "manual_repair_to_db")
+        XCTAssertTrue(decision.didPushToSheets)
+        XCTAssertFalse(decision.didPullToDB)
+        XCTAssertTrue(decision.shouldWriteAudit)
+    }
+
+    func testManualConflictRepairDecisionSkipsWhenStoresAlreadyMatch() {
+        let decision = LiveAppGateway.testManualConflictRepairDecision(
+            currentSheetLog: "Done | RPE 8.5",
+            currentDBLog: "Done | RPE 8.5",
+            choice: .applySheetsValue
+        )
+
+        XCTAssertEqual(decision.resolvedLog, "Done | RPE 8.5")
+        XCTAssertEqual(decision.resolution, "manual_repair_to_sheet")
+        XCTAssertFalse(decision.didPushToSheets)
+        XCTAssertFalse(decision.didPullToDB)
+        XCTAssertFalse(decision.shouldWriteAudit)
+    }
+
+    func testRunSyncConflictRepairUpdatesStatus() async {
+        let coordinator = AppCoordinator(
+            gateway: RepairGateway(),
+            configStore: TestConfigStore()
+        )
+        let event = PersistedSyncAuditEvent(
+            syncRunID: "run-1",
+            sheetName: "Weekly Plan (3/2/2026)",
+            dayLabel: "Thursday 3/5",
+            sourceRow: 9,
+            exerciseName: "Cable Lateral Raise",
+            sheetLog: "Done | RPE 8.5",
+            dbLog: "Done | RPE 9",
+            resolvedLog: "Done | RPE 9",
+            resolution: "conflict_resolved_to_db",
+            conflictPolicy: "prefer_database",
+            didPushToSheets: true,
+            didPullToDB: false,
+            countsAsConflict: true
+        )
+
+        await coordinator.runSyncConflictRepair(event: event, choice: .applyDatabaseValue)
+
+        XCTAssertTrue(coordinator.bidirectionalSyncStatus.contains("Applied Local DB value"))
+        XCTAssertNil(coordinator.repairingSyncAuditEventID)
+        XCTAssertNotNil(coordinator.lastBidirectionalSyncAt)
     }
 
     func testRunBidirectionalSyncNowUpdatesStatus() async {
