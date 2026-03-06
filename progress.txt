@@ -23,11 +23,16 @@ Built this session:
 - Fixed the default native build-script hang:
   - root cause was SwiftPM triggering `git status` inside `GRDB.swift`, which descended into the `SQLiteCustom/src` submodule and hung on status refresh
   - `native/SamsWorkoutNative/scripts/build_local_app.sh` now preconfigures the GRDB checkout to ignore that submodule for status scans before `swift build`
+- Added `native/SamsWorkoutNative/scripts/doctor_build_checkout.sh`:
+  - safely removes stale generated checkout lock/index artifacts in `.build/checkouts/GRDB.swift`
+  - refuses cleanup while related build/status processes are active unless `--force` is supplied
+  - verifies both `GRDB.swift` and `SQLiteCustom/src` status after cleanup
 
 Verification:
 - `swift test --scratch-path /tmp/samsworkoutnative-swiftpm-20260306 -v` passed: 187 tests, 3 skipped, 0 failures.
 - Equivalent release build completed and regenerated `native/SamsWorkoutNative/dist/SamsWorkoutNative.app`.
 - `bash scripts/build_local_app.sh` passed end-to-end after the GRDB submodule-status fix.
+- `bash scripts/doctor_build_checkout.sh` passed and confirmed clean GRDB + `SQLiteCustom/src` generated checkout state.
 
 Implementation plan phase mapping:
 - Phase 0 (Canonical Native Documentation): completed realignment for the active native app track.
