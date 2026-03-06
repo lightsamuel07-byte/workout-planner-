@@ -13,9 +13,24 @@ RESOURCES_DIR="$BUNDLE_DIR/Contents/Resources"
 PLIST_PATH="$BUNDLE_DIR/Contents/Info.plist"
 BIN_PATH="$ROOT_DIR/.build/release/WorkoutDesktopApp"
 
+ensure_grdb_checkout_status_fast() {
+    local grdb_checkout="$ROOT_DIR/.build/checkouts/GRDB.swift"
+
+    if [ ! -d "$grdb_checkout/.git" ]; then
+        swift package resolve
+    fi
+
+    if [ -d "$grdb_checkout/.git" ]; then
+        # GRDB vendors SQLite as a git submodule. Ignoring that submodule for
+        # status scans prevents SwiftPM from hanging in git status during build.
+        git -C "$grdb_checkout" config submodule.SQLiteCustom/src.ignore all || true
+    fi
+}
+
 mkdir -p "$DIST_DIR"
 rm -rf "$BUNDLE_DIR"
 
+ensure_grdb_checkout_status_fast
 swift build -c release --product WorkoutDesktopApp
 
 mkdir -p "$MACOS_DIR" "$RESOURCES_DIR"
